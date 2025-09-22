@@ -27,6 +27,7 @@ pub(crate) enum OperatorToken {
     Minus,
     Multiply,
     Divide,
+    Modulo,
     Power,
     Not,
     And,

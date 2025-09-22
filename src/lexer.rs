@@ -1,4 +1,4 @@
-use std::{convert::Infallible, str::FromStr};
+use std::str::FromStr;
 
 use derive_more::IntoIterator;
 
@@ -258,6 +258,7 @@ impl Default for Tokenizer {
             .with_rule(PatternRule::new("-".into(), Operator(Minus)))
             .with_rule(PatternRule::new("*".into(), Operator(Multiply)))
             .with_rule(PatternRule::new("/".into(), Operator(Divide)))
+            .with_rule(PatternRule::new("%".into(), Operator(Modulo)))
             .with_rule(PatternRule::new("=".into(), Operator(Assignment)))
             .with_rule(PatternRule::new("^".into(), Operator(Power)))
             .with_rule(PatternRule::new(",".into(), Punctuation(Comma)))

@@ -8,7 +8,7 @@ use num::traits::identities;
 use crate::runtime::expressions::{Expression};
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Null,
     Integer(i64),
@@ -43,7 +43,7 @@ impl Expression for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Object { //TODO: Remove public visibility
     pub class_id: String,
     pub members: HashMap<String, Value>,
@@ -151,32 +151,7 @@ impl Scope {
         self.members.remove(identifier);
     }
 
-}
-
-pub struct Environment { //TODO: Remove public visibility
-    pub procedures: Rc<HashMap<String, Box<dyn Procedure>>>,
-    pub scope: Scope,
-}
-
-impl Environment {
-    pub fn new() -> Self {
-        Self { procedures: Rc::new(HashMap::new()), scope: Scope::new() }
-    }
-
-    pub fn get_procedure_by_id(&self, id: &String) -> Result<&Box<dyn Procedure>, RuntimeError> {
-        self.procedures.get(id).ok_or(RuntimeError { message: format!("Could not find procedure labeled \"{}\"", id) })
-    }
-
-    pub fn clone_with_scope(&self, new_scope: Scope) -> Self {
-        Self {
-            procedures: self.procedures.clone(),
-            scope: new_scope,
-        }
-    }
-
-    pub fn lookup_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
-        let address = address.try_bake(self)?;
-        
+    fn get_variable(&self, address: BakedScopeAddress) -> Result<&Value, RuntimeError> {
         let mut addressants = address.unpack().into_iter();
 
         let first_addressant = addressants.next()
@@ -194,7 +169,7 @@ impl Environment {
             }
         };
         
-        let mut value = self.scope.members.get(&first_identifier)
+        let mut value = self.members.get(&first_identifier)
             .ok_or(RuntimeError{
                 message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
             })?;
@@ -238,13 +213,10 @@ impl Environment {
             }
         }
 
-        Ok(value.clone())
+        Ok(value)
     }
 
-    
-    pub fn set_variable(&mut self, address: ScopeAddress, new_value: Value) -> Result<(), RuntimeError> {
-        let address = address.try_bake(self)?;
-
+    fn get_variable_mut(&mut self, address: BakedScopeAddress) -> Result<&mut Value, RuntimeError> {
         let mut addressants = address.unpack().into_iter();
 
         let first_addressant = addressants.next()
@@ -262,7 +234,7 @@ impl Environment {
             }
         };
         
-        let mut value = self.scope.members.get_mut(&first_identifier)
+        let mut value = self.members.get_mut(&first_identifier)
             .ok_or(RuntimeError{
                 message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
             })?;
@@ -287,14 +259,15 @@ impl Environment {
                 },
                 ScopeAddressant::Index(idx) => {
                     if let Value::Array(ref mut arr) = value {
-
                         let array_length = arr.len();
 
-                        value = arr
+                        let new_value = arr
                             .get_mut(idx)
                             .ok_or(RuntimeError{
                                 message: format!("Index out of bounds: index was {}, array length was {}!", idx, array_length)
                             })?;
+
+                        value = new_value;
                     } else {
                         Err(RuntimeError{
                             message: "This value can not be indexed!".into()
@@ -306,6 +279,46 @@ impl Environment {
                 }
             }
         }
+
+        Ok(value)
+    }
+
+}
+
+pub struct Environment { //TODO: Remove public visibility
+    pub procedures: Rc<HashMap<String, Box<dyn Procedure>>>,
+    pub scope: Scope,
+}
+
+impl Environment {
+    pub fn new() -> Self {
+        Self { procedures: Rc::new(HashMap::new()), scope: Scope::new() }
+    }
+
+    pub fn get_procedure_by_id(&self, id: &String) -> Result<&Box<dyn Procedure>, RuntimeError> {
+        self.procedures.get(id).ok_or(RuntimeError { message: format!("Could not find procedure labeled \"{}\"", id) })
+    }
+
+    pub fn clone_with_scope(&self, new_scope: Scope) -> Self {
+        Self {
+            procedures: self.procedures.clone(),
+            scope: new_scope,
+        }
+    }
+
+    pub fn lookup_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
+        let address = address.try_bake(self)?;
+        
+        let value = self.scope.get_variable(address)?;
+
+        Ok(value.clone())
+    }
+
+    
+    pub fn set_variable(&mut self, address: ScopeAddress, new_value: Value) -> Result<(), RuntimeError> {
+        let address = address.try_bake(self)?;
+
+        let value = self.scope.get_variable_mut(address)?;
 
         *value = new_value;
 
