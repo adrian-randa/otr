@@ -1,4 +1,6 @@
-use crate::runtime::{Environment, RuntimeError, ScopeAddress, Value};
+use std::cell::RefCell;
+
+use crate::runtime::{Environment, ModuleAddress, RuntimeError, Scope, ScopeAddress, Value};
 
 
 pub trait Expression {
@@ -8,13 +10,13 @@ pub trait Expression {
 
 
 pub struct ProcedureCallExpression { //TODO: Remove public visibility
-    pub procedure_id: String,
+    pub procedure_id: ModuleAddress,
     pub arguments: Vec<Box<dyn Expression>>
 }
 
 impl Expression for ProcedureCallExpression {
     fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
-        let procedure = environment.get_procedure_by_id(&self.procedure_id)?;
+        let procedure = environment.get_procedure_by_address(&self.procedure_id)?;
         
         let mut arguments = Vec::with_capacity(self.arguments.len());
         for eval_result in self.arguments
@@ -24,6 +26,9 @@ impl Expression for ProcedureCallExpression {
             }) {
                 arguments.push(eval_result?);
             }
+        
+        let mut environment = environment.clone_with_scope(Scope::new());
+        environment.set_contained_module(self.procedure_id.get_module_id().into());
 
         Ok(procedure.call(environment, arguments)?)
     }
@@ -55,7 +60,7 @@ impl EqualityExpression {
 }
 
 impl Expression for EqualityExpression {
-    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;

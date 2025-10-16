@@ -1,10 +1,10 @@
 use std::{cell::RefCell, collections::HashMap, fs::read_to_string, rc::Rc};
 
-use otr::runtime::{expressions::{arithmetic::AddExpression, Expression, ProcedureCallExpression, VariableExpression}, procedures::{CompiledProcedure, Instruction, Procedure}, Environment, Object, Scope, ScopeAddressant, Value};
+use otr::runtime::{expressions::{arithmetic::AddExpression, Expression, ProcedureCallExpression, VariableExpression}, procedures::{CompiledProcedure, Instruction, Procedure}, Environment, Module, Scope, ScopeAddressant, Struct, Value};
 
 fn main() {
     
-    let mut environment = Environment::new();
+    let mut environment = Environment::new("not_main".into());
 
     let test_proc = CompiledProcedure {
         arguments_identifiers: vec![],
@@ -42,15 +42,17 @@ fn main() {
         ]
     };
 
+    let mut module = Module::default();
+
+    module.insert_procedure("test_proc".into(), Box::new(test_proc), false);
+
     let expr = ProcedureCallExpression {
-        procedure_id: "test_proc".into(),
+        procedure_id: ("main", "test_proc").into(),
         arguments: vec![],
     };
 
-    {
-        let procedures = Rc::get_mut(&mut environment.procedures).unwrap();
-        procedures.insert("test_proc".into(), Box::new(test_proc));
-    }
+    environment.load_module("main".into(), Rc::new(module));
+
 
     let returned = expr.eval(&environment);
 

@@ -4,7 +4,7 @@ use crate::runtime::{expressions::Expression, Environment, RuntimeError, Scope, 
 
 
 pub trait Procedure {
-    fn call(&self, environment: &Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError>;
+    fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
 
@@ -35,14 +35,14 @@ pub struct CompiledProcedure { //TODO: Remove public visibility
 }
 
 impl Procedure for CompiledProcedure {
-    fn call(&self, environment: &Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(&self, mut environment: Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError> {
         let members = HashMap::from_iter(self.arguments_identifiers
             .clone()
             .into_iter()
             .zip(arguments.into_iter())
         );
 
-        let mut environment = environment.clone_with_scope(Scope::from_members(members));
+        environment.insert_members(members);
 
         let mut pc = 0;
 

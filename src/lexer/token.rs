@@ -18,6 +18,8 @@ pub(crate) enum KeywordToken {
     While,
     Continue,
     Break,
+    Module,
+    Export,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +51,7 @@ pub(crate) enum PunctuationToken {
     CurlyBraces(ParenthesisType),
     Comma,
     Dot,
+    DoubleColon,
     Semicolon,
     At,
 }

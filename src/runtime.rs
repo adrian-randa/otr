@@ -1,12 +1,19 @@
 use std::cell::{Cell, RefCell};
+use std::fmt::Display;
+use std::ops::Deref;
 use std::vec::IntoIter;
 use std::{collections::HashMap, rc::Rc};
 
-use derive_more::Deref;
+use derive_more::{Deref, IntoIterator};
 use num::traits::identities;
 
 use crate::runtime::expressions::{Expression};
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
+
+#[derive(Debug)]
+pub struct RuntimeError {
+    message: String,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -17,7 +24,7 @@ pub enum Value {
     Char(char),
     Bool(bool),
     Array(Vec<Value>),
-    Object(Object)
+    Struct(Struct)
 }
 
 impl Value {
@@ -31,7 +38,7 @@ impl Value {
             Value::Char(_) => "Char".into(),
             Value::Bool(_) => "Bool".into(),
             Value::Array(_) => "Array".into(),
-            Value::Object(object) => object.class_id.clone()
+            Value::Struct(object) => object.get_struct_id().to_string()
         }
     }
 
@@ -44,18 +51,200 @@ impl Expression for Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Object { //TODO: Remove public visibility
-    pub class_id: String,
-    pub members: HashMap<String, Value>,
+struct Member {
+    is_private: bool,
+    value: Value,
 }
 
-#[derive(Debug)]
-pub struct RuntimeError {
-    message: String,
+impl From<(bool, Value)> for Member {
+    fn from((is_private, value): (bool, Value)) -> Self {
+        Self { is_private, value }
+    }
+}
+
+impl Member {
+    pub fn get_value(&self) -> &Value {
+        &self.value
+    }
+
+    pub fn get_value_mut(&mut self) -> &mut Value {
+        &mut self.value
+    }
+
+    pub fn get_value_if_public(&self) -> Result<&Value, RuntimeError> {
+        if self.is_private {
+            Err(RuntimeError { message: "Tried to access a private field!".into() })
+        } else {
+            Ok(&self.value)
+        }
+    }
+
+    pub fn get_value_mut_if_public(&mut self) -> Result<&mut Value, RuntimeError> {
+        if self.is_private {
+            Err(RuntimeError { message: "Tried to access a private field!".into() })
+        } else {
+            Ok(&mut self.value)
+        }
+    }
+
+    pub fn set_value(&mut self, value: Value) {
+        self.value = value;
+    }
+
+    pub fn set_if_public(&mut self, value: Value) -> Result<(), RuntimeError> {
+        if self.is_private {
+            Err(RuntimeError { message: "Tried to access a private field!".into() })
+        } else {
+            self.value = value;
+            Ok(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemberMap {
+    members: HashMap<String, Member>
+}
+
+impl MemberMap {
+
+    pub fn get_member(&self, ident: &String) -> Result<&Value, RuntimeError> {
+        let member = self.members.get(ident).ok_or(RuntimeError {
+            message: format!("No member labeled \"{}\"!", ident)
+        })?;
+
+        Ok(member.get_value())
+    }
+
+    pub fn get_member_mut(&mut self, ident: &String) -> Result<&mut Value, RuntimeError> {
+        let member = self.members.get_mut(ident).ok_or(RuntimeError {
+            message: format!("No member labeled \"{}\"!", ident)
+        })?;
+
+        Ok(member.get_value_mut())
+    }
+
+    pub fn get_public_member(&self, ident: &String) -> Result<&Value, RuntimeError> {
+        let member = self.members.get(ident).ok_or(RuntimeError {
+            message: format!("No member labeled \"{}\"!", ident)
+        })?;
+
+        member.get_value_if_public()
+    }
+
+    pub fn get_public_member_mut(&mut self, ident: &String) -> Result<&mut Value, RuntimeError> {
+        let member = self.members.get_mut(ident).ok_or(RuntimeError {
+            message: format!("No member labeled \"{}\"!", ident)
+        })?;
+
+        member.get_value_mut_if_public()
+    }
+
+    pub fn set_member(&mut self, ident: &String, value: Value) -> Result<(), RuntimeError> {
+        let member = self.members.get_mut(ident).ok_or(RuntimeError {
+            message: format!("No member labeled \"{}\"!", ident)
+        })?;
+
+        member.set_if_public(value)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ModuleAddress {
+    module_id: String,
+    identifier: String,
+}
+
+impl From<(&str, &str)> for ModuleAddress {
+    fn from(value: (&str, &str)) -> Self {
+        Self {
+            module_id: value.0.to_string(),
+            identifier: value.1.to_string()
+        }
+    }
+}
+
+impl Display for ModuleAddress {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}::{}", self.module_id, self.identifier)
+    }
+}
+
+impl ModuleAddress {
+    pub fn new(module_id: String, identifier: String) -> Self {
+        Self { module_id, identifier }
+    }
+
+    pub fn get_module_id(&self) -> &String {
+        &self.module_id
+    }
+
+    pub fn get_identifier(&self) -> &String {
+        &self.identifier
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Struct { //TODO: Remove public visibility
+    pub struct_id: ModuleAddress,
+    pub members: MemberMap,
+}
+
+impl Struct {
+    pub fn get_struct_id(&self) -> &ModuleAddress {
+        &self.struct_id
+    }
+
+    pub fn get_members(&self) -> &MemberMap {
+        &self.members
+    }
+
+    pub fn get_members_mut(&mut self) -> &mut MemberMap {
+        &mut self.members
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct StructPrototype {
+    members: MemberMap,
+}
+
+impl StructPrototype {
+    pub fn construct(&self) -> Self {
+        self.clone()
+    }
 }
 
 pub mod expressions;
 pub mod procedures;
+
+#[derive(Default)]
+pub struct Module {
+    struct_prototypes: HashMap<String, (StructPrototype, bool)>,
+    procedures: HashMap<String, (Box<dyn Procedure>, bool)>,
+}
+
+impl Module {
+
+    pub fn insert_procedure(&mut self, identifier: String, procedure: Box<dyn Procedure>, exported: bool) {
+        self.procedures.insert(identifier, (procedure, exported));
+    }
+
+    pub fn get_procedure(&self, identifier: &String, private_access: bool) -> Result<&Box<dyn Procedure>, RuntimeError> {
+        match self.procedures.get(identifier) {
+            Some((proc, exported)) => if *exported || private_access {
+                Ok(proc)
+            } else {
+                Err(RuntimeError {
+                message: format!("Procedure \"{}\" is not exported by this module!", identifier)
+            })
+            }
+            None => Err(RuntimeError {
+                message: format!("Procedure \"{}\" not defined in this module!", identifier)
+            })
+        }
+    }
+}
 
 
 #[derive(Clone)]
@@ -65,7 +254,7 @@ pub enum ScopeAddressant {
     DynamicIndex(Rc<dyn Expression>),
 }
 
-#[derive(Clone, Deref)]
+#[derive(Clone)]
 pub struct ScopeAddress(Vec<ScopeAddressant>);
 
 impl From<Vec<ScopeAddressant>> for ScopeAddress {
@@ -75,10 +264,6 @@ impl From<Vec<ScopeAddressant>> for ScopeAddress {
 }
 
 impl ScopeAddress {
-
-    pub fn new(address: Vec<ScopeAddressant>) -> Self {
-        Self(address)
-    }
 
     fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress, RuntimeError> {
         let mut out = Vec::with_capacity(self.0.len());
@@ -117,42 +302,38 @@ impl ScopeAddress {
 
 }
 
-#[derive(Deref)]
+#[derive(Deref, IntoIterator)]
 struct BakedScopeAddress(Vec<ScopeAddressant>);
 
-impl BakedScopeAddress {
-
-    fn unpack(self) -> Vec<ScopeAddressant> {
-        self.0
-    }
-
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Scope { //TODO: Remove public visibility
-    pub members: HashMap<String, Value>,
+    pub variables: HashMap<String, Value>,
 }
 
 impl Scope {
 
     pub fn new() -> Self {
-        Self { members: HashMap::new() }
+        Self { variables: HashMap::new() }
     }
 
     pub fn from_members(members: HashMap<String, Value>) -> Self {
-        Self { members }
+        Self { variables: members }
+    }
+
+    pub fn insert_members(&mut self, members: HashMap<String, Value>) {
+        self.variables.extend(members);
     }
 
     pub fn push(&mut self, identifier: String) {
-        self.members.insert(identifier, Value::Null);
+        self.variables.insert(identifier, Value::Null);
     }
 
     pub fn pop(&mut self, identifier: &String) {
-        self.members.remove(identifier);
+        self.variables.remove(identifier);
     }
 
-    fn get_variable(&self, address: BakedScopeAddress) -> Result<&Value, RuntimeError> {
-        let mut addressants = address.unpack().into_iter();
+    fn get_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<&Value, RuntimeError> {
+        let mut addressants = address.into_iter();
 
         let first_addressant = addressants.next()
             .ok_or(RuntimeError{
@@ -169,7 +350,7 @@ impl Scope {
             }
         };
         
-        let mut value = self.members.get(&first_identifier)
+        let mut value = self.variables.get(&first_identifier)
             .ok_or(RuntimeError{
                 message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
             })?;
@@ -177,15 +358,14 @@ impl Scope {
         for subaddressant in addressants {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
-                    if let Value::Object(ref obj) = value {
-                        let new_value = obj
-                            .members
-                            .get(&ident)
-                            .ok_or(RuntimeError {
-                                message: format!("Object does not have a member labeled \"{}\"!", ident)
+                    if let Value::Struct(ref obj) = value {
+                        if obj.get_struct_id().get_module_id() != contained_module_id {
+                            Err(RuntimeError{
+                                message: format!("Tried to access field \"{}\" of {} outside it's module!", ident, obj.get_struct_id())
                             })?;
+                        }
 
-                        value = new_value;
+                        value = obj.get_members().get_public_member(&ident)?;
                     } else {
                         Err(RuntimeError{
                             message: format!("This variable does not have a member labeled \"{}\"!", ident)
@@ -216,8 +396,8 @@ impl Scope {
         Ok(value)
     }
 
-    fn get_variable_mut(&mut self, address: BakedScopeAddress) -> Result<&mut Value, RuntimeError> {
-        let mut addressants = address.unpack().into_iter();
+    fn get_variable_mut(&mut self, address: BakedScopeAddress, contained_module_id: &String) -> Result<&mut Value, RuntimeError> {
+        let mut addressants = address.into_iter();
 
         let first_addressant = addressants.next()
             .ok_or(RuntimeError{
@@ -234,7 +414,7 @@ impl Scope {
             }
         };
         
-        let mut value = self.members.get_mut(&first_identifier)
+        let mut value = self.variables.get_mut(&first_identifier)
             .ok_or(RuntimeError{
                 message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
             })?;
@@ -242,15 +422,14 @@ impl Scope {
         for subaddressant in addressants {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
-                    if let Value::Object(ref mut obj) = value {
-                        let new_value = obj
-                            .members
-                            .get_mut(&ident)
-                            .ok_or(RuntimeError {
-                                message: format!("Object does not have a member labeled \"{}\"!", ident)
+                    if let Value::Struct(ref mut obj) = value {
+                        if obj.get_struct_id().get_module_id() != contained_module_id {
+                            Err(RuntimeError{
+                                message: format!("Tried to access field \"{}\" of {} outside it's module!", ident, obj.get_struct_id())
                             })?;
+                        }
 
-                        value = new_value;
+                        value = obj.get_members_mut().get_public_member_mut(&ident)?;
                     } else {
                         Err(RuntimeError{
                             message: format!("This variable does not have a member labeled \"{}\"!", ident)
@@ -286,30 +465,45 @@ impl Scope {
 }
 
 pub struct Environment { //TODO: Remove public visibility
-    pub procedures: Rc<HashMap<String, Box<dyn Procedure>>>,
+    pub contained_module_id: String,
+    pub loaded_modules: HashMap<String, Rc<Module>>,
     pub scope: Scope,
 }
 
 impl Environment {
-    pub fn new() -> Self {
-        Self { procedures: Rc::new(HashMap::new()), scope: Scope::new() }
+    pub fn new(contained_module_id: String) -> Self {
+        Self { contained_module_id, loaded_modules: Default::default(), scope: Default::default() }
     }
 
-    pub fn get_procedure_by_id(&self, id: &String) -> Result<&Box<dyn Procedure>, RuntimeError> {
-        self.procedures.get(id).ok_or(RuntimeError { message: format!("Could not find procedure labeled \"{}\"", id) })
+    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<&Box<dyn Procedure>, RuntimeError> {
+        let module = self.loaded_modules.get(address.get_module_id()).ok_or(RuntimeError{
+            message: format!("Module \"{}\" not loaded in this environment!", address.get_module_id())
+        })?;
+
+        module.get_procedure(address.get_identifier(), address.get_module_id() == &self.contained_module_id)
     }
 
     pub fn clone_with_scope(&self, new_scope: Scope) -> Self {
         Self {
-            procedures: self.procedures.clone(),
+            contained_module_id: self.contained_module_id.clone(),
+            loaded_modules: self.loaded_modules.clone(),
             scope: new_scope,
         }
+    }
+
+    //TODO: Refactor this sloppy mess. This function shouldnt need to exist
+    pub fn set_contained_module(&mut self, contained_module_id: String) {
+        self.contained_module_id = contained_module_id;
+    }
+
+    pub fn insert_members(&mut self, members: HashMap<String, Value>) {
+        self.scope.insert_members(members);
     }
 
     pub fn lookup_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
         let address = address.try_bake(self)?;
         
-        let value = self.scope.get_variable(address)?;
+        let value = self.scope.get_variable(address, &self.contained_module_id)?;
 
         Ok(value.clone())
     }
@@ -318,10 +512,22 @@ impl Environment {
     pub fn set_variable(&mut self, address: ScopeAddress, new_value: Value) -> Result<(), RuntimeError> {
         let address = address.try_bake(self)?;
 
-        let value = self.scope.get_variable_mut(address)?;
+        let value = self.scope.get_variable_mut(address, &self.contained_module_id)?;
 
         *value = new_value;
 
         Ok(())
+    }
+
+    pub fn get_variable_as_focused(&mut self, address: ScopeAddress) -> Result<RefCell<&mut Value>, RuntimeError> {
+        let address = address.try_bake(self)?;
+
+        let value_ref = self.scope.get_variable_mut(address, &self.contained_module_id)?;
+
+        Ok(RefCell::from(value_ref))
+    }
+
+    pub fn load_module(&mut self, module_identifier: String, module: Rc<Module>) {
+        self.loaded_modules.insert(module_identifier, module);
     }
 }
