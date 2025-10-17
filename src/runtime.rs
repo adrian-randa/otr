@@ -519,14 +519,6 @@ impl Environment {
         Ok(())
     }
 
-    pub fn get_variable_as_focused(&mut self, address: ScopeAddress) -> Result<RefCell<&mut Value>, RuntimeError> {
-        let address = address.try_bake(self)?;
-
-        let value_ref = self.scope.get_variable_mut(address, &self.contained_module_id)?;
-
-        Ok(RefCell::from(value_ref))
-    }
-
     pub fn load_module(&mut self, module_identifier: String, module: Rc<Module>) {
         self.loaded_modules.insert(module_identifier, module);
     }
