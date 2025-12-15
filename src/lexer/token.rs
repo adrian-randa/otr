@@ -1,5 +1,7 @@
-#[derive(Debug, Clone)]
-pub(crate) enum Token {
+use derive_more::IntoIterator;
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Token {
     Keyword(KeywordToken),
     Operator(OperatorToken),
     Punctuation(PunctuationToken),
@@ -7,8 +9,8 @@ pub(crate) enum Token {
     Literal(LiteralToken),
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum KeywordToken {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeywordToken {
     Let,
     Const,
     Proc,
@@ -22,8 +24,8 @@ pub(crate) enum KeywordToken {
     Export,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum OperatorToken {
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum OperatorToken {
     Assignment,
     Plus,
     Minus,
@@ -38,32 +40,33 @@ pub(crate) enum OperatorToken {
     Inequality,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum ParenthesisType {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParenthesisType {
     Opening,
-    Closing
+    Closing,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum PunctuationToken {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PunctuationToken {
     Parenthesis(ParenthesisType),
     SquareBrackets(ParenthesisType),
     CurlyBraces(ParenthesisType),
     Comma,
     Dot,
+    Colon,
     DoubleColon,
     Semicolon,
     At,
 }
 
-#[derive(Debug, Clone)]
-pub(crate) enum LiteralToken {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LiteralToken {
     WholeNumber(String),
     Decimal(String),
     Boolean(String),
     Char(String),
-    String(String)
+    String(String),
 }
 
-#[derive(Debug)]
-pub struct TokenStream(pub(crate) Vec<Token>);
+#[derive(Debug, IntoIterator)]
+pub struct TokenStream(pub Vec<Token>);

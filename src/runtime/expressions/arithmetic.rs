@@ -1,5 +1,6 @@
 use crate::runtime::{expressions::Expression, Environment, RuntimeError};
 
+#[derive(Debug)]
 pub struct AddExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
@@ -19,7 +20,6 @@ impl Expression for AddExpression {
         let rhs = self.rhs.eval(environment)?;
 
         match (lhs, rhs) {
-
             (Integer(l), Integer(r)) => Ok(Integer(l + r)),
             (Float(l), Float(r)) => Ok(Float(l + r)),
 
@@ -30,12 +30,14 @@ impl Expression for AddExpression {
             (Integer(l), String(r)) => Ok(String(l.to_string() + &r)),
             (Float(l), String(r)) => Ok(String(l.to_string() + &r)),
 
-            (l, r) => Err(RuntimeError { message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()) })
+            (l, r) => Err(RuntimeError {
+                message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
+            }),
         }
     }
 }
 
-
+#[derive(Debug)]
 pub struct SubtractExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
@@ -59,14 +61,17 @@ impl Expression for SubtractExpression {
             (Float(l), Float(r)) => Ok(Float(l - r)),
 
             (l, r) => Err(RuntimeError {
-                message: format!("Cannot subtract {} and {}!", l.get_type_id(), r.get_type_id())
-            })
+                message: format!(
+                    "Cannot subtract {} and {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
         }
     }
 }
 
-
-
+#[derive(Debug)]
 pub struct MultiplyExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
@@ -90,14 +95,17 @@ impl Expression for MultiplyExpression {
             (Float(l), Float(r)) => Ok(Float(l * r)),
 
             (l, r) => Err(RuntimeError {
-                message: format!("Cannot multiply {} and {}!", l.get_type_id(), r.get_type_id())
-            })
+                message: format!(
+                    "Cannot multiply {} and {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
         }
     }
 }
 
-
-
+#[derive(Debug)]
 pub struct DivideExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
@@ -121,13 +129,17 @@ impl Expression for DivideExpression {
             (Float(l), Float(r)) => Ok(Float(l / r)),
 
             (l, r) => Err(RuntimeError {
-                message: format!("Cannot subtract {} and {}!", l.get_type_id(), r.get_type_id())
-            })
+                message: format!(
+                    "Cannot subtract {} and {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
         }
     }
 }
 
-
+#[derive(Debug)]
 pub struct PowerExpression {
     base: Box<dyn Expression>,
     exponent: Box<dyn Expression>,
@@ -148,27 +160,27 @@ impl Expression for PowerExpression {
 
         match (base, exponent) {
             (Integer(l), Integer(r)) => Ok(Integer(
-                l.checked_pow(
-                    r.try_into().map_err(|_| RuntimeError { message:
-                        "Could not compute power; the exponent was too large!".into()
-                    })?
-                ).ok_or(RuntimeError {
-                    message: "Overflow occured while computing power!".into()
-                })?
+                l.checked_pow(r.try_into().map_err(|_| RuntimeError {
+                    message: "Could not compute power; the exponent was too large!".into(),
+                })?)
+                .ok_or(RuntimeError {
+                    message: "Overflow occured while computing power!".into(),
+                })?,
             )),
-            (Float(l), Float(r)) => Ok(Float(
-                l.powf(r)
-            )),
+            (Float(l), Float(r)) => Ok(Float(l.powf(r))),
 
             (l, r) => Err(RuntimeError {
-                message: format!("Cannot subtract {} and {}!", l.get_type_id(), r.get_type_id())
-            })
+                message: format!(
+                    "Cannot subtract {} and {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
         }
     }
 }
 
-
-
+#[derive(Debug)]
 pub struct ModuloExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
@@ -192,8 +204,12 @@ impl Expression for ModuloExpression {
             (Float(l), Float(r)) => Ok(Float(l.rem_euclid(r))),
 
             (l, r) => Err(RuntimeError {
-                message: format!("Cannot subtract {} and {}!", l.get_type_id(), r.get_type_id())
-            })
+                message: format!(
+                    "Cannot subtract {} and {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
         }
     }
 }

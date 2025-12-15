@@ -9,5 +9,7 @@ module MAIN {
         let c = a + b;
     }
 
-    exports main;
+    let f = foo("Wah!");
+
+    export main;
 }

@@ -2,10 +2,16 @@ use std::str::FromStr;
 
 use derive_more::IntoIterator;
 
-use crate::lexer::{rules::{BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule, PatternRule, StringLiteralRule}, token::{Token, TokenStream}};
+use crate::lexer::{
+    rules::{
+        BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
+        PatternRule, StringLiteralRule,
+    },
+    token::{Token, TokenStream},
+};
 
-pub(crate) mod token;
-pub(crate) mod rules;
+pub mod rules;
+pub mod token;
 
 #[derive(Debug, IntoIterator)]
 pub struct FragmentStream(Vec<String>);
@@ -19,7 +25,6 @@ impl FromStr for FragmentStream {
     type Err = FragmentationError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-
         let mut stream = Vec::new();
 
         #[derive(Debug, PartialEq)]
@@ -32,13 +37,13 @@ impl FromStr for FragmentStream {
         impl From<char> for CharKind {
             fn from(value: char) -> Self {
                 if value.is_ascii_alphabetic() {
-                    return Self::Alphabetic
+                    return Self::Alphabetic;
                 }
                 if value.is_numeric() {
-                    return Self::Numeric
+                    return Self::Numeric;
                 }
                 if value.is_ascii_punctuation() {
-                    return Self::Punctuation
+                    return Self::Punctuation;
                 }
 
                 panic!("Unsupported char kind");
@@ -96,7 +101,7 @@ impl FromStr for FragmentStream {
                             '\\' => {
                                 current.push('\\');
                             }
-                            _ => return Err(FragmentationError::InvalidControlCharacter)
+                            _ => return Err(FragmentationError::InvalidControlCharacter),
                         }
                         i = i + 2;
                         continue;
@@ -115,7 +120,6 @@ impl FromStr for FragmentStream {
                 i += 1;
                 continue;
             }
-
 
             if c.is_ascii_whitespace() {
                 if current.is_empty() {
@@ -151,15 +155,21 @@ impl FromStr for FragmentStream {
             if !current.is_empty() {
                 use CharKind::*;
                 match (current_kind, next_char_kind) {
-                    (Alphabetic, Punctuation) |
-                    (Punctuation, Alphabetic) |
-                    (Numeric, Alphabetic) => {
+                    (Alphabetic, Punctuation)
+                    | (Punctuation, Alphabetic)
+                    | (Numeric, Alphabetic) => {
                         stream.push(current);
                         current = String::new();
                     }
+                    (Numeric, Punctuation) => {
+                        if c != '.' {
+                            stream.push(current);
+                            current = String::new();
+                        }
+                    }
 
                     _ => {}
-                }                
+                }
             }
 
             current_kind = c.into();
@@ -176,9 +186,7 @@ impl FromStr for FragmentStream {
 }
 
 #[derive(Debug)]
-pub enum TokenizeError {
-
-}
+pub enum TokenizeError {}
 
 trait TokenizerRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String);
@@ -189,7 +197,6 @@ pub struct Tokenizer {
 }
 
 impl Tokenizer {
-
     pub fn new() -> Self {
         Self { rules: vec![] }
     }
@@ -201,13 +208,13 @@ impl Tokenizer {
 
     pub fn tokenize(&self, fragments: FragmentStream) -> Result<TokenStream, TokenizeError> {
         let mut stream = Vec::new();
-        
+
         for mut frag in fragments {
             'scan: while !frag.is_empty() {
                 for rule in self.rules.iter() {
                     let token;
                     (token, frag) = rule.try_apply(frag);
-                    
+
                     if let Some(token) = token {
                         stream.push(token);
                         continue 'scan;
@@ -218,17 +225,16 @@ impl Tokenizer {
 
         Ok(TokenStream(stream))
     }
-
 }
 
 impl Default for Tokenizer {
     fn default() -> Self {
         use token::*;
-        use Token::*;
         use KeywordToken::*;
-        use PunctuationToken::*;
-        use ParenthesisType::*;
         use OperatorToken::*;
+        use ParenthesisType::*;
+        use PunctuationToken::*;
+        use Token::*;
 
         Self::new()
             .with_rule(KeywordRule::new("break".into(), Keyword(Break)))
@@ -242,19 +248,35 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("while".into(), Keyword(While)))
             .with_rule(KeywordRule::new("module".into(), Keyword(Module)))
             .with_rule(KeywordRule::new("export".into(), Keyword(Export)))
-
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
             .with_rule(PatternRule::new("||".into(), Operator(Or)))
             .with_rule(PatternRule::new("==".into(), Operator(Equality)))
             .with_rule(PatternRule::new("!=".into(), Operator(Inequality)))
             .with_rule(PatternRule::new("::".into(), Punctuation(DoubleColon)))
-
-            .with_rule(PatternRule::new("(".into(), Punctuation(Parenthesis(Opening))))
-            .with_rule(PatternRule::new(")".into(), Punctuation(Parenthesis(Closing))))
-            .with_rule(PatternRule::new("[".into(), Punctuation(SquareBrackets(Opening))))
-            .with_rule(PatternRule::new("]".into(), Punctuation(SquareBrackets(Closing))))
-            .with_rule(PatternRule::new("{".into(), Punctuation(CurlyBraces(Opening))))
-            .with_rule(PatternRule::new("}".into(), Punctuation(CurlyBraces(Closing))))
+            .with_rule(PatternRule::new(
+                "(".into(),
+                Punctuation(Parenthesis(Opening)),
+            ))
+            .with_rule(PatternRule::new(
+                ")".into(),
+                Punctuation(Parenthesis(Closing)),
+            ))
+            .with_rule(PatternRule::new(
+                "[".into(),
+                Punctuation(SquareBrackets(Opening)),
+            ))
+            .with_rule(PatternRule::new(
+                "]".into(),
+                Punctuation(SquareBrackets(Closing)),
+            ))
+            .with_rule(PatternRule::new(
+                "{".into(),
+                Punctuation(CurlyBraces(Opening)),
+            ))
+            .with_rule(PatternRule::new(
+                "}".into(),
+                Punctuation(CurlyBraces(Closing)),
+            ))
             .with_rule(PatternRule::new("@".into(), Punctuation(At)))
             .with_rule(PatternRule::new("!".into(), Operator(Not)))
             .with_rule(PatternRule::new("+".into(), Operator(Plus)))
@@ -266,8 +288,8 @@ impl Default for Tokenizer {
             .with_rule(PatternRule::new("^".into(), Operator(Power)))
             .with_rule(PatternRule::new(",".into(), Punctuation(Comma)))
             .with_rule(PatternRule::new(".".into(), Punctuation(Dot)))
+            .with_rule(PatternRule::new(":".into(), Punctuation(Colon)))
             .with_rule(PatternRule::new(";".into(), Punctuation(Semicolon)))
-
             .with_rule(NumberLiteralRule)
             .with_rule(StringLiteralRule)
             .with_rule(CharLiteralRule)

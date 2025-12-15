@@ -7,12 +7,23 @@ use std::{collections::HashMap, rc::Rc};
 use derive_more::{Deref, IntoIterator};
 use num::traits::identities;
 
-use crate::runtime::expressions::{Expression};
+use crate::compiler::CompilerError;
+use crate::lexer::token::LiteralToken;
+use crate::runtime::environment::Environment;
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
+
+pub mod environment;
+pub mod expressions;
+pub mod module;
+pub mod procedures;
 
 #[derive(Debug)]
 pub struct RuntimeError {
     message: String,
+}
+
+pub trait Expression: std::fmt::Debug {
+    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,11 +35,48 @@ pub enum Value {
     Char(char),
     Bool(bool),
     Array(Vec<Value>),
-    Struct(Struct)
+    Struct(Struct),
+}
+
+impl TryFrom<LiteralToken> for Value {
+    type Error = CompilerError;
+
+    fn try_from(value: LiteralToken) -> Result<Self, Self::Error> {
+        match value {
+            LiteralToken::WholeNumber(num) => {
+                Ok(Self::Integer(
+                    num.parse().map_err(|_| CompilerError {
+                        message: format!("Could not parse '{}' as a whole number!", num)
+                    })?
+                ))
+            },
+            LiteralToken::Decimal(num) => {
+                Ok(Self::Float(
+                    num.parse().map_err(|_| CompilerError {
+                        message: format!("Could not parse '{}' as a decimal number!", num)
+                    })?
+                ))
+            },
+            LiteralToken::Boolean(b) => {
+                match &b as &str {
+                    "true" => Ok(Self::Bool(true)),
+                    "false" => Ok(Self::Bool(false)),
+                    _ => Err(CompilerError { message: format!("Could not parse {} as a boolean!", b) })
+                }
+            },
+            LiteralToken::Char(c) => {
+                Ok(Self::Char(c.chars().next().ok_or(CompilerError {
+                    message: format!("Could not parse {} as a char!", c)
+                })?))
+            },
+            LiteralToken::String(str) => {
+                Ok(Self::String(str))
+            },
+        }
+    }
 }
 
 impl Value {
-
     pub fn get_type_id(&self) -> String {
         match self {
             Value::Null => "Null".into(),
@@ -38,10 +86,9 @@ impl Value {
             Value::Char(_) => "Char".into(),
             Value::Bool(_) => "Bool".into(),
             Value::Array(_) => "Array".into(),
-            Value::Struct(object) => object.get_struct_id().to_string()
+            Value::Struct(object) => object.get_struct_id().to_string(),
         }
     }
-
 }
 
 impl Expression for Value {
@@ -73,7 +120,9 @@ impl Member {
 
     pub fn get_value_if_public(&self) -> Result<&Value, RuntimeError> {
         if self.is_private {
-            Err(RuntimeError { message: "Tried to access a private field!".into() })
+            Err(RuntimeError {
+                message: "Tried to access a private field!".into(),
+            })
         } else {
             Ok(&self.value)
         }
@@ -81,7 +130,9 @@ impl Member {
 
     pub fn get_value_mut_if_public(&mut self) -> Result<&mut Value, RuntimeError> {
         if self.is_private {
-            Err(RuntimeError { message: "Tried to access a private field!".into() })
+            Err(RuntimeError {
+                message: "Tried to access a private field!".into(),
+            })
         } else {
             Ok(&mut self.value)
         }
@@ -93,7 +144,9 @@ impl Member {
 
     pub fn set_if_public(&mut self, value: Value) -> Result<(), RuntimeError> {
         if self.is_private {
-            Err(RuntimeError { message: "Tried to access a private field!".into() })
+            Err(RuntimeError {
+                message: "Tried to access a private field!".into(),
+            })
         } else {
             self.value = value;
             Ok(())
@@ -103,14 +156,13 @@ impl Member {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberMap {
-    members: HashMap<String, Member>
+    members: HashMap<String, Member>,
 }
 
 impl MemberMap {
-
     pub fn get_member(&self, ident: &String) -> Result<&Value, RuntimeError> {
         let member = self.members.get(ident).ok_or(RuntimeError {
-            message: format!("No member labeled \"{}\"!", ident)
+            message: format!("No member labeled '{}'!", ident),
         })?;
 
         Ok(member.get_value())
@@ -118,7 +170,7 @@ impl MemberMap {
 
     pub fn get_member_mut(&mut self, ident: &String) -> Result<&mut Value, RuntimeError> {
         let member = self.members.get_mut(ident).ok_or(RuntimeError {
-            message: format!("No member labeled \"{}\"!", ident)
+            message: format!("No member labeled '{}'!", ident),
         })?;
 
         Ok(member.get_value_mut())
@@ -126,7 +178,7 @@ impl MemberMap {
 
     pub fn get_public_member(&self, ident: &String) -> Result<&Value, RuntimeError> {
         let member = self.members.get(ident).ok_or(RuntimeError {
-            message: format!("No member labeled \"{}\"!", ident)
+            message: format!("No member labeled '{}'!", ident),
         })?;
 
         member.get_value_if_public()
@@ -134,7 +186,7 @@ impl MemberMap {
 
     pub fn get_public_member_mut(&mut self, ident: &String) -> Result<&mut Value, RuntimeError> {
         let member = self.members.get_mut(ident).ok_or(RuntimeError {
-            message: format!("No member labeled \"{}\"!", ident)
+            message: format!("No member labeled '{}'!", ident),
         })?;
 
         member.get_value_mut_if_public()
@@ -142,10 +194,14 @@ impl MemberMap {
 
     pub fn set_member(&mut self, ident: &String, value: Value) -> Result<(), RuntimeError> {
         let member = self.members.get_mut(ident).ok_or(RuntimeError {
-            message: format!("No member labeled \"{}\"!", ident)
+            message: format!("No member labeled '{}'!", ident),
         })?;
 
         member.set_if_public(value)
+    }
+
+    pub fn len(&self) -> usize {
+        self.members.len()
     }
 }
 
@@ -159,7 +215,7 @@ impl From<(&str, &str)> for ModuleAddress {
     fn from(value: (&str, &str)) -> Self {
         Self {
             module_id: value.0.to_string(),
-            identifier: value.1.to_string()
+            identifier: value.1.to_string(),
         }
     }
 }
@@ -172,7 +228,10 @@ impl Display for ModuleAddress {
 
 impl ModuleAddress {
     pub fn new(module_id: String, identifier: String) -> Self {
-        Self { module_id, identifier }
+        Self {
+            module_id,
+            identifier,
+        }
     }
 
     pub fn get_module_id(&self) -> &String {
@@ -185,7 +244,8 @@ impl ModuleAddress {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Struct { //TODO: Remove public visibility
+pub struct Struct {
+    //TODO: Remove public visibility
     pub struct_id: ModuleAddress,
     pub members: MemberMap,
 }
@@ -205,66 +265,46 @@ impl Struct {
 }
 
 #[derive(Debug, Clone)]
-pub struct StructPrototype {
-    members: MemberMap,
-}
-
-impl StructPrototype {
-    pub fn construct(&self) -> Self {
-        self.clone()
-    }
-}
-
-pub mod expressions;
-pub mod procedures;
-
-#[derive(Default)]
-pub struct Module {
-    struct_prototypes: HashMap<String, (StructPrototype, bool)>,
-    procedures: HashMap<String, (Box<dyn Procedure>, bool)>,
-}
-
-impl Module {
-
-    pub fn insert_procedure(&mut self, identifier: String, procedure: Box<dyn Procedure>, exported: bool) {
-        self.procedures.insert(identifier, (procedure, exported));
-    }
-
-    pub fn get_procedure(&self, identifier: &String, private_access: bool) -> Result<&Box<dyn Procedure>, RuntimeError> {
-        match self.procedures.get(identifier) {
-            Some((proc, exported)) => if *exported || private_access {
-                Ok(proc)
-            } else {
-                Err(RuntimeError {
-                message: format!("Procedure \"{}\" is not exported by this module!", identifier)
-            })
-            }
-            None => Err(RuntimeError {
-                message: format!("Procedure \"{}\" not defined in this module!", identifier)
-            })
-        }
-    }
-}
-
-
-#[derive(Clone)]
 pub enum ScopeAddressant {
     Identifier(String),
     Index(usize),
     DynamicIndex(Rc<dyn Expression>),
 }
 
-#[derive(Clone)]
+impl From<&str> for ScopeAddressant {
+    fn from(value: &str) -> Self {
+        Self::Identifier(value.into())
+    }
+}
+
+impl From<usize> for ScopeAddressant {
+    fn from(value: usize) -> Self {
+        Self::Index(value)
+    }
+}
+
+impl<E: Expression + 'static> From<E> for ScopeAddressant {
+    fn from(value: E) -> Self {
+        Self::DynamicIndex(Rc::new(value))
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ScopeAddress(Vec<ScopeAddressant>);
 
-impl From<Vec<ScopeAddressant>> for ScopeAddress {
-    fn from(value: Vec<ScopeAddressant>) -> Self {
-        Self(value)
+impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
+    type Error = ();
+
+    fn try_from(value: Vec<ScopeAddressant>) -> Result<Self, Self::Error> {
+        if value.is_empty() {
+            Err(())
+        } else {
+            Ok(Self(value))
+        }
     }
 }
 
 impl ScopeAddress {
-
     fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress, RuntimeError> {
         let mut out = Vec::with_capacity(self.0.len());
 
@@ -276,22 +316,27 @@ impl ScopeAddress {
                     let value = expression.eval(environment)?;
                     let idx: usize = match value {
                         Value::Integer(value) => {
-                            let idx = value.try_into()
-                                .map_err(|err: std::num::TryFromIntError| RuntimeError {
-                                    message: err.to_string()
+                            let idx =
+                                value.try_into().map_err(|err: std::num::TryFromIntError| {
+                                    RuntimeError {
+                                        message: err.to_string(),
+                                    }
                                 })?;
-                            
+
                             idx
-                        },
+                        }
                         _ => {
                             return Err(RuntimeError {
-                                message: format!("Mismatched types! Expected Integer, found {}!", value.get_type_id())
+                                message: format!(
+                                    "Mismatched types! Expected Integer, found {}!",
+                                    value.get_type_id()
+                                ),
                             })
                         }
                     };
-                    
+
                     ScopeAddressant::Index(idx)
-                },
+                }
             };
 
             out.push(addressant);
@@ -299,21 +344,22 @@ impl ScopeAddress {
 
         Ok(BakedScopeAddress(out))
     }
-
 }
 
 #[derive(Deref, IntoIterator)]
 struct BakedScopeAddress(Vec<ScopeAddressant>);
 
 #[derive(Debug, Default)]
-pub struct Scope { //TODO: Remove public visibility
+pub struct Scope {
+    //TODO: Remove public visibility
     pub variables: HashMap<String, Value>,
 }
 
 impl Scope {
-
     pub fn new() -> Self {
-        Self { variables: HashMap::new() }
+        Self {
+            variables: HashMap::new(),
+        }
     }
 
     pub fn from_members(members: HashMap<String, Value>) -> Self {
@@ -332,61 +378,75 @@ impl Scope {
         self.variables.remove(identifier);
     }
 
-    fn get_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<&Value, RuntimeError> {
+    fn get_variable(
+        &self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+    ) -> Result<&Value, RuntimeError> {
         let mut addressants = address.into_iter();
 
-        let first_addressant = addressants.next()
-            .ok_or(RuntimeError{
-                message: "Tried looking up a variable in scope without an address!".into()
-            })?;
-        
+        let first_addressant = addressants.next().unwrap();
+
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => return Err(RuntimeError{
-                message: "Expected variable identifier, found index!".into()
-            }),
+            ScopeAddressant::Index(_) => {
+                return Err(RuntimeError {
+                    message: "Expected variable identifier, found index!".into(),
+                })
+            }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
-        
-        let mut value = self.variables.get(&first_identifier)
-            .ok_or(RuntimeError{
-                message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
-            })?;
+
+        let mut value = self.variables.get(&first_identifier).ok_or(RuntimeError {
+            message: format!(
+                "Could not find the variable \"{}\" in this scope!",
+                first_identifier
+            ),
+        })?;
 
         for subaddressant in addressants {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
                     if let Value::Struct(ref obj) = value {
                         if obj.get_struct_id().get_module_id() != contained_module_id {
-                            Err(RuntimeError{
-                                message: format!("Tried to access field \"{}\" of {} outside it's module!", ident, obj.get_struct_id())
+                            Err(RuntimeError {
+                                message: format!(
+                                    "Tried to access field \"{}\" of {} outside it's module!",
+                                    ident,
+                                    obj.get_struct_id()
+                                ),
                             })?;
                         }
 
                         value = obj.get_members().get_public_member(&ident)?;
                     } else {
-                        Err(RuntimeError{
-                            message: format!("This variable does not have a member labeled \"{}\"!", ident)
+                        Err(RuntimeError {
+                            message: format!(
+                                "This variable does not have a member labeled \"{}\"!",
+                                ident
+                            ),
                         })?;
                     }
-                },
+                }
                 ScopeAddressant::Index(idx) => {
                     if let Value::Array(ref arr) = value {
-                        let new_value = arr
-                            .get(idx)
-                            .ok_or(RuntimeError{
-                                message: format!("Index out of bounds: index was {}, array length was {}!", idx, arr.len())
-                            })?;
+                        let new_value = arr.get(idx).ok_or(RuntimeError {
+                            message: format!(
+                                "Index out of bounds: index was {}, array length was {}!",
+                                idx,
+                                arr.len()
+                            ),
+                        })?;
 
                         value = new_value;
                     } else {
-                        Err(RuntimeError{
-                            message: "This value can not be indexed!".into()
+                        Err(RuntimeError {
+                            message: "This value can not be indexed!".into(),
                         })?;
                     }
-                },
+                }
                 ScopeAddressant::DynamicIndex(_) => {
                     panic!("Found dynamic index as addressant after baking!");
                 }
@@ -396,63 +456,79 @@ impl Scope {
         Ok(value)
     }
 
-    fn get_variable_mut(&mut self, address: BakedScopeAddress, contained_module_id: &String) -> Result<&mut Value, RuntimeError> {
+    fn get_variable_mut(
+        &mut self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+    ) -> Result<&mut Value, RuntimeError> {
         let mut addressants = address.into_iter();
 
-        let first_addressant = addressants.next()
-            .ok_or(RuntimeError{
-                message: "Tried looking up a variable in scope without an address!".into()
-            })?;
-        
+        let first_addressant = addressants.next().unwrap();
+
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => return Err(RuntimeError{
-                message: "Expected variable identifier, found index!".into()
-            }),
+            ScopeAddressant::Index(_) => {
+                return Err(RuntimeError {
+                    message: "Expected variable identifier, found index!".into(),
+                })
+            }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
-        
-        let mut value = self.variables.get_mut(&first_identifier)
-            .ok_or(RuntimeError{
-                message: format!("Could not find the variable \"{}\" in this scope!", first_identifier)
+
+        let mut value = self
+            .variables
+            .get_mut(&first_identifier)
+            .ok_or(RuntimeError {
+                message: format!(
+                    "Could not find the variable \"{}\" in this scope!",
+                    first_identifier
+                ),
             })?;
 
         for subaddressant in addressants {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
-                    if let Value::Struct(ref mut obj) = value {
-                        if obj.get_struct_id().get_module_id() != contained_module_id {
-                            Err(RuntimeError{
-                                message: format!("Tried to access field \"{}\" of {} outside it's module!", ident, obj.get_struct_id())
+                    if let Value::Struct(ref mut s) = value {
+                        if s.get_struct_id().get_module_id() != contained_module_id {
+                            Err(RuntimeError {
+                                message: format!(
+                                    "Tried to access field '{}' of {} outside it's module!",
+                                    ident,
+                                    s.get_struct_id()
+                                ),
                             })?;
                         }
 
-                        value = obj.get_members_mut().get_public_member_mut(&ident)?;
+                        value = s.get_members_mut().get_public_member_mut(&ident)?;
                     } else {
-                        Err(RuntimeError{
-                            message: format!("This variable does not have a member labeled \"{}\"!", ident)
+                        Err(RuntimeError {
+                            message: format!(
+                                "This variable does not have a member labeled '{}'!",
+                                ident
+                            ),
                         })?;
                     }
-                },
+                }
                 ScopeAddressant::Index(idx) => {
                     if let Value::Array(ref mut arr) = value {
                         let array_length = arr.len();
 
-                        let new_value = arr
-                            .get_mut(idx)
-                            .ok_or(RuntimeError{
-                                message: format!("Index out of bounds: index was {}, array length was {}!", idx, array_length)
-                            })?;
+                        let new_value = arr.get_mut(idx).ok_or(RuntimeError {
+                            message: format!(
+                                "Index out of bounds: index was {}, array length was {}!",
+                                idx, array_length
+                            ),
+                        })?;
 
                         value = new_value;
                     } else {
-                        Err(RuntimeError{
-                            message: "This value can not be indexed!".into()
+                        Err(RuntimeError {
+                            message: "This value can not be indexed!".into(),
                         })?;
                     }
-                },
+                }
                 ScopeAddressant::DynamicIndex(_) => {
                     panic!("Found dynamic index as addressant after baking!");
                 }
@@ -460,66 +536,5 @@ impl Scope {
         }
 
         Ok(value)
-    }
-
-}
-
-pub struct Environment { //TODO: Remove public visibility
-    pub contained_module_id: String,
-    pub loaded_modules: HashMap<String, Rc<Module>>,
-    pub scope: Scope,
-}
-
-impl Environment {
-    pub fn new(contained_module_id: String) -> Self {
-        Self { contained_module_id, loaded_modules: Default::default(), scope: Default::default() }
-    }
-
-    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<&Box<dyn Procedure>, RuntimeError> {
-        let module = self.loaded_modules.get(address.get_module_id()).ok_or(RuntimeError{
-            message: format!("Module \"{}\" not loaded in this environment!", address.get_module_id())
-        })?;
-
-        module.get_procedure(address.get_identifier(), address.get_module_id() == &self.contained_module_id)
-    }
-
-    pub fn clone_with_scope(&self, new_scope: Scope) -> Self {
-        Self {
-            contained_module_id: self.contained_module_id.clone(),
-            loaded_modules: self.loaded_modules.clone(),
-            scope: new_scope,
-        }
-    }
-
-    //TODO: Refactor this sloppy mess. This function shouldnt need to exist
-    pub fn set_contained_module(&mut self, contained_module_id: String) {
-        self.contained_module_id = contained_module_id;
-    }
-
-    pub fn insert_members(&mut self, members: HashMap<String, Value>) {
-        self.scope.insert_members(members);
-    }
-
-    pub fn lookup_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
-        let address = address.try_bake(self)?;
-        
-        let value = self.scope.get_variable(address, &self.contained_module_id)?;
-
-        Ok(value.clone())
-    }
-
-    
-    pub fn set_variable(&mut self, address: ScopeAddress, new_value: Value) -> Result<(), RuntimeError> {
-        let address = address.try_bake(self)?;
-
-        let value = self.scope.get_variable_mut(address, &self.contained_module_id)?;
-
-        *value = new_value;
-
-        Ok(())
-    }
-
-    pub fn load_module(&mut self, module_identifier: String, module: Rc<Module>) {
-        self.loaded_modules.insert(module_identifier, module);
     }
 }

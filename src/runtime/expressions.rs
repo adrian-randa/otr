@@ -1,42 +1,57 @@
 use std::cell::RefCell;
 
-use crate::runtime::{Environment, ModuleAddress, RuntimeError, Scope, ScopeAddress, Value};
+use crate::runtime::{
+    Environment, Expression, ModuleAddress, RuntimeError, Scope, ScopeAddress, Value,
+};
 
-
-pub trait Expression {
-    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError>;
-}
-
-
-
-pub struct ProcedureCallExpression { //TODO: Remove public visibility
+#[derive(Debug)]
+pub struct ProcedureCallExpression {
+    //TODO: Remove public visibility
     pub procedure_id: ModuleAddress,
-    pub arguments: Vec<Box<dyn Expression>>
+    pub arguments: Vec<Box<dyn Expression>>,
 }
 
 impl Expression for ProcedureCallExpression {
     fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
         let procedure = environment.get_procedure_by_address(&self.procedure_id)?;
-        
+
         let mut arguments = Vec::with_capacity(self.arguments.len());
-        for eval_result in self.arguments
+        for eval_result in self
+            .arguments
             .iter()
-            .map(|arg_exp| {
-                arg_exp.eval(environment)
-            }) {
-                arguments.push(eval_result?);
-            }
-        
-        let mut environment = environment.clone_with_scope(Scope::new());
-        environment.set_contained_module(self.procedure_id.get_module_id().into());
+            .map(|arg_exp| arg_exp.eval(environment))
+        {
+            arguments.push(eval_result?);
+        }
+
+        let environment = environment.open_subenvironment(Scope::new(), &self.procedure_id);
 
         Ok(procedure.call(environment, arguments)?)
     }
 }
 
+#[derive(Debug)]
+pub struct StructConstructionExpression {
+    pub struct_id: ModuleAddress,
+    pub field_overrides: Vec<(String, Box<dyn Expression>)>
+}
 
+impl Expression for StructConstructionExpression {
+    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
+        let mut instance = environment.get_struct_by_address(&self.struct_id)?;
 
-pub struct VariableExpression { //TODO: Change visibility to private
+        for (field, expr) in &self.field_overrides {
+            let value = expr.eval(environment)?;
+            instance.get_members_mut().set_member(field, value)?;
+        }
+
+        Ok(Value::Struct(instance))
+    }
+}
+
+#[derive(Debug)]
+pub struct VariableExpression {
+    //TODO: Change visibility to private
     pub variable_address: ScopeAddress,
 }
 
@@ -46,8 +61,7 @@ impl Expression for VariableExpression {
     }
 }
 
-
-
+#[derive(Debug)]
 pub struct EqualityExpression {
     lhs: Box<dyn Expression>,
     rhs: Box<dyn Expression>,
