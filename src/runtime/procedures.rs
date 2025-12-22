@@ -1,13 +1,14 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::runtime::{
-    Environment, Expression, RuntimeError, Scope, ScopeAddress, ScopeAddressant, Value,
-};
+use crate::{compiler::{CompilerError, expression_parser::ExpressionParser}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{
+    Environment, Expression, RuntimeError, Scope, ScopeAddress, ScopeAddressant, Value, expressions::boolean::NotExpression,
+}};
 
-pub trait Procedure {
+pub trait Procedure: std::fmt::Debug {
     fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError>;
 }
 
+#[derive(Debug)]
 pub enum Instruction {
     //TODO: Remove public viisibility
     PushVarToScope {
@@ -16,6 +17,8 @@ pub enum Instruction {
     PopVarFromScope {
         identifier: String,
     },
+    GrowStack,
+    ShrinkStack,
     EvaluateExpression {
         expression: Box<dyn Expression>,
         target: Option<ScopeAddress>,
@@ -29,6 +32,7 @@ pub enum Instruction {
     },
 }
 
+#[derive(Debug)]
 pub struct CompiledProcedure {
     //TODO: Remove public visibility
     pub arguments_identifiers: Vec<String>,
@@ -57,10 +61,16 @@ impl Procedure for CompiledProcedure {
 
             match &self.instructions[pc] {
                 Instruction::PushVarToScope { identifier } => {
-                    environment.scope.push(identifier.clone());
+                    environment.scope.push(identifier.clone())?;
                 }
                 Instruction::PopVarFromScope { identifier } => {
-                    environment.scope.pop(identifier);
+                    environment.scope.pop(identifier)?;
+                }
+                Instruction::GrowStack => {
+                    environment.scope.grow_stack();
+                }
+                Instruction::ShrinkStack => {
+                    environment.scope.shrink_stack();
                 }
                 Instruction::EvaluateExpression { expression, target } => {
                     let eval_result = expression.eval(&mut environment)?;
@@ -105,20 +115,96 @@ impl Procedure for CompiledProcedure {
 }
 
 
+
+trait ScopeExcapeHandler: std::fmt::Debug {
+    fn resolve(&self, instructions: &mut Vec<Instruction>);
+}
+
+#[derive(Debug)]
+struct IfScopeEscapeHandler {
+    target_instruction: usize,
+}
+
+impl ScopeExcapeHandler for IfScopeEscapeHandler {
+    fn resolve(&self, instructions: &mut Vec<Instruction>) {
+        let next_ic = instructions.len();
+
+        if let Some(Instruction::JumpConditional {
+            condition_expression: _,
+            jump_target 
+        }) = instructions.get_mut(self.target_instruction) {
+            *jump_target = next_ic;
+        } else {
+            panic!("Tried resolving if scope escape but initial jump is missing!");
+        }
+    }
+}
+
+#[derive(Debug)]
+struct WhileScopeEscapeHandler {
+    target_instruction: usize,
+}
+
+impl ScopeExcapeHandler for WhileScopeEscapeHandler {
+    fn resolve(&self, instructions: &mut Vec<Instruction>) {
+        instructions.push(Instruction::JumpConditional {
+            condition_expression: Box::new(Value::Bool(true)),
+            jump_target: self.target_instruction
+        });
+        let next_ic = instructions.len();
+        if let Some(Instruction::JumpConditional {
+            condition_expression: _,
+            jump_target 
+        }) = instructions.get_mut(self.target_instruction) {
+            
+            *jump_target = next_ic;
+        } else {
+            panic!("Tried resolving if scope escape but initial jump is missing!");
+        }
+    }
+}
+
+#[derive(Debug)]
+enum CompiledProcedureBuilderState {
+    Base,
+    VarDeclaration {
+        ident: Option<String>,
+        expression: Option<Vec<Token>>,
+    },
+    Assignment {
+        address: Vec<Token>,
+        expression: Vec<Token>,
+    },
+    IfStatement {
+        condition_expression: Vec<Token>,
+        parenthesis_index: usize,
+    },
+    WhileStatement {
+        condition_expression: Vec<Token>,
+        parenthesis_index: usize,
+    },
+    Indeterminate {
+        tokens: Vec<Token>,
+    },
+    Return {
+        expression: Vec<Token>,
+    }
+}
+
+#[derive(Debug)]
 pub struct CompiledProcedureBuilder {
     procedure: CompiledProcedure,
+    state: CompiledProcedureBuilderState,
+    scope_stack: Vec<Box<dyn ScopeExcapeHandler>>,
 }
 
 impl CompiledProcedureBuilder {
     pub fn new() -> Self {
         Self {
-            procedure: CompiledProcedure { arguments_identifiers: Vec::new(), instructions: Vec::new() }
+            procedure: CompiledProcedure { arguments_identifiers: Vec::new(), instructions: Vec::new() },
+            state: CompiledProcedureBuilderState::Base,
+            scope_stack: Vec::new(),
         }
-    }
-
-    pub fn push_instruction(mut self, instruction: Instruction) -> Self {
-        self.procedure.instructions.push(instruction);
-        self
     }
 
     pub fn push_argument_identifier(mut self, ident: String) -> Self {
@@ -126,8 +212,232 @@ impl CompiledProcedureBuilder {
         self
     }
 
-    pub fn build(self) -> CompiledProcedure {
-        self.procedure
+    pub fn scope_stack_size(&self) -> usize {
+        self.scope_stack.len()
+    }
+
+    pub fn read(mut self, token: Token) -> Result<Self, CompilerError> {
+
+        if let Token::Punctuation(PunctuationToken::Semicolon) = token {
+            return self.finish_current_instruction()
+        }
+
+        use CompiledProcedureBuilderState::*;
+        match &mut self.state {
+            Base => {
+                match token {
+                    Token::Keyword(KeywordToken::Let) => {
+                        self.state = VarDeclaration { ident: None, expression: None }
+                    }
+                    Token::Keyword(KeywordToken::If) => {
+                        self.state = IfStatement { condition_expression: Vec::new(), parenthesis_index: 0 }
+                    }
+                    Token::Keyword(KeywordToken::While) => {
+                        self.state = WhileStatement { condition_expression: Vec::new(), parenthesis_index: 0 }
+                    }
+                    Token::Keyword(KeywordToken::Return) => {
+                        self.state = Return { expression: Vec::new() }
+                    }
+
+                    Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
+                        self.scope_stack
+                            .pop()
+                            .ok_or(CompilerError {
+                                message: "Invalid closing curly brace!".into()
+                            })?
+                            .resolve(&mut self.procedure.instructions);
+                    }
+
+                    other => {
+                        self.state = Indeterminate { tokens: vec![other] }
+                    }
+                }
+            },
+            VarDeclaration { ident, expression } => {
+                if ident.is_none() {
+                    if let Token::Identifier(ident) = token {
+                        self.state = VarDeclaration { ident: Some(ident), expression: expression.take() }
+                    } else {
+                        return Err(CompilerError {
+                            message: format!("Unexprected token. Expected identifier, found {:?}!", token)
+                        });
+                    }
+                } else {
+                    if let Some(expr) = expression {
+                        expr.push(token);
+                    } else {
+                        if let Token::Operator(OperatorToken::Assignment) = token {
+                            self.state = VarDeclaration { ident: ident.take(), expression: Some(Vec::new()) }
+                        } else {
+                            return Err(CompilerError {
+                                message: format!("Unexprected token. Expected '=', found {:?}!", token)
+                            });
+                        }
+                    }
+                }
+            },
+            Assignment { address, expression } => {
+                expression.push(token);
+            },
+            IfStatement { condition_expression, parenthesis_index } => {
+                if let Token::Punctuation(PunctuationToken::Parenthesis(par)) = &token {
+                    match par {
+                        ParenthesisType::Opening => *parenthesis_index += 1,
+                        ParenthesisType::Closing => if *parenthesis_index > 0 {
+                            *parenthesis_index -= 1
+                        } else {
+                            return Err(CompilerError { message: "Invalid parenthesis structure!".into() })
+                        },
+                    }
+                }
+
+                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
+                    if *parenthesis_index == 0 {
+                        return self.finish_current_instruction()
+                    }
+                }
+
+                condition_expression.push(token);
+            },
+            WhileStatement { condition_expression, parenthesis_index } => {
+                if let Token::Punctuation(PunctuationToken::Parenthesis(par)) = &token {
+                    match par {
+                        ParenthesisType::Opening => *parenthesis_index += 1,
+                        ParenthesisType::Closing => if *parenthesis_index > 0 {
+                            *parenthesis_index -= 1
+                        } else {
+                            return Err(CompilerError { message: "Invalid parenthesis structure!".into() })
+                        },
+                    }
+                }
+
+                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
+                    if *parenthesis_index == 0 {
+                        return self.finish_current_instruction()
+                    }
+                }
+
+                condition_expression.push(token);
+            },
+            Indeterminate { tokens } => {
+                match token {
+                    Token::Operator(OperatorToken::Assignment) => {
+                        self.state = Assignment { address: tokens.to_vec(), expression: Vec::new() }
+                    }
+
+                    other => {
+                        tokens.push(other);
+                    }
+                }
+            },
+            Return { expression } => {
+                expression.push(token);
+            },
+        }
+
+
+        Ok(self)
+    }
+
+    fn finish_current_instruction(mut self) -> Result<Self, CompilerError> {
+        match &mut self.state {
+            CompiledProcedureBuilderState::Base => {
+            },
+            CompiledProcedureBuilderState::VarDeclaration { ident, expression } => {
+                let ident = ident.clone().ok_or(CompilerError {
+                    message: "Missing variable identifier!".into()
+                })?;
+                self.procedure.instructions.push(
+                    Instruction::PushVarToScope { identifier: ident.clone() }
+                );
+                if let Some(expression) = expression {
+                    let expression = ExpressionParser::parse(expression.to_owned())?;
+
+                    self.procedure.instructions.push(
+                        Instruction::EvaluateExpression { expression, target: Some(vec![
+                            ScopeAddressant::Identifier(ident)
+                        ].try_into().unwrap()) }
+                    )
+                }
+            },
+            CompiledProcedureBuilderState::Assignment { address, expression } => {
+                let target = Some(ScopeAddress::try_from(address.to_owned())?);
+
+                let expression = ExpressionParser::parse(expression.to_owned())?;
+
+                self.procedure.instructions.push(Instruction::EvaluateExpression { expression, target });
+            },
+            CompiledProcedureBuilderState::IfStatement { condition_expression, parenthesis_index } => {
+                if *parenthesis_index > 0 {
+                    return Err(CompilerError {
+                        message: "Invalid parenthesis structure!".into()
+                     });
+                }
+
+                let condition_expression = Box::new(NotExpression::new(
+                    ExpressionParser::parse(condition_expression.to_owned())?
+                ));
+
+                self.scope_stack.push(
+                    Box::new(IfScopeEscapeHandler { target_instruction: self.procedure.instructions.len() })
+                );
+                
+                self.procedure.instructions.push(
+                    Instruction::JumpConditional { condition_expression, jump_target: usize::MAX }
+                );
+            },
+            CompiledProcedureBuilderState::WhileStatement { condition_expression, parenthesis_index } => {
+                if *parenthesis_index > 0 {
+                    return Err(CompilerError {
+                        message: "Invalid parenthesis structure!".into()
+                     });
+                }
+
+                let condition_expression = Box::new(NotExpression::new(
+                    ExpressionParser::parse(condition_expression.to_owned())?
+                ));
+
+                self.scope_stack.push(
+                    Box::new(WhileScopeEscapeHandler { target_instruction: self.procedure.instructions.len() })
+                );
+                
+                self.procedure.instructions.push(
+                    Instruction::JumpConditional { condition_expression, jump_target: usize::MAX }
+                );
+            },
+            CompiledProcedureBuilderState::Indeterminate { tokens } => {
+                let expression = ExpressionParser::parse(tokens.to_owned())?;
+
+                self.procedure.instructions.push(
+                    Instruction::EvaluateExpression { expression, target: None }
+                );
+            },
+            CompiledProcedureBuilderState::Return { expression } => {
+                let expression = ExpressionParser::parse(expression.to_owned())?;
+
+                self.procedure.instructions.push(
+                    Instruction::Return { expression }
+                );
+            },
+        }
+        self.state = CompiledProcedureBuilderState::Base;
+        Ok(self)
+    }
+
+    pub fn build(self) -> Result<CompiledProcedure, CompilerError> {
+        if let CompiledProcedureBuilderState::Base = self.state {
+            if !self.scope_stack.is_empty() {
+                return Err(CompilerError {
+                    message: "Unclosed scope!".into()
+                });
+            }
+
+            Ok(self.procedure)
+        } else {
+            Err(CompilerError {
+                message: "Incomplete instruction!".into()
+            })
+        }
     }
 }
 

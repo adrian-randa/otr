@@ -130,7 +130,7 @@ impl Expression for DivideExpression {
 
             (l, r) => Err(RuntimeError {
                 message: format!(
-                    "Cannot subtract {} and {}!",
+                    "Cannot divide {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
@@ -171,7 +171,7 @@ impl Expression for PowerExpression {
 
             (l, r) => Err(RuntimeError {
                 message: format!(
-                    "Cannot subtract {} and {}!",
+                    "Cannot compute power of {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
@@ -205,7 +205,41 @@ impl Expression for ModuloExpression {
 
             (l, r) => Err(RuntimeError {
                 message: format!(
-                    "Cannot subtract {} and {}!",
+                    "Cannot modulate {} by {}!",
+                    l.get_type_id(),
+                    r.get_type_id()
+                ),
+            }),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct GreaterThanExpression {
+    lhs: Box<dyn Expression>,
+    rhs: Box<dyn Expression>,
+}
+
+impl GreaterThanExpression {
+    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
+        Self { lhs, rhs }
+    }
+}
+
+impl Expression for GreaterThanExpression {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+        use super::Value::*;
+
+        let lhs = self.lhs.eval(environment)?;
+        let rhs = self.rhs.eval(environment)?;
+
+        match (lhs, rhs) {
+            (Integer(l), Integer(r)) => Ok(Bool(l > r)),
+            (Float(l), Float(r)) => Ok(Bool(l > r)),
+
+            (l, r) => Err(RuntimeError {
+                message: format!(
+                    "Ordering is undefined on {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),

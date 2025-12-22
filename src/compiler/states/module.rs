@@ -1,13 +1,18 @@
 use std::rc::Rc;
 
-use crate::{compiler::{CompilerError, CompilerState, states::CompilerBaseState}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{RuntimeError, module::Module}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState}}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::{RuntimeError, module::Module}};
 
-
+#[derive(Debug, PartialEq, Eq)]
+enum ModuleSubstate {
+    PreScope,
+    InScope,
+    Export,
+}
 
 pub struct CompilerModuleState {
     base: CompilerBaseState,
     module_name: Option<String>,
-    in_scope: bool,
+    substate: ModuleSubstate,
     module: Module,
 }
 
@@ -16,52 +21,106 @@ impl CompilerModuleState {
         Self {
             base,
             module_name: None,
-            in_scope: false,
+            substate: ModuleSubstate::PreScope,
             module: Module::default()
         }
+    }
+
+    pub fn get_module_mut(&mut self) -> &mut Module {
+        &mut self.module
+    }
+
+    pub fn get_name(&self) -> Option<&String> {
+        self.module_name.as_ref()
     }
 }
 
 impl CompilerState for CompilerModuleState {
-    fn read(mut self, token: Token) -> Result<Box<dyn CompilerState>, crate::compiler::CompilerError> {
-        if self.module_name.is_none() {
-            if let Token::Identifier(ident) = token {
-                self.module_name = Some(ident);
-                return Ok(Box::new(self));
-            } else {
-                return Err(CompilerError {
-                    message: format!("Unexpected token! Expected identifier, found {:?}", token)
-                });
-            }
-        }
-        if !self.in_scope {
-            if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
-                self.in_scope = true;
-                return Ok(Box::new(self));
-            } else {
-                return Err(CompilerError {
-                    message: format!("Unexpected token! Expected '{{', found {:?}", token)
-                });
-            }
+    fn read(mut self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>, crate::compiler::CompilerError> {
+
+        match self.substate {
+            ModuleSubstate::PreScope => {
+                if self.module_name.is_none() {
+                    if let Token::Identifier(ident) = token {
+                        self.module_name = Some(ident);
+                        return Ok(self);
+                    } else {
+                        return Err(CompilerError {
+                            message: format!("Unexpected token! Expected identifier, found {:?}", token)
+                        });
+                    }
+                }
+
+                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
+                    self.substate = ModuleSubstate::InScope;
+                    return Ok(self);
+                } else {
+                    return Err(CompilerError {
+                        message: format!("Unexpected token! Expected '{{', found {:?}", token)
+                    });
+                }
+            },
+            ModuleSubstate::InScope => {
+                match token {
+                    Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
+                        self.base.environment.load_module(
+                            self.module_name.unwrap(),
+                            Rc::new(self.module)
+                        );
+                        Ok(Box::new(self.base))
+                    }
+
+                    Token::Keyword(KeywordToken::Proc) => {
+                        return Ok(Box::new(CompilerProcedureState::new(*self, Vec::new())))
+                    }
+
+                    Token::Punctuation(PunctuationToken::At) => {
+                        return Ok(Box::new(
+                            CompilerDecoratorState::new(*self)
+                        ));
+                    }
+
+                    Token::Keyword(KeywordToken::Export) => {
+                        self.substate = ModuleSubstate::Export;
+                        return Ok(self);
+                    }
+
+                    _ => {
+                        return Err(CompilerError {
+                            message: format!("Unexpected token! Expected procedure/struct declaration, found {:?}", token)
+                        });
+                    }
+                }
+            },
+            ModuleSubstate::Export => {
+                match token {
+                    Token::Punctuation(PunctuationToken::Comma) => {
+                        return Ok(self);
+                    }
+
+                    Token::Identifier(ident) => {
+                        self.module.set_member_visibility(&ident, true)?;
+                        return Ok(self);
+                    }
+
+                    Token::Punctuation(PunctuationToken::Semicolon) => {
+                        self.substate = ModuleSubstate::InScope;
+                        return Ok(self);
+                    }
+
+                    other => {
+                        return Err(CompilerError {
+                            message: format!("Unexpected token. Expected identifier, found {:?}!", other)
+                        });
+                    }
+                }
+            },
         }
 
-        match token {
-
-            Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
-                self.base.environment.load_module(
-                    self.module_name.unwrap(),
-                    Rc::new(self.module)
-                );
-                Ok(Box::new(self.base))
-            }
-
-            _ => Err(CompilerError {
-                message: format!("Unexpected token! Expected procedure/struct declaration, found {:?}", token)
-            })
-        }
+        
     }
 
-    fn finalize(self) -> Result<crate::runtime::environment::Environment, crate::compiler::CompilerError> {
+    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment, crate::compiler::CompilerError> {
         Err(CompilerError {
             message: "Unfinished module declaration!".into()
         })

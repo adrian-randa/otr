@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::runtime::{ModuleAddress, RuntimeError, Struct, environment::Environment, procedures::Procedure};
+use crate::{compiler::CompilerError, runtime::{ModuleAddress, RuntimeError, Struct, environment::Environment, procedures::Procedure}};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Module {
     struct_prototypes: HashMap<String, (Struct, bool)>,
     procedures: HashMap<String, (Box<dyn Procedure>, bool)>,
@@ -55,5 +55,21 @@ impl Module {
                 message: format!("Struct \"{}\" not defined in this module!", identifier),
             })
         }
+    }
+
+    pub fn set_member_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<(), CompilerError> {
+
+        if let Some(member) = self.procedures.get_mut(member_ident) {
+            member.1 = visibility;
+            return Ok(());
+        }
+        if let Some(member) = self.struct_prototypes.get_mut(member_ident) {
+            member.1 = visibility;
+            return Ok(());
+        }
+
+        Err(CompilerError {
+            message: format!("Member '{}' not found!", member_ident)
+        })
     }
 }

@@ -18,6 +18,8 @@ pub enum KeywordToken {
     Return,
     For,
     While,
+    If,
+    Else,
     Continue,
     Break,
     Module,
@@ -38,6 +40,10 @@ pub enum OperatorToken {
     Or,
     Equality,
     Inequality,
+    Greater,
+    Less,
+    GreaterEquals,
+    LessEquals,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -8,8 +8,10 @@ use derive_more::{Deref, IntoIterator};
 use num::traits::identities;
 
 use crate::compiler::CompilerError;
-use crate::lexer::token::LiteralToken;
+use crate::compiler::expression_parser::ExpressionParser;
+use crate::lexer::token::{LiteralToken, ParenthesisType, PunctuationToken, Token};
 use crate::runtime::environment::Environment;
+use crate::runtime::expressions::ProcedureCallExpression;
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
 
 pub mod environment;
@@ -304,6 +306,44 @@ impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
     }
 }
 
+impl TryFrom<Vec<Token>> for ScopeAddress {
+    type Error = CompilerError;
+
+    fn try_from(value: Vec<Token>) -> Result<Self, Self::Error> {
+        let mut tokens = value.into_iter();
+        
+        let mut addressants = Vec::new();
+
+        while let Some(token) = tokens.next() {
+            match token {
+                Token::Identifier(ident) => {
+                    addressants.push(ScopeAddressant::Identifier(ident));
+                }
+                Token::Punctuation(PunctuationToken::Dot) => {}
+                Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
+                    let index_expression = ExpressionParser::take_until_closing(
+                        &mut tokens,
+                        Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
+                    )?;
+
+                    let index_expression = ExpressionParser::parse(index_expression)?;
+
+                    addressants.push(ScopeAddressant::DynamicIndex(index_expression.into()));
+                }
+
+                other => {
+                    return Err(CompilerError {
+                        message: format!("Invalid address. Found unexpected token {:?}!", other)
+                    });
+                }
+            }
+        }
+
+
+        addressants.try_into().map_err(|_| CompilerError { message: "Address could not be parsed!".into() })
+    }
+}
+
 impl ScopeAddress {
     fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress, RuntimeError> {
         let mut out = Vec::with_capacity(self.0.len());
@@ -349,33 +389,149 @@ impl ScopeAddress {
 #[derive(Deref, IntoIterator)]
 struct BakedScopeAddress(Vec<ScopeAddressant>);
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
+struct Stack (Vec<HashMap<String, Value>>);
+
+impl Default for Stack {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Stack {
+    fn new() -> Self {
+        Self(vec![HashMap::new()])    
+    }
+
+    fn from_members(members: HashMap<String, Value>) -> Self {
+        Self(vec![members])
+    }
+
+    fn insert_members(&mut self, members: HashMap<String, Value>) {
+        let last = self.0.len() - 1;
+        self.0[last].extend(members.into_iter());
+    }
+    
+    fn grow(&mut self) {
+        self.0.push(HashMap::new());
+    }
+
+    fn shrink(&mut self) {
+        self.0.pop();
+    }
+
+    fn push(&mut self, identifier: String, value: Value) -> Result<(), RuntimeError> {
+        let last = self.0.len() - 1;
+        if self.0[last].insert(identifier.clone(), value).is_some() {
+            return Err(RuntimeError {
+                message: format!("Variable '{}' already present in this scope!", identifier)
+            });
+        }
+
+        Ok(())
+    }
+
+    fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
+        let last = self.0.len() - 1;
+        if self.0[last].remove(identifier).is_none() {
+            return Err(RuntimeError {
+                message: format!("Variable '{}' cannot be popped from the stack as it is not present!", identifier)
+            });
+        }
+
+        Ok(())
+    }
+
+    fn get(&self, identifier: &String) -> Result<&Value, RuntimeError> {
+        for i in (0..self.0.len()).rev() {
+            if let Some(value) = self.0[i].get(identifier) {
+                return Ok(value);
+            }
+        }
+
+        Err(RuntimeError {
+            message: format!(
+                "Could not find the variable \"{}\" in this scope!",
+                identifier
+            ),
+        })
+    }
+
+    fn get_mut(&mut self, identifier: &String) -> Result<&mut Value, RuntimeError> {
+        let last = self.0.len() - 1;
+        
+        let mut idx = None;
+
+        for i in (0..=last).rev() {
+            if self.0[i].contains_key(identifier) {
+                idx = Some(i);
+                break;
+            }
+        }
+
+        if let Some(i) = idx {
+            return Ok(self.0[i].get_mut(identifier).unwrap());
+        }
+        Err(RuntimeError {
+            message: format!(
+                "Could not find the variable \"{}\" in this scope!",
+                identifier
+            ),
+        })
+    }
+
+    fn set(&mut self, identifier: &String, new_value: Value) -> Result<(), RuntimeError> {
+        for i in (0..self.0.len()).rev() {
+            if let Some(value) = self.0[i].get_mut(identifier) {
+                *value = new_value;
+                return Ok(());
+            }
+        }
+
+        Err(RuntimeError {
+            message: format!(
+                "Could not find the variable \"{}\" in this scope!",
+                identifier
+            ),
+        })
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct Scope {
     //TODO: Remove public visibility
-    pub variables: HashMap<String, Value>,
+    pub stack: Stack,
 }
 
 impl Scope {
     pub fn new() -> Self {
         Self {
-            variables: HashMap::new(),
+            stack: Stack::new(),
         }
     }
 
     pub fn from_members(members: HashMap<String, Value>) -> Self {
-        Self { variables: members }
+        Self { stack: Stack::from_members(members) }
     }
 
     pub fn insert_members(&mut self, members: HashMap<String, Value>) {
-        self.variables.extend(members);
+        self.stack.insert_members(members);
     }
 
-    pub fn push(&mut self, identifier: String) {
-        self.variables.insert(identifier, Value::Null);
+    pub fn push(&mut self, identifier: String) -> Result<(), RuntimeError> {
+        self.stack.push(identifier, Value::Null)
     }
 
-    pub fn pop(&mut self, identifier: &String) {
-        self.variables.remove(identifier);
+    pub fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
+        self.stack.pop(&identifier)
+    }
+
+    pub fn grow_stack(&mut self) {
+        self.stack.grow();
+    }
+
+    pub fn shrink_stack(&mut self) {
+        self.stack.shrink();
     }
 
     fn get_variable(
@@ -399,12 +555,7 @@ impl Scope {
             }
         };
 
-        let mut value = self.variables.get(&first_identifier).ok_or(RuntimeError {
-            message: format!(
-                "Could not find the variable \"{}\" in this scope!",
-                first_identifier
-            ),
-        })?;
+        let mut value = self.stack.get(&first_identifier)?;
 
         for subaddressant in addressants {
             match subaddressant {
@@ -478,14 +629,8 @@ impl Scope {
         };
 
         let mut value = self
-            .variables
-            .get_mut(&first_identifier)
-            .ok_or(RuntimeError {
-                message: format!(
-                    "Could not find the variable \"{}\" in this scope!",
-                    first_identifier
-                ),
-            })?;
+            .stack
+            .get_mut(&first_identifier)?;
 
         for subaddressant in addressants {
             match subaddressant {
@@ -536,5 +681,34 @@ impl Scope {
         }
 
         Ok(value)
+    }
+}
+
+
+#[derive(Debug)]
+pub struct RuntimeObject {
+    pub(crate) base_environement: Environment,
+    pub(crate) entrypoint: Option<ModuleAddress>
+}
+
+impl RuntimeObject {
+    pub(crate) fn new() -> Self {
+        Self {
+            base_environement: Environment::new("".into()),
+            entrypoint: None
+        }
+    }
+
+    pub fn execute(self) -> Result<Value, RuntimeError> {
+        let entrypoint = self.entrypoint.ok_or(RuntimeError {
+            message: "No specified entrypoint!".into()
+        })?;
+
+        let main_expression = ProcedureCallExpression::new(
+            entrypoint,
+            Vec::new()
+        );
+
+        main_expression.eval(&self.base_environement)
     }
 }

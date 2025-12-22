@@ -18,6 +18,7 @@ use std::rc::Rc;
 
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
 pub struct Environment {
     //TODO: Remove public visibility
     pub contained_module_id: String,

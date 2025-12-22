@@ -246,6 +246,8 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("return".into(), Keyword(Return)))
             .with_rule(KeywordRule::new("struct".into(), Keyword(Struct)))
             .with_rule(KeywordRule::new("while".into(), Keyword(While)))
+            .with_rule(KeywordRule::new("if".into(), Keyword(If)))
+            .with_rule(KeywordRule::new("else".into(), Keyword(Else)))
             .with_rule(KeywordRule::new("module".into(), Keyword(Module)))
             .with_rule(KeywordRule::new("export".into(), Keyword(Export)))
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
@@ -253,6 +255,10 @@ impl Default for Tokenizer {
             .with_rule(PatternRule::new("==".into(), Operator(Equality)))
             .with_rule(PatternRule::new("!=".into(), Operator(Inequality)))
             .with_rule(PatternRule::new("::".into(), Punctuation(DoubleColon)))
+            .with_rule(PatternRule::new(">=".into(), Operator(GreaterEquals)))
+            .with_rule(PatternRule::new("<=".into(), Operator(LessEquals)))
+            .with_rule(PatternRule::new(">".into(), Operator(Greater)))
+            .with_rule(PatternRule::new("<".into(), Operator(Less)))
             .with_rule(PatternRule::new(
                 "(".into(),
                 Punctuation(Parenthesis(Opening)),
@@ -277,6 +283,7 @@ impl Default for Tokenizer {
                 "}".into(),
                 Punctuation(CurlyBraces(Closing)),
             ))
+            .with_rule(NumberLiteralRule)
             .with_rule(PatternRule::new("@".into(), Punctuation(At)))
             .with_rule(PatternRule::new("!".into(), Operator(Not)))
             .with_rule(PatternRule::new("+".into(), Operator(Plus)))
@@ -290,7 +297,6 @@ impl Default for Tokenizer {
             .with_rule(PatternRule::new(".".into(), Punctuation(Dot)))
             .with_rule(PatternRule::new(":".into(), Punctuation(Colon)))
             .with_rule(PatternRule::new(";".into(), Punctuation(Semicolon)))
-            .with_rule(NumberLiteralRule)
             .with_rule(StringLiteralRule)
             .with_rule(CharLiteralRule)
             .with_rule(BooleanLiteralRule)

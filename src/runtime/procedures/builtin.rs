@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use crate::runtime::{procedures::Procedure, Environment, Expression, RuntimeError, Value};
 
+#[derive(Debug)]
 pub struct SizeProcedure;
 
 impl Procedure for SizeProcedure {

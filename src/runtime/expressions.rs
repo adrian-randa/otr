@@ -30,6 +30,12 @@ impl Expression for ProcedureCallExpression {
     }
 }
 
+impl ProcedureCallExpression {
+    pub(crate) fn new(procedure_id: ModuleAddress, arguments: Vec<Box<dyn Expression>>) -> Self {
+        Self { procedure_id, arguments }
+    }
+}
+
 #[derive(Debug)]
 pub struct StructConstructionExpression {
     pub struct_id: ModuleAddress,

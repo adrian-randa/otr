@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{compiler::CompilerError, lexer::token::{OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress, ScopeAddress, ScopeAddressant, Value, expressions::{EqualityExpression, ProcedureCallExpression, StructConstructionExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}}};
+use crate::{compiler::CompilerError, lexer::token::{OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress, ScopeAddress, ScopeAddressant, Value, expressions::{EqualityExpression, ProcedureCallExpression, StructConstructionExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}}};
 
 #[derive(Debug)]
 pub enum ExpressionAtom {
@@ -62,6 +62,9 @@ impl ExpressionParser {
                     }
 
                     op => {
+                        if operator_order[i].1 == 0 {
+                            return Err(CompilerError { message: "Expressions may not start with a binary operator!".into() });
+                        }
                         if let (
                             Some(ExpressionAtom::Subexpression(lhs)),
                             Some(ExpressionAtom::Subexpression(rhs))
@@ -284,7 +287,9 @@ impl ExpressionParser {
 
                 Token::Operator(operator) => {
                     if stack.is_empty() {
-                        atoms.push(RawExpressionAtom::Subexpression(current_subexpression));
+                        if !current_subexpression.is_empty() {
+                            atoms.push(RawExpressionAtom::Subexpression(current_subexpression));
+                        }
                         current_subexpression = Vec::new();
                         atoms.push(RawExpressionAtom::Operator(operator));
                         continue;
@@ -503,6 +508,10 @@ impl ExpressionParser {
             OperatorToken::Or => 1,
             OperatorToken::Equality => 0,
             OperatorToken::Inequality => 0,
+            OperatorToken::Greater => 0,
+            OperatorToken::Less => 0,
+            OperatorToken::GreaterEquals => 0,
+            OperatorToken::LessEquals => 0,
         }
     }
 
@@ -525,11 +534,17 @@ impl ExpressionParser {
             OperatorToken::Or => Ok(Box::new(OrExpression::new(lhs, rhs))),
             OperatorToken::Equality => Ok(Box::new(EqualityExpression::new(lhs, rhs))),
             OperatorToken::Inequality => Ok(Box::new(NotExpression::new(Box::new(EqualityExpression::new(lhs, rhs))))),
-            
-            
             OperatorToken::Not => Err(CompilerError {
                 message: "'Not' operator is not a binary operator!".into()
             }),
+            OperatorToken::Greater => Ok(Box::new(GreaterThanExpression::new(lhs, rhs))),
+            OperatorToken::Less => Ok(Box::new(GreaterThanExpression::new(rhs, lhs))),
+            OperatorToken::GreaterEquals => Ok(Box::new(
+                NotExpression::new(Box::new(GreaterThanExpression::new(rhs, lhs)))
+            )),
+            OperatorToken::LessEquals => Ok(Box::new(
+                NotExpression::new(Box::new(GreaterThanExpression::new(lhs, rhs)))
+            )),
         }
     }
     
