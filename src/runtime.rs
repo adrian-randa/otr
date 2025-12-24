@@ -695,7 +695,7 @@ impl RuntimeObject {
     pub(crate) fn new() -> Self {
         Self {
             base_environement: Environment::new("".into()),
-            entrypoint: None
+            entrypoint: None,
         }
     }
 

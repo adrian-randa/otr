@@ -24,6 +24,7 @@ pub enum KeywordToken {
     Break,
     Module,
     Export,
+    Import,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

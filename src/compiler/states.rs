@@ -1,4 +1,4 @@
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::module::CompilerModuleState}, lexer::token::{KeywordToken, Token}, runtime::environment::{self, Environment}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{import::CompilerImportState, module::CompilerModuleState}}, lexer::token::{KeywordToken, Token}, runtime::environment::{self, Environment}};
 
 #[derive(Clone)]
 pub struct CompilerBaseState {
@@ -8,7 +8,7 @@ pub struct CompilerBaseState {
 impl CompilerBaseState {
     pub fn new() -> Self {
         Self {
-            environment: Environment::new("".into()),
+            environment: Environment::default(),
         }
     }
 }
@@ -19,6 +19,10 @@ impl CompilerState for CompilerBaseState {
 
             Token::Keyword(KeywordToken::Module) => {
                 Ok(Box::new(CompilerModuleState::new(*self)))
+            }
+
+            Token::Keyword(KeywordToken::Import) => {
+                Ok(Box::new(CompilerImportState::new(*self)))
             }
 
             _ => Err(CompilerError {
@@ -35,3 +39,4 @@ impl CompilerState for CompilerBaseState {
 pub mod module;
 pub mod decorator;
 pub mod procedure;
+pub mod import;

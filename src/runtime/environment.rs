@@ -7,6 +7,7 @@ use super::RuntimeError;
 use crate::runtime::Struct;
 use crate::runtime::module::Module;
 use crate::runtime::procedures::Procedure;
+use crate::runtime::procedures::builtin::arrays;
 
 use super::ModuleAddress;
 
@@ -24,6 +25,18 @@ pub struct Environment {
     pub contained_module_id: String,
     pub loaded_modules: HashMap<String, Rc<Module>>,
     pub scope: Scope,
+}
+
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            contained_module_id: Default::default(),
+            loaded_modules: HashMap::from_iter(vec![
+                ("Arrays".into(), Rc::new(arrays::get_module()))
+            ].into_iter()),
+            scope: Default::default()
+        }
+    }
 }
 
 impl Environment {

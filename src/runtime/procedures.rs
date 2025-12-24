@@ -57,8 +57,6 @@ impl Procedure for CompiledProcedure {
         let mut pc = 0;
 
         while pc < self.instructions.len() {
-            println!("{:?}", environment.scope);
-
             match &self.instructions[pc] {
                 Instruction::PushVarToScope { identifier } => {
                     environment.scope.push(identifier.clone())?;
@@ -127,6 +125,8 @@ struct IfScopeEscapeHandler {
 
 impl ScopeExcapeHandler for IfScopeEscapeHandler {
     fn resolve(&self, instructions: &mut Vec<Instruction>) {
+        instructions.push(Instruction::ShrinkStack);
+
         let next_ic = instructions.len();
 
         if let Some(Instruction::JumpConditional {
@@ -147,6 +147,7 @@ struct WhileScopeEscapeHandler {
 
 impl ScopeExcapeHandler for WhileScopeEscapeHandler {
     fn resolve(&self, instructions: &mut Vec<Instruction>) {
+        instructions.push(Instruction::ShrinkStack);
         instructions.push(Instruction::JumpConditional {
             condition_expression: Box::new(Value::Bool(true)),
             jump_target: self.target_instruction
@@ -385,6 +386,9 @@ impl CompiledProcedureBuilder {
                 self.procedure.instructions.push(
                     Instruction::JumpConditional { condition_expression, jump_target: usize::MAX }
                 );
+                self.procedure.instructions.push(
+                    Instruction::GrowStack
+                );
             },
             CompiledProcedureBuilderState::WhileStatement { condition_expression, parenthesis_index } => {
                 if *parenthesis_index > 0 {
@@ -397,6 +401,7 @@ impl CompiledProcedureBuilder {
                     ExpressionParser::parse(condition_expression.to_owned())?
                 ));
 
+                
                 self.scope_stack.push(
                     Box::new(WhileScopeEscapeHandler { target_instruction: self.procedure.instructions.len() })
                 );
@@ -404,6 +409,7 @@ impl CompiledProcedureBuilder {
                 self.procedure.instructions.push(
                     Instruction::JumpConditional { condition_expression, jump_target: usize::MAX }
                 );
+                self.procedure.instructions.push(Instruction::GrowStack);
             },
             CompiledProcedureBuilderState::Indeterminate { tokens } => {
                 let expression = ExpressionParser::parse(tokens.to_owned())?;

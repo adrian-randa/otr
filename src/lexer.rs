@@ -250,6 +250,7 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("else".into(), Keyword(Else)))
             .with_rule(KeywordRule::new("module".into(), Keyword(Module)))
             .with_rule(KeywordRule::new("export".into(), Keyword(Export)))
+            .with_rule(KeywordRule::new("import".into(), Keyword(Import)))
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
             .with_rule(PatternRule::new("||".into(), Operator(Or)))
             .with_rule(PatternRule::new("==".into(), Operator(Equality)))
