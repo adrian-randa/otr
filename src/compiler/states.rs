@@ -1,4 +1,4 @@
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{import::CompilerImportState, module::CompilerModuleState}}, lexer::token::{KeywordToken, Token}, runtime::environment::{self, Environment}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{import::CompilerImportState, module::CompilerModuleState, r#struct::CompilerStructState}}, lexer::token::{KeywordToken, Token}, runtime::environment::{self, Environment}};
 
 #[derive(Clone)]
 pub struct CompilerBaseState {
@@ -39,4 +39,5 @@ impl CompilerState for CompilerBaseState {
 pub mod module;
 pub mod decorator;
 pub mod procedure;
+pub mod r#struct;
 pub mod import;

@@ -101,7 +101,7 @@ impl TokenizerRule for NumberLiteralRule {
             if fragment.contains('.') {
                 return (Some(Literal(Decimal(fragment))), "".into());
             } else {
-                return (Some(Literal(WholeNumber(fragment))), "".into());
+                return (Some(Literal(Integer(fragment))), "".into());
             }
         }
 

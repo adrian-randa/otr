@@ -1,6 +1,6 @@
 use std::rc::Rc;
 
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState}}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::{RuntimeError, module::Module}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState, r#struct::CompilerStructState}}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::{RuntimeError, module::Module}};
 
 #[derive(Debug, PartialEq, Eq)]
 enum ModuleSubstate {
@@ -71,7 +71,11 @@ impl CompilerState for CompilerModuleState {
                     }
 
                     Token::Keyword(KeywordToken::Proc) => {
-                        return Ok(Box::new(CompilerProcedureState::new(*self, Vec::new())))
+                        return Ok(Box::new(CompilerProcedureState::new(*self, Vec::new())));
+                    }
+
+                    Token::Keyword(KeywordToken::Struct) => {
+                        return Ok(Box::new(CompilerStructState::new(*self)));
                     }
 
                     Token::Punctuation(PunctuationToken::At) => {

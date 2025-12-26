@@ -13,8 +13,6 @@ use super::ModuleAddress;
 
 use super::Scope;
 
-use super::module;
-
 use std::rc::Rc;
 
 use std::collections::HashMap;
@@ -71,7 +69,7 @@ impl Environment {
             .get(address.get_module_id())
             .ok_or(RuntimeError {
                 message: format!(
-                    "Module \"{}\" not loaded in this environment!",
+                    "Module '{}' not loaded in this environment!",
                     address.get_module_id()
                 ),
             })?;

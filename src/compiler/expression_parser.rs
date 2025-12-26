@@ -240,7 +240,9 @@ impl ExpressionParser {
             current.push(next);
         }
 
-        slices.push(current);
+        if !current.is_empty() {
+            slices.push(current);
+        }
 
         Ok(slices)
     }

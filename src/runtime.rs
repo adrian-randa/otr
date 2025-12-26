@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::fmt::Display;
+use std::fmt::{Display, format};
 use std::ops::Deref;
 use std::vec::IntoIter;
 use std::{collections::HashMap, rc::Rc};
@@ -45,7 +45,10 @@ impl TryFrom<LiteralToken> for Value {
 
     fn try_from(value: LiteralToken) -> Result<Self, Self::Error> {
         match value {
-            LiteralToken::WholeNumber(num) => {
+            LiteralToken::Null => {
+                Ok(Self::Null)
+            }
+            LiteralToken::Integer(num) => {
                 Ok(Self::Integer(
                     num.parse().map_err(|_| CompilerError {
                         message: format!("Could not parse '{}' as a whole number!", num)
@@ -101,13 +104,13 @@ impl Expression for Value {
 
 #[derive(Debug, Clone, PartialEq)]
 struct Member {
-    is_private: bool,
+    is_public: bool,
     value: Value,
 }
 
 impl From<(bool, Value)> for Member {
-    fn from((is_private, value): (bool, Value)) -> Self {
-        Self { is_private, value }
+    fn from((is_public, value): (bool, Value)) -> Self {
+        Self { is_public, value }
     }
 }
 
@@ -121,22 +124,22 @@ impl Member {
     }
 
     pub fn get_value_if_public(&self) -> Result<&Value, RuntimeError> {
-        if self.is_private {
+        if self.is_public {
+            Ok(&self.value)
+        } else {
             Err(RuntimeError {
                 message: "Tried to access a private field!".into(),
             })
-        } else {
-            Ok(&self.value)
         }
     }
 
     pub fn get_value_mut_if_public(&mut self) -> Result<&mut Value, RuntimeError> {
-        if self.is_private {
+        if self.is_public {
+            Ok(&mut self.value)
+        } else {
             Err(RuntimeError {
                 message: "Tried to access a private field!".into(),
             })
-        } else {
-            Ok(&mut self.value)
         }
     }
 
@@ -145,14 +148,19 @@ impl Member {
     }
 
     pub fn set_if_public(&mut self, value: Value) -> Result<(), RuntimeError> {
-        if self.is_private {
+        if self.is_public {
+            self.value = value;
+            Ok(())
+        } else {
             Err(RuntimeError {
                 message: "Tried to access a private field!".into(),
             })
-        } else {
-            self.value = value;
-            Ok(())
         }
+    }
+    
+    fn set(&mut self, value: Value) -> Result<(), RuntimeError> {
+        self.value = value;
+        Ok(())
     }
 }
 
@@ -162,6 +170,22 @@ pub struct MemberMap {
 }
 
 impl MemberMap {
+    pub fn new() -> Self {
+        Self {
+            members: HashMap::new(),
+        }
+    }
+
+    pub fn insert_member(&mut self, ident: String, value: Value, is_public: bool) -> Result<(), RuntimeError> {
+        if self.members.insert(ident.clone(), Member { value, is_public }).is_some() {
+            return Err(RuntimeError {
+                message: format!("Cannot insert key '{}' into struct as it is already present!", ident)
+            })
+        }
+
+        Ok(())
+    }
+
     pub fn get_member(&self, ident: &String) -> Result<&Value, RuntimeError> {
         let member = self.members.get(ident).ok_or(RuntimeError {
             message: format!("No member labeled '{}'!", ident),
@@ -194,12 +218,20 @@ impl MemberMap {
         member.get_value_mut_if_public()
     }
 
-    pub fn set_member(&mut self, ident: &String, value: Value) -> Result<(), RuntimeError> {
+    pub fn set_public_member(&mut self, ident: &String, value: Value) -> Result<(), RuntimeError> {
         let member = self.members.get_mut(ident).ok_or(RuntimeError {
             message: format!("No member labeled '{}'!", ident),
         })?;
 
         member.set_if_public(value)
+    }
+
+    pub fn set_member(&mut self, ident: &String, value: Value) -> Result<(), RuntimeError> {
+        let member = self.members.get_mut(ident).ok_or(RuntimeError {
+            message: format!("No member labeled '{}'!", ident),
+        })?;
+
+        member.set(value)
     }
 
     pub fn len(&self) -> usize {
@@ -253,6 +285,13 @@ pub struct Struct {
 }
 
 impl Struct {
+    pub fn new(struct_id: ModuleAddress) -> Self {
+        Self {
+            struct_id,
+            members: MemberMap::new(),
+        }
+    }
+
     pub fn get_struct_id(&self) -> &ModuleAddress {
         &self.struct_id
     }
@@ -451,7 +490,7 @@ impl Stack {
 
         Err(RuntimeError {
             message: format!(
-                "Could not find the variable \"{}\" in this scope!",
+                "Could not find the variable '{}' in this scope!",
                 identifier
             ),
         })
@@ -474,7 +513,7 @@ impl Stack {
         }
         Err(RuntimeError {
             message: format!(
-                "Could not find the variable \"{}\" in this scope!",
+                "Could not find the variable '{}' in this scope!",
                 identifier
             ),
         })
@@ -490,7 +529,7 @@ impl Stack {
 
         Err(RuntimeError {
             message: format!(
-                "Could not find the variable \"{}\" in this scope!",
+                "Could not find the variable '{}' in this scope!",
                 identifier
             ),
         })
@@ -561,6 +600,13 @@ impl Scope {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
                     if let Value::Struct(ref obj) = value {
+                        let members = obj.get_members();
+
+                        if let Ok(member) = members.get_public_member(&ident) {
+                            value = member;
+                            continue;
+                        }
+
                         if obj.get_struct_id().get_module_id() != contained_module_id {
                             Err(RuntimeError {
                                 message: format!(
@@ -571,7 +617,7 @@ impl Scope {
                             })?;
                         }
 
-                        value = obj.get_members().get_public_member(&ident)?;
+                        value = members.get_member(&ident)?;
                     } else {
                         Err(RuntimeError {
                             message: format!(
@@ -635,18 +681,25 @@ impl Scope {
         for subaddressant in addressants {
             match subaddressant {
                 ScopeAddressant::Identifier(ident) => {
-                    if let Value::Struct(ref mut s) = value {
-                        if s.get_struct_id().get_module_id() != contained_module_id {
+                    if let Value::Struct(ref mut obj) = value {
+                        let struct_id = obj.get_struct_id().clone();
+
+                        if let Ok(_member) = obj.get_members().get_public_member(&ident) {
+                            value = obj.get_members_mut().get_public_member_mut(&ident)?;
+                            continue;
+                        }
+
+                        if struct_id.get_module_id() != contained_module_id {
                             Err(RuntimeError {
                                 message: format!(
                                     "Tried to access field '{}' of {} outside it's module!",
                                     ident,
-                                    s.get_struct_id()
+                                    struct_id
                                 ),
                             })?;
                         }
 
-                        value = s.get_members_mut().get_public_member_mut(&ident)?;
+                        value = obj.get_members_mut().get_member_mut(&ident)?;
                     } else {
                         Err(RuntimeError {
                             message: format!(

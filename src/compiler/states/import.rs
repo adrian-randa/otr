@@ -1,8 +1,8 @@
-use crate::{compiler::{CompilerError, CompilerState, states::CompilerBaseState}, lexer::token::Token};
+use crate::{compiler::{CompilerError, CompilerState, file_reader::ImportAddress, states::CompilerBaseState}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}};
 
 pub struct CompilerImportState {
     base_state: CompilerBaseState,
-    module_id: Option<String>,
+    module_id: Option<ImportAddress>,
 }
 
 impl CompilerState for CompilerImportState {
@@ -11,7 +11,10 @@ impl CompilerState for CompilerImportState {
         if self.module_id.is_none() {
             match token {
                 Token::Identifier(ident) => {
-                    self.module_id = Some(ident);
+                    self.module_id = Some(ImportAddress {
+                        module_id: ident,
+                        path: None
+                    });
                     return Ok(self);
                 }
 
@@ -23,9 +26,35 @@ impl CompilerState for CompilerImportState {
             }
         } else {
             match token {
-                Token::Punctuation(crate::lexer::token::PunctuationToken::Semicolon) => {
+                Token::Punctuation(PunctuationToken::Semicolon) => {
                     compiler_environment.get_file_reader_mut().enqueue(self.module_id.unwrap());
                     return Ok(Box::new(self.base_state))
+                }
+
+                Token::Keyword(KeywordToken::From) => {
+                    let module_id = self.module_id.as_mut().unwrap();
+
+                    if module_id.path.is_some() {
+                        return Err(CompilerError {
+                            message: "Cannot declare more than one location for an import!".into()
+                        })
+                    }
+
+                    module_id.path = Some(String::new());
+
+                    return Ok(self)
+                }
+
+                Token::Literal(LiteralToken::String(path)) => {
+                    let module_id = self.module_id.as_mut().unwrap();
+                    if module_id.path.is_some() {
+                        module_id.path = Some(path);
+                        return Ok(self)
+                    } else {
+                        return Err(CompilerError {
+                            message: "Unexpected String literal. Try adding 'from' to declare a location for an import!".into()
+                        })
+                    }
                 }
                 
                 other => {

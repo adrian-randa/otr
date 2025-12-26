@@ -68,7 +68,7 @@ impl CompilerState for CompilerProcedureState {
                         self.substate = ProcedureSubstate::PreInstructions;
                         return Ok(self);
                     }
-                    
+
 
                     other => {
                         return Err(CompilerError {
@@ -108,7 +108,7 @@ impl CompilerState for CompilerProcedureState {
             },
             ProcedureSubstate::Instructions => {
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) = token {
-                    if self.procedure.scope_stack_size() == 0 {
+                    if self.procedure.scope_stack_size() == 0 && !self.procedure.is_scanning() {
                         let procedure = self.procedure.build()?;
                         let name = self.name.ok_or(CompilerError {
                             message: "Missing procedure name!".into()

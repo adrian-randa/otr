@@ -157,7 +157,7 @@ impl FromStr for FragmentStream {
                 match (current_kind, next_char_kind) {
                     (Alphabetic, Punctuation)
                     | (Punctuation, Alphabetic)
-                    | (Numeric, Alphabetic) => {
+                    /*| (Numeric, Alphabetic) */ => {
                         stream.push(current);
                         current = String::new();
                     }
@@ -251,6 +251,17 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("module".into(), Keyword(Module)))
             .with_rule(KeywordRule::new("export".into(), Keyword(Export)))
             .with_rule(KeywordRule::new("import".into(), Keyword(Import)))
+            .with_rule(KeywordRule::new("from".into(), Keyword(From)))
+            .with_rule(KeywordRule::new("public".into(), Keyword(Public)))
+
+            .with_rule(KeywordRule::new("Null".into(), Literal(LiteralToken::Null)))
+            .with_rule(KeywordRule::new("Integer".into(), PrimitiveType(PrimitiveTypeToken::Integer)))
+            .with_rule(KeywordRule::new("Decimal".into(), PrimitiveType(PrimitiveTypeToken::Decimal)))
+            .with_rule(KeywordRule::new("Boolean".into(), PrimitiveType(PrimitiveTypeToken::Boolean)))
+            .with_rule(KeywordRule::new("Char".into(), PrimitiveType(PrimitiveTypeToken::Char)))
+            .with_rule(KeywordRule::new("String".into(), PrimitiveType(PrimitiveTypeToken::String)))
+            .with_rule(KeywordRule::new("Array".into(), PrimitiveType(PrimitiveTypeToken::Array)))
+
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
             .with_rule(PatternRule::new("||".into(), Operator(Or)))
             .with_rule(PatternRule::new("==".into(), Operator(Equality)))

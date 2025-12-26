@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{any::Any, collections::HashMap, rc::Rc};
 
 use crate::{compiler::{CompilerError, expression_parser::ExpressionParser}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{
     Environment, Expression, RuntimeError, Scope, ScopeAddress, ScopeAddressant, Value, expressions::boolean::NotExpression,
@@ -116,6 +116,8 @@ impl Procedure for CompiledProcedure {
 
 trait ScopeExcapeHandler: std::fmt::Debug {
     fn resolve(&self, instructions: &mut Vec<Instruction>);
+
+    fn as_any(&self) -> &dyn Any;
 }
 
 #[derive(Debug)]
@@ -137,6 +139,10 @@ impl ScopeExcapeHandler for IfScopeEscapeHandler {
         } else {
             panic!("Tried resolving if scope escape but initial jump is missing!");
         }
+    }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
     }
 }
 
@@ -163,6 +169,10 @@ impl ScopeExcapeHandler for WhileScopeEscapeHandler {
             panic!("Tried resolving if scope escape but initial jump is missing!");
         }
     }
+    
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
 }
 
 #[derive(Debug)]
@@ -180,6 +190,9 @@ enum CompiledProcedureBuilderState {
         condition_expression: Vec<Token>,
         parenthesis_index: usize,
     },
+    ElseStatement {
+        original_jump: usize,
+    },
     WhileStatement {
         condition_expression: Vec<Token>,
         parenthesis_index: usize,
@@ -196,7 +209,8 @@ enum CompiledProcedureBuilderState {
 pub struct CompiledProcedureBuilder {
     procedure: CompiledProcedure,
     state: CompiledProcedureBuilderState,
-    scope_stack: Vec<Box<dyn ScopeExcapeHandler>>,
+    scope_stack: Vec<Box<dyn ScopeExcapeHandler + 'static>>,
+    last_popped_scope: Option<Box<dyn ScopeExcapeHandler + 'static>>,
 }
 
 impl CompiledProcedureBuilder {
@@ -205,6 +219,15 @@ impl CompiledProcedureBuilder {
             procedure: CompiledProcedure { arguments_identifiers: Vec::new(), instructions: Vec::new() },
             state: CompiledProcedureBuilderState::Base,
             scope_stack: Vec::new(),
+            last_popped_scope: None,
+        }
+    }
+
+    pub fn is_scanning(&self) -> bool {
+        if let CompiledProcedureBuilderState::Base = self.state {
+            false
+        } else {
+            true
         }
     }
 
@@ -233,6 +256,19 @@ impl CompiledProcedureBuilder {
                     Token::Keyword(KeywordToken::If) => {
                         self.state = IfStatement { condition_expression: Vec::new(), parenthesis_index: 0 }
                     }
+                    Token::Keyword(KeywordToken::Else) => {
+                        let last_scope = self.last_popped_scope.as_ref()
+                            .ok_or(CompilerError {
+                                message: "Missing if-clause!".into()
+                            })?;
+                        
+                        let if_clause = last_scope.as_any()
+                            .downcast_ref::<IfScopeEscapeHandler>().ok_or(CompilerError {
+                                message: "else-clauses can only extend 'if' clauses!".into()
+                            })?;
+                        
+                        self.state = ElseStatement { original_jump: if_clause.target_instruction };
+                    }
                     Token::Keyword(KeywordToken::While) => {
                         self.state = WhileStatement { condition_expression: Vec::new(), parenthesis_index: 0 }
                     }
@@ -241,12 +277,17 @@ impl CompiledProcedureBuilder {
                     }
 
                     Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
-                        self.scope_stack
+                        let handler = self.scope_stack
                             .pop()
                             .ok_or(CompilerError {
                                 message: "Invalid closing curly brace!".into()
-                            })?
-                            .resolve(&mut self.procedure.instructions);
+                            })?;
+                        
+                        handler.resolve(&mut self.procedure.instructions);
+
+                        
+                        
+                        self.last_popped_scope = Some(handler);
                     }
 
                     other => {
@@ -300,6 +341,19 @@ impl CompiledProcedureBuilder {
 
                 condition_expression.push(token);
             },
+            ElseStatement { original_jump: _ } => {
+                match token {
+                    Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) => {
+                        return self.finish_current_instruction();
+                    }
+
+                    other => {
+                        return Err(CompilerError {
+                            message: format!("Unexpected token. Expected '{{', found {:?}!", other)
+                        });
+                    }
+                }
+            }
             WhileStatement { condition_expression, parenthesis_index } => {
                 if let Token::Punctuation(PunctuationToken::Parenthesis(par)) = &token {
                     match par {
@@ -390,6 +444,34 @@ impl CompiledProcedureBuilder {
                     Instruction::GrowStack
                 );
             },
+            CompiledProcedureBuilderState::ElseStatement { original_jump } => {
+                let instruction = &mut self.procedure.instructions[*original_jump];
+
+                match instruction {
+                    Instruction::JumpConditional { condition_expression: _, jump_target } => {
+                        *jump_target += 1;
+
+                        self.scope_stack.push(
+                            Box::new(IfScopeEscapeHandler { target_instruction: self.procedure.instructions.len() })
+                        );
+
+                        self.procedure.instructions.push(Instruction::JumpConditional {
+                            condition_expression: Box::new(Value::Bool(true)),
+                            jump_target: usize::MAX
+                        });
+
+                        self.procedure.instructions.push(
+                            Instruction::GrowStack
+                        );
+                    }
+
+                    _ => {
+                        return Err(CompilerError {
+                            message: "Instruction referenced by 'if' scope handler is not of type JumpConditional!".into()
+                        })
+                    }
+                }
+            }
             CompiledProcedureBuilderState::WhileStatement { condition_expression, parenthesis_index } => {
                 if *parenthesis_index > 0 {
                     return Err(CompilerError {
@@ -419,7 +501,11 @@ impl CompiledProcedureBuilder {
                 );
             },
             CompiledProcedureBuilderState::Return { expression } => {
-                let expression = ExpressionParser::parse(expression.to_owned())?;
+                let expression = if expression.is_empty() {
+                    Box::new(Value::Null)
+                } else {
+                    ExpressionParser::parse(expression.to_owned())?
+                };
 
                 self.procedure.instructions.push(
                     Instruction::Return { expression }

@@ -7,6 +7,7 @@ pub enum Token {
     Punctuation(PunctuationToken),
     Identifier(String),
     Literal(LiteralToken),
+    PrimitiveType(PrimitiveTypeToken)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +26,9 @@ pub enum KeywordToken {
     Module,
     Export,
     Import,
+    From,
+    Public,
+    Is,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -68,11 +72,22 @@ pub enum PunctuationToken {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiteralToken {
-    WholeNumber(String),
+    Null,
+    Integer(String),
     Decimal(String),
     Boolean(String),
     Char(String),
     String(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum PrimitiveTypeToken {
+    Integer,
+    Decimal,
+    Boolean,
+    Char,
+    String,
+    Array,
 }
 
 #[derive(Debug, IntoIterator)]
