@@ -96,7 +96,7 @@ impl TokenizerRule for NumberLiteralRule {
         if fragment
             .chars()
             .next()
-            .is_some_and(|c| c.is_numeric() || c == '-')
+            .is_some_and(|c| c.is_numeric() || (c == '-' && fragment.len() > 1))
         {
             if fragment.contains('.') {
                 return (Some(Literal(Decimal(fragment))), "".into());

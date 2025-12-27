@@ -30,6 +30,10 @@ fn main() {
 
     //println!("Basepath {:?} | Module name {}", env::current_dir().unwrap(), module_name);
 
+    let test = file_reader.try_read_module(&main_module).unwrap();
+
+    println!("{:?}", Tokenizer::default().tokenize(FragmentStream::from_str(&test).unwrap()));
+
     file_reader.enqueue(main_module);
 
     let compiler = Compiler::new(file_reader);
