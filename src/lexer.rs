@@ -74,6 +74,9 @@ impl FromStr for FragmentStream {
 
                 current.push('\'');
 
+                stream.push(current);
+                current = String::new();
+
                 i += 2;
                 continue;
             }
@@ -253,6 +256,8 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("import".into(), Keyword(Import)))
             .with_rule(KeywordRule::new("from".into(), Keyword(From)))
             .with_rule(KeywordRule::new("public".into(), Keyword(Public)))
+            .with_rule(KeywordRule::new("ref".into(), Keyword(Ref)))
+            .with_rule(KeywordRule::new("clone".into(), Keyword(Clone)))
 
             .with_rule(KeywordRule::new("Null".into(), Literal(LiteralToken::Null)))
             .with_rule(KeywordRule::new("Integer".into(), PrimitiveType(PrimitiveTypeToken::Integer)))

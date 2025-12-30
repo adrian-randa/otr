@@ -1,7 +1,7 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::runtime::{
-    Environment, Expression, ModuleAddress, RuntimeError, Scope, ScopeAddress, Value,
+    Environment, Expression, ModuleAddress, RuntimeError, scope::{Scope, ScopeAddress}, Value,
 };
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ impl Expression for StructConstructionExpression {
             instance.get_members_mut().set_member(field, value)?;
         }
 
-        Ok(Value::Struct(instance))
+        Ok(Value::Struct(Rc::new(RefCell::new(Some(instance)))))
     }
 }
 
@@ -63,7 +63,29 @@ pub struct VariableExpression {
 
 impl Expression for VariableExpression {
     fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
-        environment.lookup_variable(self.variable_address.clone())
+        environment.query_variable(self.variable_address.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct ReferenceExpression {
+    pub variable_address: ScopeAddress,
+}
+
+impl Expression for ReferenceExpression {
+    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
+        environment.reference_variable(self.variable_address.clone())
+    }
+}
+
+#[derive(Debug)]
+pub struct CloneExpression {
+    pub variable_address: ScopeAddress,
+}
+
+impl Expression for CloneExpression {
+    fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError> {
+        environment.clone_variable(self.variable_address.clone())
     }
 }
 

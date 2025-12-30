@@ -29,6 +29,8 @@ pub enum KeywordToken {
     From,
     Public,
     Is,
+    Ref,
+    Clone,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

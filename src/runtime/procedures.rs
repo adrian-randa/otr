@@ -1,7 +1,7 @@
-use std::{any::Any, collections::HashMap, rc::Rc};
+use std::{any::Any, collections::HashMap};
 
 use crate::{compiler::{CompilerError, expression_parser::ExpressionParser}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{
-    Environment, Expression, RuntimeError, Scope, ScopeAddress, ScopeAddressant, Value, expressions::boolean::NotExpression,
+    Environment, Expression, RuntimeError, scope::ScopeAddress, ScopeAddressant, Value, expressions::boolean::NotExpression,
 }};
 
 pub trait Procedure: std::fmt::Debug {
@@ -71,7 +71,7 @@ impl Procedure for CompiledProcedure {
                     environment.scope.shrink_stack();
                 }
                 Instruction::EvaluateExpression { expression, target } => {
-                    let eval_result = expression.eval(&mut environment)?;
+                    let eval_result = expression.eval(&environment)?;
 
                     if let Some(target) = target {
                         environment.set_variable(target.clone(), eval_result)?;

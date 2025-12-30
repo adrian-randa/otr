@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{compiler::CompilerError, lexer::token::{OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress, ScopeAddress, ScopeAddressant, Value, expressions::{EqualityExpression, ProcedureCallExpression, StructConstructionExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}}};
+use crate::{compiler::CompilerError, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress, scope::{ScopeAddress, ScopeAddressant}, Value, expressions::{CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}}};
 
 #[derive(Debug)]
 pub enum ExpressionAtom {
@@ -361,98 +361,115 @@ impl ExpressionParser {
 
 
                 let base_ident = tokens[0].to_owned();
-                // Complex address
-                if let Token::Identifier(base_ident) = base_ident {
+                match base_ident {
+                    Token::Identifier(base_ident) => {
+                        let first_separator = tokens[1].to_owned();
 
-                    let first_separator = tokens[1].to_owned();
+                        // Member of a module
+                        if let Token::Punctuation(PunctuationToken::DoubleColon) = first_separator {
+                            let mut tokens = tokens.into_iter().skip(2);
 
-                    // Member of a module
-                    if let Token::Punctuation(PunctuationToken::DoubleColon) = first_separator {
-                        let mut tokens = tokens.into_iter().skip(2);
+                            let member_ident = tokens.next();
+                            if let Some(Token::Identifier(member_ident)) = member_ident {
+                                match tokens.next() {
+                                    
+                                    // Procedure
+                                    Some(Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening))) => {
+                                        let arguments = Self::take_until_closing(
+                                            &mut tokens,
+                                            Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
+                                        )?;
 
-                        let member_ident = tokens.next();
-                        if let Some(Token::Identifier(member_ident)) = member_ident {
-                            match tokens.next() {
-                                
-                                // Procedure
-                                Some(Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening))) => {
-                                    let arguments = Self::take_until_closing(
-                                        &mut tokens,
-                                        Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
-                                    )?;
+                                        let arguments = Self::split_by_commas(arguments)?;
+                                        let mut argument_expressions = Vec::new();
+                                        for argument in arguments {
+                                            argument_expressions.push(Self::parse(argument)?);
+                                        }
 
-                                    let arguments = Self::split_by_commas(arguments)?;
-                                    let mut argument_expressions = Vec::new();
-                                    for argument in arguments {
-                                        argument_expressions.push(Self::parse(argument)?);
+                                        let module_address = ModuleAddress::new(base_ident, member_ident);
+
+                                        return Ok(ExpressionAtom::Subexpression(Box::new(ProcedureCallExpression {
+                                            procedure_id: module_address,
+                                            arguments: argument_expressions
+                                        })));
                                     }
 
-                                    let module_address = ModuleAddress::new(base_ident, member_ident);
+                                    // Struct construction
+                                    Some(Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening))) => {
+                                        let fields = Self::take_until_closing(
+                                            &mut tokens,
+                                            Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing))
+                                        )?;
+                                        let fields = Self::split_by_commas(fields)?;
 
-                                    return Ok(ExpressionAtom::Subexpression(Box::new(ProcedureCallExpression {
-                                        procedure_id: module_address,
-                                        arguments: argument_expressions
-                                    })));
-                                }
+                                        let mut field_overrides = Vec::new();
 
-                                // Struct construction
-                                Some(Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening))) => {
-                                    let fields = Self::take_until_closing(
-                                        &mut tokens,
-                                        Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing))
-                                    )?;
-                                    let fields = Self::split_by_commas(fields)?;
-
-                                    let mut field_overrides = Vec::new();
-
-                                    for field in fields {
-                                        let mut field = field.into_iter();
-                                        let field_ident = field.next();
-                                        if let Some(Token::Identifier(field_ident)) = field_ident {
-                                            let separator = field.next();
-                                            if let Some(Token::Punctuation(PunctuationToken::Colon)) = separator {
-                                                field_overrides.push((
-                                                    field_ident,
-                                                    Self::parse(field)?
-                                                ));
+                                        for field in fields {
+                                            let mut field = field.into_iter();
+                                            let field_ident = field.next();
+                                            if let Some(Token::Identifier(field_ident)) = field_ident {
+                                                let separator = field.next();
+                                                if let Some(Token::Punctuation(PunctuationToken::Colon)) = separator {
+                                                    field_overrides.push((
+                                                        field_ident,
+                                                        Self::parse(field)?
+                                                    ));
+                                                } else {
+                                                    return Err(CompilerError {
+                                                        message: format!("Unexpected token. Expected identifier, found {:?}!", separator)
+                                                    });
+                                                }
                                             } else {
                                                 return Err(CompilerError {
-                                                    message: format!("Unexpected token. Expected identifier, found {:?}!", separator)
+                                                    message: format!("Unexpected token. Expected identifier, found {:?}!", field_ident)
                                                 });
                                             }
-                                        } else {
-                                            return Err(CompilerError {
-                                                message: format!("Unexpected token. Expected identifier, found {:?}!", field_ident)
-                                            });
                                         }
+
+                                        let module_address = ModuleAddress::new(base_ident, member_ident);
+
+                                        return Ok(ExpressionAtom::Subexpression(Box::new(StructConstructionExpression {
+                                            struct_id: module_address,
+                                            field_overrides
+                                        })));
                                     }
 
-                                    let module_address = ModuleAddress::new(base_ident, member_ident);
-
-                                    return Ok(ExpressionAtom::Subexpression(Box::new(StructConstructionExpression {
-                                        struct_id: module_address,
-                                        field_overrides
-                                    })));
+                                    other => {
+                                        return Err(CompilerError {
+                                            message: format!("Unexpected token: {:?}", other)
+                                        });
+                                    }
                                 }
-
-                                other => {
-                                    return Err(CompilerError {
-                                        message: format!("Unexpected token: {:?}", other)
-                                    });
-                                }
+                            } else {
+                                return Err(CompilerError {
+                                    message: format!("Unexpected token. Expected identifier, found {:?}", member_ident)
+                                });
                             }
                         } else {
-                            return Err(CompilerError {
-                                message: format!("Unexpected token. Expected identifier, found {:?}", member_ident)
-                            });
+                            return Self::parse_variable_address(tokens);
                         }
-                    } else {
-                        return Self::parse_variable_address(tokens);
                     }
-                } else {
-                    return Err(CompilerError {
-                        message: format!("Unexpected token. Expected identifier, found {:?}!", base_ident)
-                    });
+                    Token::Keyword(KeywordToken::Ref) => {
+                        let mut tokens = tokens;
+                        let tokens: Vec<Token> = tokens.drain(1..).collect();
+
+                        let variable_address = ScopeAddress::try_from(tokens)?;
+
+                        Ok(ExpressionAtom::Subexpression(Box::new(ReferenceExpression { variable_address })))
+                    }
+                    Token::Keyword(KeywordToken::Clone) => {
+                        let mut tokens = tokens;
+                        let tokens: Vec<Token> = tokens.drain(1..).collect();
+
+                        let variable_address = ScopeAddress::try_from(tokens)?;
+
+                        Ok(ExpressionAtom::Subexpression(Box::new(CloneExpression { variable_address })))
+                    }
+                    _ => {
+                        return Err(CompilerError {
+                            message: format!("Unexpected token. Expected identifier, found {:?}!", base_ident)
+                        });
+                    }
                 }
             },
         }

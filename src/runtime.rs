@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::fmt::{Display, format};
 use std::ops::Deref;
+use std::rc::Weak;
 use std::vec::IntoIter;
 use std::{collections::HashMap, rc::Rc};
 
@@ -13,6 +14,7 @@ use crate::lexer::token::{LiteralToken, ParenthesisType, PunctuationToken, Token
 use crate::runtime::environment::Environment;
 use crate::runtime::expressions::ProcedureCallExpression;
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
+use crate::runtime::scope::ScopeAddressant;
 
 pub mod environment;
 pub mod expressions;
@@ -28,7 +30,7 @@ pub trait Expression: std::fmt::Debug {
     fn eval(&self, environment: &Environment) -> Result<Value, RuntimeError>;
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug)]
 pub enum Value {
     Null,
     Integer(i64),
@@ -37,7 +39,48 @@ pub enum Value {
     Char(char),
     Bool(bool),
     Array(Vec<Value>),
-    Struct(Struct),
+    Struct(Rc<RefCell<Option<Struct>>>),
+    StructRef(Weak<RefCell<Option<Struct>>>),
+}
+
+impl Clone for Value {
+    fn clone(&self) -> Self {
+        match self {
+            Self::Null => Self::Null,
+            Self::Integer(arg0) => Self::Integer(arg0.clone()),
+            Self::Float(arg0) => Self::Float(arg0.clone()),
+            Self::String(arg0) => Self::String(arg0.clone()),
+            Self::Char(arg0) => Self::Char(arg0.clone()),
+            Self::Bool(arg0) => Self::Bool(arg0.clone()),
+            Self::Array(arg0) => Self::Array(arg0.clone()),
+            Self::Struct(arg0) => {
+                Value::Struct(Rc::new(RefCell::new(
+                    arg0.borrow().as_ref().map(|obj| {
+                        obj.clone()
+                    })
+                )))
+            },
+            Self::StructRef(arg0) => Self::StructRef(arg0.clone()),
+        }
+    }
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Integer(l0), Self::Integer(r0)) => l0 == r0,
+            (Self::Float(l0), Self::Float(r0)) => l0 == r0,
+            (Self::String(l0), Self::String(r0)) => l0 == r0,
+            (Self::Char(l0), Self::Char(r0)) => l0 == r0,
+            (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
+            (Self::Array(l0), Self::Array(r0)) => l0 == r0,
+            (Self::Struct(l0), Self::Struct(r0)) => l0 == r0,
+            (Self::StructRef(l0), Self::StructRef(r0)) => {
+                l0.upgrade() == r0.upgrade()
+            },
+            _ => core::mem::discriminant(self) == core::mem::discriminant(other),
+        }
+    }
 }
 
 impl TryFrom<LiteralToken> for Value {
@@ -91,7 +134,344 @@ impl Value {
             Value::Char(_) => "Char".into(),
             Value::Bool(_) => "Bool".into(),
             Value::Array(_) => "Array".into(),
-            Value::Struct(object) => object.get_struct_id().to_string(),
+            Value::Struct(object) => object
+                .borrow()
+                .as_ref()
+                .map(|obj| obj.get_struct_id().to_string())
+                .unwrap_or("Moved".into()),
+            Value::StructRef(weak) => weak
+                .upgrade()
+                .map(|obj| obj.borrow()
+                    .as_ref()
+                    .map(|obj| obj.get_struct_id().to_string())
+                    .unwrap_or("Moved".into()))
+                .unwrap_or("Dropped".into()),
+        }
+    }
+
+    pub fn query(&self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String) -> Result<Value, RuntimeError> {
+        let mut address = address.into_iter();
+        if let Some(addressant) = address.next() {
+            match self {
+                Value::Null | Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Char(_) |
+                Value::Bool(_)  => Err(RuntimeError {
+                    message: format!("Value '{:?}' doesn't acceppt addressant '{:?}'", self, addressant)
+                }),
+                Value::Array(arr) => {
+                    if let ScopeAddressant::Index(i) = addressant {
+                        arr.get(i).ok_or(RuntimeError {
+                            message: format!("Index out of bounds! Index {} on array of length {}!", i, arr.len())
+                        })?.query(address, contained_module_id)
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Arrays only accept indexing addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::Struct(ref_cell) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let reference = ref_cell.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::StructRef(weak) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let rc = weak.upgrade().ok_or(RuntimeError {
+                            message: format!("Use of dropped value!")
+                        })?;
+
+                        let reference = rc.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+            }
+        } else {
+            match self {
+                Value::Null | Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Char(_) |
+                Value::Bool(_) | Value::Array(_) | Value::StructRef(_) => Ok(self.clone()),
+                Value::Struct(ref_cell) => {
+                    if ref_cell.borrow().is_none() {
+                        return Err(RuntimeError {
+                            message: "Use of moved value!".into()
+                        });
+                    }
+
+                    // Move value
+                    let value = ref_cell.replace(None);
+
+                    Ok(Value::Struct(Rc::new(RefCell::new(value))))
+                }
+            }
+        }
+    }
+
+    pub fn reference(&self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String) -> Result<Value, RuntimeError> {
+        let mut address = address.into_iter();
+        if let Some(addressant) = address.next() {
+            match self {
+                Value::Null | Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Char(_) |
+                Value::Bool(_)  => Err(RuntimeError {
+                    message: format!("Value '{:?}' doesn't acceppt addressant '{:?}'", self, addressant)
+                }),
+                Value::Array(arr) => {
+                    if let ScopeAddressant::Index(i) = addressant {
+                        arr.get(i).ok_or(RuntimeError {
+                            message: format!("Index out of bounds! Index {} on array of length {}!", i, arr.len())
+                        })?.query(address, contained_module_id)
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Arrays only accept indexing addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::Struct(ref_cell) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let reference = ref_cell.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::StructRef(weak) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let rc = weak.upgrade().ok_or(RuntimeError {
+                            message: format!("Use of dropped value!")
+                        })?;
+
+                        let reference = rc.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+            }
+        } else {
+            match self {
+                Value::Null | Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Char(_) |
+                Value::Bool(_) | Value::Array(_) | Value::StructRef(_) => Err(RuntimeError {
+                    message: format!("Can only reference owned structs. Found {:?}!", self)
+                }),
+                Value::Struct(ref_cell) => {
+                    if ref_cell.borrow().is_none() {
+                        return Err(RuntimeError {
+                            message: "Use of moved value!".into()
+                        });
+                    }
+
+                    // Reference
+                    let weak = Rc::downgrade(&ref_cell.clone());
+
+                    Ok(Value::StructRef(weak))
+                }
+            }
+        }
+    }
+
+    pub fn set(&mut self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String, value: Value) -> Result<(), RuntimeError> {
+        let mut address = address.into_iter();
+        if let Some(addressant) = address.next() {
+            match self {
+                Value::Null | 
+                Value::Integer(_) |
+                Value::Float(_) |
+                Value::String(_) |
+                Value::Char(_) |
+                Value::Bool(_)  => Err(RuntimeError {
+                    message: format!("Value '{:?}' doesn't acceppt addressant '{:?}'", self, addressant)
+                }),
+                Value::Array(arr) => {
+                    if let ScopeAddressant::Index(i) = addressant {
+                        let len = arr.len();
+                        arr.get_mut(i).ok_or(RuntimeError {
+                            message: format!("Index out of bounds! Index {} on array of length {}!", i, len)
+                        })?.set(address, contained_module_id, value)
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Arrays only accept indexing addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::Struct(ref_cell) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let mut reference = ref_cell.borrow_mut();
+                        let obj = reference.as_mut().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let module_id = obj.get_struct_id().get_module_id().clone();
+
+                        let members = obj.get_members_mut();
+                        
+                        if &module_id == contained_module_id {
+                            members.get_member_mut(&ident)?.set(address, contained_module_id, value)
+                        } else {
+                            members.get_public_member_mut(&ident)?.set(address, contained_module_id, value)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::StructRef(weak) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let rc = weak.upgrade().ok_or(RuntimeError {
+                            message: format!("Use of dropped value!")
+                        })?;
+
+                        let mut reference = rc.borrow_mut();
+                        let obj = reference.as_mut().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let module_id = obj.get_struct_id().get_module_id().clone();
+
+                        let members = obj.get_members_mut();
+                        
+                        if &module_id == contained_module_id {
+                            members.get_member_mut(&ident)?.set(address, contained_module_id, value)
+                        } else {
+                            members.get_public_member_mut(&ident)?.set(address, contained_module_id, value)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+            }
+        } else {
+            *self = value;
+            Ok(())
+        }
+    }
+    
+    fn clone_variable(&self, address: IntoIter<ScopeAddressant>, contained_module_id: &String) -> Result<Value, RuntimeError> {
+        let mut address = address.into_iter();
+        if let Some(addressant) = address.next() {
+            match self {
+                Value::Null | Value::Integer(_) | Value::Float(_) | Value::String(_) | Value::Char(_) |
+                Value::Bool(_)  => Err(RuntimeError {
+                    message: format!("Value '{:?}' doesn't acceppt addressant '{:?}'", self, addressant)
+                }),
+                Value::Array(arr) => {
+                    if let ScopeAddressant::Index(i) = addressant {
+                        arr.get(i).ok_or(RuntimeError {
+                            message: format!("Index out of bounds! Index {} on array of length {}!", i, arr.len())
+                        })?.query(address, contained_module_id)
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Arrays only accept indexing addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::Struct(ref_cell) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let reference = ref_cell.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+                Value::StructRef(weak) => {
+                    if let ScopeAddressant::Identifier(ident) = addressant {
+                        let rc = weak.upgrade().ok_or(RuntimeError {
+                            message: format!("Use of dropped value!")
+                        })?;
+
+                        let reference = rc.borrow();
+                        let obj = reference.as_ref().ok_or(RuntimeError {
+                            message: format!("Use of moved value!")
+                        })?;
+
+                        let members = obj.get_members();
+                        
+                        if obj.get_struct_id().get_module_id() == contained_module_id {
+                            members.get_member(&ident)?.query(address, contained_module_id)
+                        } else {
+                            members.get_public_member(&ident)?.query(address, contained_module_id)
+                        }
+                    } else {
+                        Err(RuntimeError {
+                            message: format!("Structs only accept identifier addressants. Found {:?}!", addressant)
+                        })
+                    }
+                },
+            }
+        } else {
+            if let Value::StructRef(weak) = self {
+                let rc = weak.upgrade().ok_or(RuntimeError {
+                    message: "Clone of dropped value".into()
+                })?;
+
+                Ok(Value::Struct(rc).clone())
+            } else {
+                Ok(self.clone())
+            }
         }
     }
 }
@@ -305,438 +685,6 @@ impl Struct {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ScopeAddressant {
-    Identifier(String),
-    Index(usize),
-    DynamicIndex(Rc<dyn Expression>),
-}
-
-impl From<&str> for ScopeAddressant {
-    fn from(value: &str) -> Self {
-        Self::Identifier(value.into())
-    }
-}
-
-impl From<usize> for ScopeAddressant {
-    fn from(value: usize) -> Self {
-        Self::Index(value)
-    }
-}
-
-impl<E: Expression + 'static> From<E> for ScopeAddressant {
-    fn from(value: E) -> Self {
-        Self::DynamicIndex(Rc::new(value))
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ScopeAddress(Vec<ScopeAddressant>);
-
-impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
-    type Error = ();
-
-    fn try_from(value: Vec<ScopeAddressant>) -> Result<Self, Self::Error> {
-        if value.is_empty() {
-            Err(())
-        } else {
-            Ok(Self(value))
-        }
-    }
-}
-
-impl TryFrom<Vec<Token>> for ScopeAddress {
-    type Error = CompilerError;
-
-    fn try_from(value: Vec<Token>) -> Result<Self, Self::Error> {
-        let mut tokens = value.into_iter();
-        
-        let mut addressants = Vec::new();
-
-        while let Some(token) = tokens.next() {
-            match token {
-                Token::Identifier(ident) => {
-                    addressants.push(ScopeAddressant::Identifier(ident));
-                }
-                Token::Punctuation(PunctuationToken::Dot) => {}
-                Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
-                    let index_expression = ExpressionParser::take_until_closing(
-                        &mut tokens,
-                        Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
-                    )?;
-
-                    let index_expression = ExpressionParser::parse(index_expression)?;
-
-                    addressants.push(ScopeAddressant::DynamicIndex(index_expression.into()));
-                }
-
-                other => {
-                    return Err(CompilerError {
-                        message: format!("Invalid address. Found unexpected token {:?}!", other)
-                    });
-                }
-            }
-        }
-
-
-        addressants.try_into().map_err(|_| CompilerError { message: "Address could not be parsed!".into() })
-    }
-}
-
-impl ScopeAddress {
-    fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress, RuntimeError> {
-        let mut out = Vec::with_capacity(self.0.len());
-
-        for addressant in self.0 {
-            let addressant = match addressant {
-                ScopeAddressant::Identifier(ident) => ScopeAddressant::Identifier(ident),
-                ScopeAddressant::Index(idx) => ScopeAddressant::Index(idx),
-                ScopeAddressant::DynamicIndex(expression) => {
-                    let value = expression.eval(environment)?;
-                    let idx: usize = match value {
-                        Value::Integer(value) => {
-                            let idx =
-                                value.try_into().map_err(|err: std::num::TryFromIntError| {
-                                    RuntimeError {
-                                        message: err.to_string(),
-                                    }
-                                })?;
-
-                            idx
-                        }
-                        _ => {
-                            return Err(RuntimeError {
-                                message: format!(
-                                    "Mismatched types! Expected Integer, found {}!",
-                                    value.get_type_id()
-                                ),
-                            })
-                        }
-                    };
-
-                    ScopeAddressant::Index(idx)
-                }
-            };
-
-            out.push(addressant);
-        }
-
-        Ok(BakedScopeAddress(out))
-    }
-}
-
-#[derive(Deref, IntoIterator)]
-struct BakedScopeAddress(Vec<ScopeAddressant>);
-
-#[derive(Debug, Clone)]
-struct Stack (Vec<HashMap<String, Value>>);
-
-impl Default for Stack {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Stack {
-    fn new() -> Self {
-        Self(vec![HashMap::new()])    
-    }
-
-    fn from_members(members: HashMap<String, Value>) -> Self {
-        Self(vec![members])
-    }
-
-    fn insert_members(&mut self, members: HashMap<String, Value>) {
-        let last = self.0.len() - 1;
-        self.0[last].extend(members.into_iter());
-    }
-    
-    fn grow(&mut self) {
-        self.0.push(HashMap::new());
-    }
-
-    fn shrink(&mut self) {
-        self.0.pop();
-    }
-
-    fn push(&mut self, identifier: String, value: Value) -> Result<(), RuntimeError> {
-        let last = self.0.len() - 1;
-        if self.0[last].insert(identifier.clone(), value).is_some() {
-            return Err(RuntimeError {
-                message: format!("Variable '{}' already present in this scope!", identifier)
-            });
-        }
-
-        Ok(())
-    }
-
-    fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
-        let last = self.0.len() - 1;
-        if self.0[last].remove(identifier).is_none() {
-            return Err(RuntimeError {
-                message: format!("Variable '{}' cannot be popped from the stack as it is not present!", identifier)
-            });
-        }
-
-        Ok(())
-    }
-
-    fn get(&self, identifier: &String) -> Result<&Value, RuntimeError> {
-        for i in (0..self.0.len()).rev() {
-            if let Some(value) = self.0[i].get(identifier) {
-                return Ok(value);
-            }
-        }
-
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
-    }
-
-    fn get_mut(&mut self, identifier: &String) -> Result<&mut Value, RuntimeError> {
-        let last = self.0.len() - 1;
-        
-        let mut idx = None;
-
-        for i in (0..=last).rev() {
-            if self.0[i].contains_key(identifier) {
-                idx = Some(i);
-                break;
-            }
-        }
-
-        if let Some(i) = idx {
-            return Ok(self.0[i].get_mut(identifier).unwrap());
-        }
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
-    }
-
-    fn set(&mut self, identifier: &String, new_value: Value) -> Result<(), RuntimeError> {
-        for i in (0..self.0.len()).rev() {
-            if let Some(value) = self.0[i].get_mut(identifier) {
-                *value = new_value;
-                return Ok(());
-            }
-        }
-
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct Scope {
-    //TODO: Remove public visibility
-    pub stack: Stack,
-}
-
-impl Scope {
-    pub fn new() -> Self {
-        Self {
-            stack: Stack::new(),
-        }
-    }
-
-    pub fn from_members(members: HashMap<String, Value>) -> Self {
-        Self { stack: Stack::from_members(members) }
-    }
-
-    pub fn insert_members(&mut self, members: HashMap<String, Value>) {
-        self.stack.insert_members(members);
-    }
-
-    pub fn push(&mut self, identifier: String) -> Result<(), RuntimeError> {
-        self.stack.push(identifier, Value::Null)
-    }
-
-    pub fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
-        self.stack.pop(&identifier)
-    }
-
-    pub fn grow_stack(&mut self) {
-        self.stack.grow();
-    }
-
-    pub fn shrink_stack(&mut self) {
-        self.stack.shrink();
-    }
-
-    fn get_variable(
-        &self,
-        address: BakedScopeAddress,
-        contained_module_id: &String,
-    ) -> Result<&Value, RuntimeError> {
-        let mut addressants = address.into_iter();
-
-        let first_addressant = addressants.next().unwrap();
-
-        let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
-            }
-            ScopeAddressant::DynamicIndex(_) => {
-                panic!("Found dynamic index as addressant after baking!");
-            }
-        };
-
-        let mut value = self.stack.get(&first_identifier)?;
-
-        for subaddressant in addressants {
-            match subaddressant {
-                ScopeAddressant::Identifier(ident) => {
-                    if let Value::Struct(ref obj) = value {
-                        let members = obj.get_members();
-
-                        if let Ok(member) = members.get_public_member(&ident) {
-                            value = member;
-                            continue;
-                        }
-
-                        if obj.get_struct_id().get_module_id() != contained_module_id {
-                            Err(RuntimeError {
-                                message: format!(
-                                    "Tried to access field \"{}\" of {} outside it's module!",
-                                    ident,
-                                    obj.get_struct_id()
-                                ),
-                            })?;
-                        }
-
-                        value = members.get_member(&ident)?;
-                    } else {
-                        Err(RuntimeError {
-                            message: format!(
-                                "This variable does not have a member labeled \"{}\"!",
-                                ident
-                            ),
-                        })?;
-                    }
-                }
-                ScopeAddressant::Index(idx) => {
-                    if let Value::Array(ref arr) = value {
-                        let new_value = arr.get(idx).ok_or(RuntimeError {
-                            message: format!(
-                                "Index out of bounds: index was {}, array length was {}!",
-                                idx,
-                                arr.len()
-                            ),
-                        })?;
-
-                        value = new_value;
-                    } else {
-                        Err(RuntimeError {
-                            message: "This value can not be indexed!".into(),
-                        })?;
-                    }
-                }
-                ScopeAddressant::DynamicIndex(_) => {
-                    panic!("Found dynamic index as addressant after baking!");
-                }
-            }
-        }
-
-        Ok(value)
-    }
-
-    fn get_variable_mut(
-        &mut self,
-        address: BakedScopeAddress,
-        contained_module_id: &String,
-    ) -> Result<&mut Value, RuntimeError> {
-        let mut addressants = address.into_iter();
-
-        let first_addressant = addressants.next().unwrap();
-
-        let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
-            }
-            ScopeAddressant::DynamicIndex(_) => {
-                panic!("Found dynamic index as addressant after baking!");
-            }
-        };
-
-        let mut value = self
-            .stack
-            .get_mut(&first_identifier)?;
-
-        for subaddressant in addressants {
-            match subaddressant {
-                ScopeAddressant::Identifier(ident) => {
-                    if let Value::Struct(ref mut obj) = value {
-                        let struct_id = obj.get_struct_id().clone();
-
-                        if let Ok(_member) = obj.get_members().get_public_member(&ident) {
-                            value = obj.get_members_mut().get_public_member_mut(&ident)?;
-                            continue;
-                        }
-
-                        if struct_id.get_module_id() != contained_module_id {
-                            Err(RuntimeError {
-                                message: format!(
-                                    "Tried to access field '{}' of {} outside it's module!",
-                                    ident,
-                                    struct_id
-                                ),
-                            })?;
-                        }
-
-                        value = obj.get_members_mut().get_member_mut(&ident)?;
-                    } else {
-                        Err(RuntimeError {
-                            message: format!(
-                                "This variable does not have a member labeled '{}'!",
-                                ident
-                            ),
-                        })?;
-                    }
-                }
-                ScopeAddressant::Index(idx) => {
-                    if let Value::Array(ref mut arr) = value {
-                        let array_length = arr.len();
-
-                        let new_value = arr.get_mut(idx).ok_or(RuntimeError {
-                            message: format!(
-                                "Index out of bounds: index was {}, array length was {}!",
-                                idx, array_length
-                            ),
-                        })?;
-
-                        value = new_value;
-                    } else {
-                        Err(RuntimeError {
-                            message: "This value can not be indexed!".into(),
-                        })?;
-                    }
-                }
-                ScopeAddressant::DynamicIndex(_) => {
-                    panic!("Found dynamic index as addressant after baking!");
-                }
-            }
-        }
-
-        Ok(value)
-    }
-}
-
 
 #[derive(Debug)]
 pub struct RuntimeObject {
@@ -765,3 +713,5 @@ impl RuntimeObject {
         main_expression.eval(&self.base_environement)
     }
 }
+
+pub mod scope;

@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, env, fs::{self, read_to_string}, rc::Rc, str::FromStr};
 
 use otr::{compiler::{Compiler, expression_parser::ExpressionParser, file_reader::{FileReader, ImportAddress}}, lexer::{FragmentStream, Tokenizer, token::{PunctuationToken, Token}}, runtime::{
-    Expression, ModuleAddress, Scope, ScopeAddressant, Struct, Value, environment::Environment, expressions::{
+    Expression, ModuleAddress, scope::{Scope, ScopeAddressant}, Struct, Value, environment::Environment, expressions::{
         EqualityExpression, ProcedureCallExpression, VariableExpression, arithmetic::AddExpression, boolean::NotExpression
     }, module::Module, procedures::{CompiledProcedure, CompiledProcedureBuilder, Instruction, Procedure}
 }};
@@ -27,12 +27,6 @@ fn main() {
         module_id: module_name,
         path: None,
     };
-
-    //println!("Basepath {:?} | Module name {}", env::current_dir().unwrap(), module_name);
-
-    let test = file_reader.try_read_module(&main_module).unwrap();
-
-    println!("{:?}", Tokenizer::default().tokenize(FragmentStream::from_str(&test).unwrap()));
 
     file_reader.enqueue(main_module);
 

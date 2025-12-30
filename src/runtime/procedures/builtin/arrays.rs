@@ -1,6 +1,6 @@
 use crate::runtime::{RuntimeError, Value, environment::Environment, module::Module, procedures::Procedure};
 
-pub fn get_module() -> Module {
+pub(crate) fn get_module() -> Module {
     let mut module = Module::default();
 
     module.insert_procedure("new".into(), Box::new(NewArrayProcedure), true);
@@ -11,10 +11,10 @@ pub fn get_module() -> Module {
 
 
 #[derive(Debug)]
-pub struct NewArrayProcedure;
+pub(crate) struct NewArrayProcedure;
 
 impl Procedure for NewArrayProcedure {
-    fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
+    fn call(&self, _environment: Environment, arguments: Vec<Value>) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
         let size = arguments.get(0).or(Some(&Value::Integer(0))).unwrap();
 
         if let Value::Integer(size) = size {
@@ -28,10 +28,10 @@ impl Procedure for NewArrayProcedure {
 }
 
 #[derive(Debug)]
-pub struct ArraySizeProcedure;
+pub(crate) struct ArraySizeProcedure;
 
 impl Procedure for ArraySizeProcedure {
-    fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError> {
+    fn call(&self, _environment: Environment, arguments: Vec<Value>) -> Result<Value, RuntimeError> {
         let arg = arguments.first().ok_or(RuntimeError {
             message: "Missing argument!".into(),
         })?;
