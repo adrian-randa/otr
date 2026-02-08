@@ -2,8 +2,9 @@ use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use derive_more::{Deref, IntoIterator};
 
-use crate::{compiler::{CompilerError, expression_parser::ExpressionParser}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{Expression, RuntimeError, Value, environment::Environment}};
+use crate::{compiler::expression_parser::ExpressionParser, error::{Error, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{Expression, RuntimeError, Value, environment::Environment}};
 
+use crate::error::Result;
 
 #[derive(Debug, Clone)]
 pub enum ScopeAddressant {
@@ -36,7 +37,7 @@ pub struct ScopeAddress(Vec<ScopeAddressant>);
 impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
     type Error = ();
 
-    fn try_from(value: Vec<ScopeAddressant>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<ScopeAddressant>) -> std::result::Result<Self, Self::Error> {
         if value.is_empty() {
             Err(())
         } else {
@@ -46,9 +47,9 @@ impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
 }
 
 impl TryFrom<Vec<Token>> for ScopeAddress {
-    type Error = CompilerError;
+    type Error = Box<dyn Error>;
 
-    fn try_from(value: Vec<Token>) -> Result<Self, Self::Error> {
+    fn try_from(value: Vec<Token>) -> std::result::Result<Self, Self::Error> {
         let mut tokens = value.into_iter();
         
         let mut addressants = Vec::new();
@@ -71,20 +72,18 @@ impl TryFrom<Vec<Token>> for ScopeAddress {
                 }
 
                 other => {
-                    return Err(CompilerError {
-                        message: format!("Invalid address. Found unexpected token {:?}!", other)
-                    });
+                    return Err(CompilerError::InvalidScopeAddress { unexpected_token: Some(other) }.boxed());
                 }
             }
         }
 
 
-        addressants.try_into().map_err(|_| CompilerError { message: "Address could not be parsed!".into() })
+        addressants.try_into().map_err(|_| CompilerError::InvalidScopeAddress { unexpected_token: None }.boxed())
     }
 }
 
 impl ScopeAddress {
-    pub(crate) fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress, RuntimeError> {
+    pub(crate) fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress> {
         let mut out = Vec::with_capacity(self.0.len());
 
         for addressant in self.0 {
@@ -96,21 +95,12 @@ impl ScopeAddress {
                     let idx: usize = match value {
                         Value::Integer(value) => {
                             let idx =
-                                value.try_into().map_err(|err: std::num::TryFromIntError| {
-                                    RuntimeError {
-                                        message: err.to_string(),
-                                    }
-                                })?;
+                                value.try_into().unwrap();
 
                             idx
                         }
                         _ => {
-                            return Err(RuntimeError {
-                                message: format!(
-                                    "Mismatched types! Expected Integer, found {}!",
-                                    value.get_type_id()
-                                ),
-                            })
+                            return Err(RuntimeError::TypeMismatch { expected: super::Type::Integer, found: value.get_type_id() }.boxed())
                         }
                     };
 
@@ -159,44 +149,35 @@ impl Stack {
         self.0.pop();
     }
 
-    fn push(&mut self, identifier: String, value: Value) -> Result<(), RuntimeError> {
+    fn push(&mut self, identifier: String, value: Value) -> Result<()> {
         let last = self.0.len() - 1;
         if self.0[last].insert(identifier.clone(), value).is_some() {
-            return Err(RuntimeError {
-                message: format!("Variable '{}' already present in this scope!", identifier)
-            });
+            return Err(RuntimeError::VariableAlreadyPresent { variable_identifier: identifier }.boxed());
         }
 
         Ok(())
     }
 
-    fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
+    fn pop(&mut self, identifier: &String) -> Result<()> {
         let last = self.0.len() - 1;
         if self.0[last].remove(identifier).is_none() {
-            return Err(RuntimeError {
-                message: format!("Variable '{}' cannot be popped from the stack as it is not present!", identifier)
-            });
+            return Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed());
         }
 
         Ok(())
     }
 
-    fn get(&self, identifier: &String) -> Result<&Value, RuntimeError> {
+    fn get(&self, identifier: &String) -> Result<&Value> {
         for i in (0..self.0.len()).rev() {
             if let Some(value) = self.0[i].get(identifier) {
                 return Ok(value);
             }
         }
 
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
+        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
     }
 
-    fn get_mut(&mut self, identifier: &String) -> Result<&mut Value, RuntimeError> {
+    fn get_mut(&mut self, identifier: &String) -> Result<&mut Value> {
         let last = self.0.len() - 1;
         
         let mut idx = None;
@@ -211,15 +192,10 @@ impl Stack {
         if let Some(i) = idx {
             return Ok(self.0[i].get_mut(identifier).unwrap());
         }
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
+        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
     }
 
-    fn set(&mut self, identifier: &String, new_value: Value) -> Result<(), RuntimeError> {
+    fn set(&mut self, identifier: &String, new_value: Value) -> Result<()> {
         for i in (0..self.0.len()).rev() {
             if let Some(value) = self.0[i].get_mut(identifier) {
                 *value = new_value;
@@ -227,12 +203,7 @@ impl Stack {
             }
         }
 
-        Err(RuntimeError {
-            message: format!(
-                "Could not find the variable '{}' in this scope!",
-                identifier
-            ),
-        })
+        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
     }
 }
 
@@ -257,11 +228,11 @@ impl Scope {
         self.stack.insert_members(members);
     }
 
-    pub fn push(&mut self, identifier: String) -> Result<(), RuntimeError> {
+    pub fn push(&mut self, identifier: String) -> Result<()> {
         self.stack.push(identifier, Value::Null)
     }
 
-    pub fn pop(&mut self, identifier: &String) -> Result<(), RuntimeError> {
+    pub fn pop(&mut self, identifier: &String) -> Result<()> {
         self.stack.pop(&identifier)
     }
 
@@ -277,7 +248,7 @@ impl Scope {
         &self,
         address: BakedScopeAddress,
         contained_module_id: &String,
-    ) -> Result<Value, RuntimeError> {
+    ) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -285,9 +256,7 @@ impl Scope {
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
             ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
+                panic!("Unsupported scope address!");
             }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
@@ -297,7 +266,7 @@ impl Scope {
         self.stack.get(&first_identifier)?.query(address, contained_module_id)
     }
 
-    pub(crate) fn set_variable(&mut self, address: BakedScopeAddress, contained_module_id: &String, value: Value) -> Result<(), RuntimeError> {
+    pub(crate) fn set_variable(&mut self, address: BakedScopeAddress, contained_module_id: &String, value: Value) -> Result<()> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -305,9 +274,7 @@ impl Scope {
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
             ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
+                panic!("Unsupported scope address!");
             }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
@@ -317,7 +284,7 @@ impl Scope {
         self.stack.get_mut(&first_identifier)?.set(address, contained_module_id, value)
     }
 
-    pub(crate) fn reference_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value, RuntimeError> {
+    pub(crate) fn reference_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -325,9 +292,7 @@ impl Scope {
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
             ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
+                panic!("Unsupported scope address!");
             }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
@@ -337,7 +302,7 @@ impl Scope {
         self.stack.get(&first_identifier)?.reference(address, contained_module_id)
     }
 
-    pub(crate) fn clone_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value, RuntimeError> {
+    pub(crate) fn clone_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -345,9 +310,7 @@ impl Scope {
         let first_identifier = match first_addressant {
             ScopeAddressant::Identifier(ident) => ident,
             ScopeAddressant::Index(_) => {
-                return Err(RuntimeError {
-                    message: "Expected variable identifier, found index!".into(),
-                })
+                panic!("Unsupported scope address!");
             }
             ScopeAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
@@ -355,5 +318,23 @@ impl Scope {
         };
 
         self.stack.get(&first_identifier)?.clone_variable(address, contained_module_id)
+    }
+
+    pub(crate) fn query_type(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
+        let mut address = address.into_iter();
+
+        let first_addressant = address.next().unwrap();
+
+        let first_identifier = match first_addressant {
+            ScopeAddressant::Identifier(ident) => ident,
+            ScopeAddressant::Index(_) => {
+                panic!("Unsupported scope address!");
+            }
+            ScopeAddressant::DynamicIndex(_) => {
+                panic!("Found dynamic index as addressant after baking!");
+            }
+        };
+
+        self.stack.get(&first_identifier)?.query_type(address, contained_module_id)
     }
 }

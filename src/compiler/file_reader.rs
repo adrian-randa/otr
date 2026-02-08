@@ -1,6 +1,8 @@
 use std::{collections::{HashSet, VecDeque}, fmt::Display, fs, path::{Path, PathBuf}, str::FromStr};
 
-use crate::{compiler::CompilerError, lexer::{FragmentStream, token::Token}};
+use crate::{compiler::CompilerError, lexer::{FragmentStream, Tokenizer, token::{ContextualizedToken, ContextualizedTokenStream, Token, TokenStream}}};
+
+use crate::error::Result;
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub struct ImportAddress {
@@ -14,49 +16,103 @@ impl Display for ImportAddress {
     }
 }
 
+struct SourceFile {
+    path: PathBuf,
+    tokens: Box<dyn Iterator<Item = ContextualizedToken>>,
+}
+
+impl Iterator for SourceFile {
+    type Item = ContextualizedToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.tokens.next()
+    }
+}
+
 pub struct FileReader {
     root_file_path: PathBuf,
-    queue: VecDeque<ImportAddress>,
-    read_modules: HashSet<ImportAddress>
+    source_stack: Vec<SourceFile>,
+    read_modules: HashSet<ImportAddress>,
+
+    tokenizer: Tokenizer,
 }
 
 impl FileReader {
-    pub fn new(root_file_path: PathBuf) -> Self {
+    pub fn new(tokenizer: Tokenizer, root_file_path: PathBuf) -> Self {
         Self {
             root_file_path,
 
-            queue: VecDeque::new(),
+            source_stack: Vec::new(),
             read_modules: HashSet::new(),
+
+            tokenizer,
         }
     }
 
-    pub fn try_read_module(&self, module: &ImportAddress) -> Result<String, CompilerError> {
+    fn resolve_path(&self, import_address: &ImportAddress) -> Result<PathBuf> {
         let mut path = self.root_file_path.clone();
         
-            if let Some(location) = &module.path {
-                path = path.join(location);
-            }
-            path = path.join(module.module_id.clone() + ".otr");
+        if let Some(location) = &import_address.path {
+            path = path.join(location);
+        }
+        path = path.join(import_address.module_id.clone() + ".otr");
 
-        fs::read_to_string(path).map_err(|err| CompilerError {
+        Ok(path)
+    }
+
+    pub fn try_read_module(&self, module: &ImportAddress) -> Result<String> {
+        let path = self.resolve_path(module)?;
+
+        fs::read_to_string(path).map_err(|err| CompilerError::Unknown {
             message: format!("Module '{}' could not be loaded from the file system! {}", module, err)
-        })
+        }.boxed())
     }
 
-    pub fn enqueue(&mut self, module: ImportAddress) {
-        if !self.read_modules.contains(&module) {
-            self.queue.push_back(module.clone());
-            self.read_modules.insert(module);
-        }
+    fn tokenize(&self, source: String) -> Result<ContextualizedTokenStream> {
+        let fragments = FragmentStream::from_str(&source)?;
+
+        self.tokenizer.tokenize(fragments)
     }
 
-    pub fn dequeue(&mut self) -> Result<Option<String>, CompilerError> {
-        if self.queue.is_empty() {
-            return Ok(None);
+    pub fn push_dependency(&mut self, dependency: ImportAddress) -> Result<()> {
+        if self.read_modules.contains(&dependency) {
+            return Ok(());
         }
 
-        let module = self.queue.pop_front().unwrap();
+        let file = self.try_read_module(&dependency)?;
+        let tokens = self.tokenize(file)?;
+        self.source_stack.push(
+            SourceFile {
+                path: self.resolve_path(&dependency)?,
+                tokens: Box::new(tokens.into_iter())
+            }
+        );
 
-        Ok(Some(self.try_read_module(&module)?))
+        self.read_modules.insert(dependency);
+        
+        Ok(())
+    }
+
+    pub fn get_current_file(&self) -> Result<&PathBuf> {
+        Ok(&self.source_stack
+            .last()
+            .ok_or(CompilerError::Unknown { message: "No current file in file reader!".into() }.boxed())?
+            .path)
+    }
+}
+
+impl Iterator for FileReader {
+    type Item = ContextualizedToken;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for i in (0..self.source_stack.len()).rev() {
+            if let Some(token) = self.source_stack[i].next() {
+                return Some(token);
+            } else {
+                self.source_stack.pop();
+            }
+        }
+
+        None
     }
 }

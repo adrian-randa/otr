@@ -1,5 +1,7 @@
 use crate::runtime::{expressions::Expression, RuntimeError};
 
+use crate::error::Result;
+
 #[derive(Debug)]
 pub struct AndExpression {
     lhs: Box<dyn Expression>,
@@ -16,7 +18,7 @@ impl Expression for AndExpression {
     fn eval(
         &self,
         environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
+    ) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -25,13 +27,13 @@ impl Expression for AndExpression {
         match (lhs, rhs) {
             (Bool(l), Bool(r)) => Ok(Bool(l && r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot perform boolean and operation on {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -52,7 +54,7 @@ impl Expression for OrExpression {
     fn eval(
         &self,
         environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
+    ) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -61,13 +63,13 @@ impl Expression for OrExpression {
         match (lhs, rhs) {
             (Bool(l), Bool(r)) => Ok(Bool(l || r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot perform boolean or operation on {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -87,7 +89,7 @@ impl Expression for NotExpression {
     fn eval(
         &self,
         environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
+    ) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let value = self.expr.eval(environment)?;
@@ -95,12 +97,12 @@ impl Expression for NotExpression {
         match value {
             Bool(value) => Ok(Bool(!value)),
 
-            value => Err(RuntimeError {
+            value => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot perform boolean nor operation on {}!",
                     value.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }

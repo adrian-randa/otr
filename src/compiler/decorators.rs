@@ -2,6 +2,8 @@ use std::collections::HashMap;
 
 use crate::{compiler::{CompilerError, Decorator}, lexer::token::Token, runtime::{ModuleAddress, RuntimeObject}};
 
+use crate::error::Result;
+
 pub struct EntrypointDecorator {
     procedure_id: ModuleAddress
 }
@@ -13,11 +15,11 @@ impl EntrypointDecorator {
 }
 
 impl Decorator for EntrypointDecorator {
-    fn apply(self: Box<Self>, runtime_object: &mut RuntimeObject) -> Result<(), CompilerError> {
+    fn apply(self: Box<Self>, runtime_object: &mut RuntimeObject) -> Result<()> {
         if runtime_object.entrypoint.is_some() {
-            Err(CompilerError {
+            Err(CompilerError::Unknown {
                 message: format!("Duplicate entrypoint! Entrypoint is already set to {:?}!", runtime_object.entrypoint)
-            })
+            }.boxed())
         } else {
             runtime_object.entrypoint = Some(self.procedure_id);
             Ok(())

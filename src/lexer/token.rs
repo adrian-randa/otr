@@ -1,13 +1,19 @@
 use derive_more::IntoIterator;
 
+#[derive(Debug)]
+pub struct ContextualizedToken {
+    pub token: Token,
+    pub line_index: usize,
+    pub column_index: usize,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Token {
     Keyword(KeywordToken),
     Operator(OperatorToken),
     Punctuation(PunctuationToken),
     Identifier(String),
-    Literal(LiteralToken),
-    PrimitiveType(PrimitiveTypeToken)
+    Literal(LiteralToken)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -29,8 +35,10 @@ pub enum KeywordToken {
     From,
     Public,
     Is,
+    In,
     Ref,
     Clone,
+    Typeof,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -70,27 +78,35 @@ pub enum PunctuationToken {
     DoubleColon,
     Semicolon,
     At,
+    ThinArrow,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum LiteralToken {
     Null,
     Integer(String),
-    Decimal(String),
+    Float(String),
     Boolean(String),
     Char(String),
     String(String),
+    Type(PrimitiveTypeToken),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveTypeToken {
     Integer,
-    Decimal,
-    Boolean,
+    Float,
+    Bool,
     Char,
     String,
     Array,
+    Moved,
+    Dropped,
+    Type,
 }
 
 #[derive(Debug, IntoIterator)]
 pub struct TokenStream(pub Vec<Token>);
+
+#[derive(Debug, IntoIterator)]
+pub struct ContextualizedTokenStream(pub Vec<ContextualizedToken>);

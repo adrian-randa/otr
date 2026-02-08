@@ -1,30 +1,56 @@
-use std::str::FromStr;
+use std::str::{Chars, FromStr};
 
 use derive_more::IntoIterator;
 
-use crate::lexer::{
+use crate::error::{Error, Result};
+
+use crate::lexer::token::{ContextualizedToken, ContextualizedTokenStream};
+use crate::{error::{fragmenter_error::FragmentationError, tokenizer_error::TokenizerError}, lexer::{
     rules::{
         BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
         PatternRule, StringLiteralRule,
     },
     token::{Token, TokenStream},
-};
+}};
 
 pub mod rules;
 pub mod token;
 
-#[derive(Debug, IntoIterator)]
-pub struct FragmentStream(Vec<String>);
-
-#[derive(Debug)]
-pub enum FragmentationError {
-    InvalidControlCharacter,
+struct CharCoordinateIterator<'a> {
+    iter: Chars<'a>,
+    line: usize,
+    column: usize,
 }
 
-impl FromStr for FragmentStream {
-    type Err = FragmentationError;
+impl<'a> Iterator for CharCoordinateIterator<'a> {
+    type Item = (char, usize, usize);
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn next(&mut self) -> Option<Self::Item> {
+        let c = self.iter.next()?;
+        self.column += 1;
+        if c == '\n' {
+            self.column = 1;
+            self.line += 1;
+        }
+
+        Some((c, self.line, self.column))
+    }
+}
+
+#[derive(Debug)]
+pub struct Fragment {
+    fragment: String,
+    line_index: usize,
+    column_index: usize,
+}
+
+#[derive(Debug, IntoIterator)]
+pub struct FragmentStream(Vec<Fragment>);
+
+impl FromStr for FragmentStream {
+    type Err = Box<dyn Error>;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         let mut stream = Vec::new();
 
         #[derive(Debug, PartialEq)]
@@ -51,30 +77,51 @@ impl FromStr for FragmentStream {
         }
 
         let mut current = String::new();
+        let mut current_pos = (0, 0);
         let mut current_kind = CharKind::Alphabetic;
 
-        let chars: Vec<char> = s.chars().collect();
+        let s = s.to_string();
+
+        let chars: Vec<(char, usize, usize)> = CharCoordinateIterator {
+            iter: s.chars(),
+            line: 1,
+            column: 1,
+        }.collect();
+
+        let (_, line, column) = chars.last().unwrap();
 
         let mut i = 0;
 
         while i < chars.len() {
-            let c = chars[i];
+            let (c, line, column) = chars[i];
 
             i += 1;
 
             if c == '\'' {
                 if !current.is_empty() {
-                    stream.push(current);
+                    stream.push(
+                        Fragment {
+                            fragment: current,
+                            line_index: current_pos.0,
+                            column_index: current_pos.1,
+                        }
+                    );
+                    current_pos = (line, column);
                     current = String::new();
                 }
 
                 current.push('\'');
 
-                current.push(chars[i]);
+                current.push(chars[i].0);
 
                 current.push('\'');
 
-                stream.push(current);
+                stream.push(Fragment {
+                    fragment: current,
+                    line_index: current_pos.0,
+                    column_index: current_pos.1,
+                });
+                current_pos = (line, column);
                 current = String::new();
 
                 i += 2;
@@ -83,15 +130,20 @@ impl FromStr for FragmentStream {
 
             if c == '\"' {
                 if !current.is_empty() {
-                    stream.push(current);
+                    stream.push(Fragment {
+                        fragment: current,
+                        line_index: current_pos.0,
+                        column_index: current_pos.1,
+                    });
+                    current_pos = (line, column);
                     current = String::new();
                 }
 
                 current.push('\"');
 
-                while chars[i] != '\"' {
-                    if chars[i] == '\\' {
-                        match chars[i + 1] {
+                while chars[i].0 != '\"' {
+                    if chars[i].0 == '\\' {
+                        match chars[i + 1].0 {
                             'n' => {
                                 current.push('\n');
                             }
@@ -104,20 +156,32 @@ impl FromStr for FragmentStream {
                             '\\' => {
                                 current.push('\\');
                             }
-                            _ => return Err(FragmentationError::InvalidControlCharacter),
+                            _ => return Err(FragmentationError::InvalidControlCharacter {
+                                line_index: line,
+                                column_index: column
+                            }.boxed()),
                         }
                         i = i + 2;
                         continue;
                     }
+                    if chars[i].0 == '\n' {
+                        return Err(FragmentationError::LinebreakInStringLiteral { line_index: line, column_index: column }.boxed())
+                    }
 
-                    current.push(chars[i]);
+                    current.push(chars[i].0);
 
                     i += 1;
+                    
                 }
 
                 current.push('\"');
 
-                stream.push(current);
+                stream.push(Fragment {
+                    fragment: current,
+                    line_index: current_pos.0,
+                    column_index: current_pos.1,
+                });
+                current_pos = (line, column);
                 current = String::new();
 
                 i += 1;
@@ -126,20 +190,31 @@ impl FromStr for FragmentStream {
 
             if c.is_ascii_whitespace() {
                 if current.is_empty() {
+                    current_pos = (line, column);
                     continue;
                 }
-                stream.push(current);
+                stream.push(Fragment {
+                    fragment: current,
+                    line_index: current_pos.0,
+                    column_index: current_pos.1,
+                });
+                current_pos = (line, column);
                 current = String::new();
                 continue;
             }
 
             if c == '#' {
                 if !current.is_empty() {
-                    stream.push(current);
+                    stream.push(Fragment {
+                        fragment: current,
+                        line_index: current_pos.0,
+                        column_index: current_pos.1,
+                    });
+                    current_pos = (line, column);
                     current = String::new();
                 }
 
-                while chars[i] != '\n' && i < chars.len() {
+                while chars[i].0 != '\n' && i < chars.len() {
                     i += 1;
                 }
 
@@ -147,8 +222,17 @@ impl FromStr for FragmentStream {
             }
 
             if c == ';' {
-                stream.push(current);
-                stream.push(";".into());
+                stream.push(Fragment {
+                    fragment: current,
+                    line_index: current_pos.0,
+                    column_index: current_pos.1,
+                });
+                stream.push(Fragment {
+                    fragment: ";".into(),
+                    line_index: current_pos.0,
+                    column_index: column,
+                });
+                current_pos = (line, column);
                 current = String::new();
                 continue;
             }
@@ -161,12 +245,22 @@ impl FromStr for FragmentStream {
                     (Alphabetic, Punctuation)
                     | (Punctuation, Alphabetic)
                     /*| (Numeric, Alphabetic) */ => {
-                        stream.push(current);
+                        stream.push(Fragment {
+                            fragment: current,
+                            line_index: current_pos.0,
+                            column_index: current_pos.1,
+                        });
+                        current_pos = (line, column);
                         current = String::new();
                     }
                     (Numeric, Punctuation) => {
                         if c != '.' {
-                            stream.push(current);
+                            stream.push(Fragment {
+                                fragment: current,
+                                line_index: current_pos.0,
+                                column_index: current_pos.1,
+                            });
+                            current_pos = (line, column);
                             current = String::new();
                         }
                     }
@@ -181,15 +275,16 @@ impl FromStr for FragmentStream {
         }
 
         if !current.is_empty() {
-            stream.push(current);
+            stream.push(Fragment {
+                fragment: current,
+                line_index: current_pos.0,
+                column_index: current_pos.1,
+            });
         }
 
         Ok(Self(stream))
     }
 }
-
-#[derive(Debug)]
-pub enum TokenizeError {}
 
 trait TokenizerRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String);
@@ -209,24 +304,36 @@ impl Tokenizer {
         self
     }
 
-    pub fn tokenize(&self, fragments: FragmentStream) -> Result<TokenStream, TokenizeError> {
+    pub fn tokenize(&self, fragments: FragmentStream) -> Result<ContextualizedTokenStream> {
         let mut stream = Vec::new();
 
         for mut frag in fragments {
-            'scan: while !frag.is_empty() {
+            'scan: while !frag.fragment.is_empty() {
                 for rule in self.rules.iter() {
-                    let token;
-                    (token, frag) = rule.try_apply(frag);
+                    let frag_len = frag.fragment.len();
+                    let (token, remainder) = rule.try_apply(frag.fragment);
+                    let rem_len = remainder.len();
+                    let line = frag.line_index;
+                    let column = frag.column_index;
+                    frag = Fragment {
+                       fragment: remainder,
+                       line_index: frag.line_index,
+                       column_index: frag.column_index + frag_len - rem_len,
+                    };
 
                     if let Some(token) = token {
-                        stream.push(token);
+                        stream.push(ContextualizedToken {
+                            token,
+                            line_index: line,
+                            column_index: column,
+                        });
                         continue 'scan;
                     }
                 }
             }
         }
 
-        Ok(TokenStream(stream))
+        Ok(ContextualizedTokenStream(stream))
     }
 }
 
@@ -238,12 +345,14 @@ impl Default for Tokenizer {
         use ParenthesisType::*;
         use PunctuationToken::*;
         use Token::*;
+        use LiteralToken::*;
 
         Self::new()
             .with_rule(KeywordRule::new("break".into(), Keyword(Break)))
             .with_rule(KeywordRule::new("const".into(), Keyword(Const)))
             .with_rule(KeywordRule::new("continue".into(), Keyword(Continue)))
             .with_rule(KeywordRule::new("for".into(), Keyword(For)))
+            .with_rule(KeywordRule::new("in".into(), Keyword(In)))
             .with_rule(KeywordRule::new("let".into(), Keyword(Let)))
             .with_rule(KeywordRule::new("proc".into(), Keyword(Proc)))
             .with_rule(KeywordRule::new("return".into(), Keyword(Return)))
@@ -258,14 +367,18 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("public".into(), Keyword(Public)))
             .with_rule(KeywordRule::new("ref".into(), Keyword(Ref)))
             .with_rule(KeywordRule::new("clone".into(), Keyword(Clone)))
+            .with_rule(KeywordRule::new("typeof".into(), Keyword(Typeof)))
 
             .with_rule(KeywordRule::new("Null".into(), Literal(LiteralToken::Null)))
-            .with_rule(KeywordRule::new("Integer".into(), PrimitiveType(PrimitiveTypeToken::Integer)))
-            .with_rule(KeywordRule::new("Decimal".into(), PrimitiveType(PrimitiveTypeToken::Decimal)))
-            .with_rule(KeywordRule::new("Boolean".into(), PrimitiveType(PrimitiveTypeToken::Boolean)))
-            .with_rule(KeywordRule::new("Char".into(), PrimitiveType(PrimitiveTypeToken::Char)))
-            .with_rule(KeywordRule::new("String".into(), PrimitiveType(PrimitiveTypeToken::String)))
-            .with_rule(KeywordRule::new("Array".into(), PrimitiveType(PrimitiveTypeToken::Array)))
+            .with_rule(KeywordRule::new("Integer".into(), Literal(Type(PrimitiveTypeToken::Integer))))
+            .with_rule(KeywordRule::new("Float".into(), Literal(Type(PrimitiveTypeToken::Float))))
+            .with_rule(KeywordRule::new("Bool".into(), Literal(Type(PrimitiveTypeToken::Bool))))
+            .with_rule(KeywordRule::new("Char".into(), Literal(Type(PrimitiveTypeToken::Char))))
+            .with_rule(KeywordRule::new("String".into(), Literal(Type(PrimitiveTypeToken::String))))
+            .with_rule(KeywordRule::new("Array".into(), Literal(Type(PrimitiveTypeToken::Array))))
+            .with_rule(KeywordRule::new("Type".into(), Literal(Type(PrimitiveTypeToken::Type))))
+            .with_rule(KeywordRule::new("Moved".into(), Literal(Type(PrimitiveTypeToken::Moved))))
+            .with_rule(KeywordRule::new("Dropeed".into(), Literal(Type(PrimitiveTypeToken::Dropped))))
 
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
             .with_rule(PatternRule::new("||".into(), Operator(Or)))
@@ -274,6 +387,7 @@ impl Default for Tokenizer {
             .with_rule(PatternRule::new("::".into(), Punctuation(DoubleColon)))
             .with_rule(PatternRule::new(">=".into(), Operator(GreaterEquals)))
             .with_rule(PatternRule::new("<=".into(), Operator(LessEquals)))
+            .with_rule(PatternRule::new("->".into(), Punctuation(ThinArrow)))
             .with_rule(PatternRule::new(">".into(), Operator(Greater)))
             .with_rule(PatternRule::new("<".into(), Operator(Less)))
             .with_rule(PatternRule::new(

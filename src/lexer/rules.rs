@@ -99,7 +99,7 @@ impl TokenizerRule for NumberLiteralRule {
             .is_some_and(|c| c.is_numeric() || (c == '-' && fragment.len() > 1))
         {
             if fragment.contains('.') {
-                return (Some(Literal(Decimal(fragment))), "".into());
+                return (Some(Literal(Float(fragment))), "".into());
             } else {
                 return (Some(Literal(Integer(fragment))), "".into());
             }

@@ -1,5 +1,7 @@
 use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{module::CompilerModuleState, procedure::CompilerProcedureState}}, lexer::token::{KeywordToken, PunctuationToken, Token}, runtime::environment::Environment};
 
+use crate::error::Result;
+
 #[derive(Clone)]
 pub struct RawDecorator {
     ident: String,
@@ -28,15 +30,13 @@ impl CompilerDecoratorState {
 }
 
 impl CompilerState for CompilerDecoratorState {
-    fn read(mut self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>, CompilerError> {
+    fn read(mut self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
         
         match token {
             
             Token::Punctuation(PunctuationToken::At) => {
                 if self.num_decorators > self.decorators.len() {
-                    Err(CompilerError{
-                        message: format!("Unexpected token! Expected identifier, found {:?}", token)
-                    })
+                    Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: token }.boxed())
                 } else {
                     self.num_decorators += 1;
                     Ok(self)
@@ -45,9 +45,7 @@ impl CompilerState for CompilerDecoratorState {
 
             Token::Identifier(ref ident) => {
                 if self.decorators.len() >= self.num_decorators {
-                    Err(CompilerError{
-                        message: format!("Unexpected token! Expected '@', found {:?}", token)
-                    })
+                    Err(CompilerError::UnexpectedToken { expected: Some("@".into()), found: token }.boxed())
                 } else {
                     self.decorators.push(RawDecorator { ident: ident.to_string() });
                     Ok(self)
@@ -63,16 +61,14 @@ impl CompilerState for CompilerDecoratorState {
                 ));
             }
 
-            _ => Err(CompilerError{
-                message: format!("Unexpected token!")
-            })
+            _ => Err(CompilerError::UnexpectedToken { expected: None, found: token }.boxed())
         }
 
     }
 
-    fn finalize(self: Box<Self>) -> Result<Environment, CompilerError> {
-        Err(CompilerError {
+    fn finalize(self: Box<Self>) -> Result<Environment> {
+        Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into()
-        })
+        }.boxed())
     }
 }

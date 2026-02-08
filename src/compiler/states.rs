@@ -1,5 +1,7 @@
 use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{import::CompilerImportState, module::CompilerModuleState, r#struct::CompilerStructState}}, lexer::token::{KeywordToken, Token}, runtime::environment::{self, Environment}};
 
+use crate::error::Result;
+
 #[derive(Clone)]
 pub struct CompilerBaseState {
     environment: Environment,
@@ -14,24 +16,22 @@ impl CompilerBaseState {
 }
 
 impl CompilerState for CompilerBaseState {
-    fn read(self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>, super::CompilerError> {
+    fn read(self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
         match token {
 
             Token::Keyword(KeywordToken::Module) => {
-                Ok(Box::new(CompilerModuleState::new(*self)))
+                Ok(Box::new(CompilerModuleState::new(*self)) as Box<dyn CompilerState>)
             }
 
             Token::Keyword(KeywordToken::Import) => {
-                Ok(Box::new(CompilerImportState::new(*self)))
+                Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>)
             }
 
-            _ => Err(CompilerError {
-                message: format!("Unexpected token: {:?}", token)
-            })
+            other => Err(CompilerError::UnexpectedToken { expected: None, found: other }.boxed())
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<Environment, super::CompilerError> {
+    fn finalize(self: Box<Self>) -> Result<Environment> {
         Ok(self.environment)
     }
 }

@@ -7,16 +7,7 @@ use otr::{compiler::{Compiler, expression_parser::ExpressionParser, file_reader:
 }};
 
 fn main() {
-    
-    /* let input = "Dere::Saft { saftigkeit: 20 }";
-
-    let fragments = FragmentStream::from_str(input).unwrap();
-
-    let tokens = Tokenizer::default().tokenize(fragments).unwrap();
-
-    println!("{:?}", ExpressionParser::parse(tokens)); */
-
-    let mut file_reader = FileReader::new(env::current_dir().unwrap());
+    let mut file_reader = FileReader::new(Tokenizer::default(), env::current_dir().unwrap());
 
     let mut args = env::args();
     args.next();
@@ -28,11 +19,21 @@ fn main() {
         path: None,
     };
 
-    file_reader.enqueue(main_module);
+    if let Err(error) = file_reader.push_dependency(main_module) {
+        println!("{error}");
+    }
 
     let compiler = Compiler::new(file_reader);
 
-    let runtime_object = compiler.compile().unwrap();
+    let runtime_object = match compiler.compile() {
+        Ok(obj) => obj,
+        Err(error) => {
+            println!("{error}");
+            return;
+        }
+    };
     
-    println!("{:?}", runtime_object.execute());
+    if let Err(error) = runtime_object.execute() {
+        println!("{error}");
+    }
 }

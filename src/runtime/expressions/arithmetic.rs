@@ -1,5 +1,7 @@
 use crate::runtime::{expressions::Expression, Environment, RuntimeError};
 
+use crate::error::Result;
+
 #[derive(Debug)]
 pub struct AddExpression {
     lhs: Box<dyn Expression>,
@@ -13,7 +15,7 @@ impl AddExpression {
 }
 
 impl Expression for AddExpression {
-    fn eval(&self, environment: &Environment) -> Result<super::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<super::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -30,9 +32,9 @@ impl Expression for AddExpression {
             (Integer(l), String(r)) => Ok(String(l.to_string() + &r)),
             (Float(l), String(r)) => Ok(String(l.to_string() + &r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -50,7 +52,7 @@ impl SubtractExpression {
 }
 
 impl Expression for SubtractExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -60,13 +62,13 @@ impl Expression for SubtractExpression {
             (Integer(l), Integer(r)) => Ok(Integer(l - r)),
             (Float(l), Float(r)) => Ok(Float(l - r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot subtract {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -84,7 +86,7 @@ impl MultiplyExpression {
 }
 
 impl Expression for MultiplyExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -94,13 +96,13 @@ impl Expression for MultiplyExpression {
             (Integer(l), Integer(r)) => Ok(Integer(l * r)),
             (Float(l), Float(r)) => Ok(Float(l * r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot multiply {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -118,7 +120,7 @@ impl DivideExpression {
 }
 
 impl Expression for DivideExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -128,13 +130,13 @@ impl Expression for DivideExpression {
             (Integer(l), Integer(r)) => Ok(Integer(l / r)),
             (Float(l), Float(r)) => Ok(Float(l / r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot divide {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -152,7 +154,7 @@ impl PowerExpression {
 }
 
 impl Expression for PowerExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let base = self.base.eval(environment)?;
@@ -160,22 +162,22 @@ impl Expression for PowerExpression {
 
         match (base, exponent) {
             (Integer(l), Integer(r)) => Ok(Integer(
-                l.checked_pow(r.try_into().map_err(|_| RuntimeError {
+                l.checked_pow(r.try_into().map_err(|_| RuntimeError::Unknown {
                     message: "Could not compute power; the exponent was too large!".into(),
-                })?)
-                .ok_or(RuntimeError {
+                }.boxed())?)
+                .ok_or(RuntimeError::Unknown {
                     message: "Overflow occured while computing power!".into(),
-                })?,
+                }.boxed())?,
             )),
             (Float(l), Float(r)) => Ok(Float(l.powf(r))),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot compute power of {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -193,7 +195,7 @@ impl ModuloExpression {
 }
 
 impl Expression for ModuloExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -203,13 +205,13 @@ impl Expression for ModuloExpression {
             (Integer(l), Integer(r)) => Ok(Integer(l.rem_euclid(r))),
             (Float(l), Float(r)) => Ok(Float(l.rem_euclid(r))),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Cannot modulate {} by {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }
@@ -227,7 +229,7 @@ impl GreaterThanExpression {
 }
 
 impl Expression for GreaterThanExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value, RuntimeError> {
+    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -237,13 +239,13 @@ impl Expression for GreaterThanExpression {
             (Integer(l), Integer(r)) => Ok(Bool(l > r)),
             (Float(l), Float(r)) => Ok(Bool(l > r)),
 
-            (l, r) => Err(RuntimeError {
+            (l, r) => Err(RuntimeError::Unknown {
                 message: format!(
                     "Ordering is undefined on {} and {}!",
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }),
+            }.boxed()),
         }
     }
 }

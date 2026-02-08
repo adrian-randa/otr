@@ -1,5 +1,7 @@
 use crate::runtime::{RuntimeError, Value, module::Module, procedures::Procedure};
 
+use crate::error::Result;
+
 pub(crate) fn get_module() -> Module {
     let mut module = Module::default();
 
@@ -12,10 +14,8 @@ pub(crate) fn get_module() -> Module {
 pub(crate) struct NumberParseProcedure;
 
 impl Procedure for NumberParseProcedure {
-    fn call(&self, _environment: crate::runtime::environment::Environment, arguments: Vec<crate::runtime::Value>) -> Result<crate::runtime::Value, crate::runtime::RuntimeError> {
-        let value = arguments.get(0).ok_or(RuntimeError {
-            message: "Missing argument for 'Numbers::parse'!".into()
-        })?;
+    fn call(&self, _environment: crate::runtime::environment::Environment, arguments: Vec<crate::runtime::Value>) -> Result<crate::runtime::Value> {
+        let value = arguments.get(0).ok_or(RuntimeError::NoSuchVariable { variable_identifier: "number".into() }.boxed())?;
 
         match value {
 
@@ -23,9 +23,9 @@ impl Procedure for NumberParseProcedure {
                 let n = *c as u8;
 
                 if n < '0' as u8 || n > '9' as u8 {
-                    Err(RuntimeError {
+                    Err(RuntimeError::Unknown {
                         message: format!("'{}' is not a valid digit!", c)
-                    })
+                    }.boxed())
                 } else {
                     Ok(Value::Integer((n - '0' as u8) as i64))
                 }
@@ -36,15 +36,13 @@ impl Procedure for NumberParseProcedure {
                 } else if let Ok(float) = str.parse() {
                     Ok(Value::Float(float))
                 } else {
-                    Err(RuntimeError {
+                    Err(RuntimeError::Unknown {
                         message: format!("'{}' is not a valid number!", str)
-                    })
+                    }.boxed())
                 }
             }
 
-            other => Err(RuntimeError {
-                message: format!("Cannot parse number from value of type {}!", other.get_type_id())
-            })
+            other => Err(RuntimeError::TypeMismatch { expected: crate::runtime::Type::String, found: other.get_type_id() }.boxed())
         }
     }
 }

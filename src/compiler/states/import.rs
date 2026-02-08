@@ -1,12 +1,14 @@
 use crate::{compiler::{CompilerError, CompilerState, file_reader::ImportAddress, states::CompilerBaseState}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}};
 
+use crate::error::Result;
+
 pub struct CompilerImportState {
     base_state: CompilerBaseState,
     module_id: Option<ImportAddress>,
 }
 
 impl CompilerState for CompilerImportState {
-    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>, crate::compiler::CompilerError> {
+    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
         
         if self.module_id.is_none() {
             match token {
@@ -19,15 +21,13 @@ impl CompilerState for CompilerImportState {
                 }
 
                 other => {
-                    return Err(CompilerError {
-                        message: format!("Unexpected token. Expected identifier, found {:?}!", other)
-                    });
+                    return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
                 }
             }
         } else {
             match token {
                 Token::Punctuation(PunctuationToken::Semicolon) => {
-                    compiler_environment.get_file_reader_mut().enqueue(self.module_id.unwrap());
+                    compiler_environment.get_file_reader_mut().push_dependency(self.module_id.unwrap())?;
                     return Ok(Box::new(self.base_state))
                 }
 
@@ -35,9 +35,9 @@ impl CompilerState for CompilerImportState {
                     let module_id = self.module_id.as_mut().unwrap();
 
                     if module_id.path.is_some() {
-                        return Err(CompilerError {
+                        return Err(CompilerError::InvalidDefinition {
                             message: "Cannot declare more than one location for an import!".into()
-                        })
+                        }.boxed())
                     }
 
                     module_id.path = Some(String::new());
@@ -51,25 +51,23 @@ impl CompilerState for CompilerImportState {
                         module_id.path = Some(path);
                         return Ok(self)
                     } else {
-                        return Err(CompilerError {
+                        return Err(CompilerError::InvalidDefinition {
                             message: "Unexpected String literal. Try adding 'from' to declare a location for an import!".into()
-                        })
+                        }.boxed())
                     }
                 }
                 
                 other => {
-                    return Err(CompilerError {
-                        message: format!("Unexpected token. Expected ';', found {:?}!", other)
-                    });
+                    return Err(CompilerError::UnexpectedToken { expected: Some(";".into()), found: other }.boxed());
                 }
             }
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment, crate::compiler::CompilerError> {
-        Err(CompilerError {
+    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
+        Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into()
-        })
+        }.boxed())
     }
 }
 

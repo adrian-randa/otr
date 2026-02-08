@@ -1,5 +1,7 @@
 use crate::{compiler::{CompilerError, CompilerState, states::module::CompilerModuleState}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::{ModuleAddress, Struct, Value}};
 
+use crate::error::Result;
+
 enum CompilerStructSubstate {
     Identifier,
     PreFields,
@@ -18,7 +20,7 @@ pub struct CompilerStructState {
 }
 
 impl CompilerState for CompilerStructState {
-    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>, crate::compiler::CompilerError> {
+    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, _compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
         match self.substate {
             CompilerStructSubstate::Identifier => {
                 match token {
@@ -29,9 +31,7 @@ impl CompilerState for CompilerStructState {
                     }
 
                     other => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token. Expected identifier, found {:?}!", other)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
                     }
                 }
             },
@@ -45,9 +45,7 @@ impl CompilerState for CompilerStructState {
                     }
 
                     other => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token. Expected '{{', found {:?}!", other)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("{".into()), found: other }.boxed());
                     }
                 }
             },
@@ -63,11 +61,28 @@ impl CompilerState for CompilerStructState {
                         self.substate = CompilerStructSubstate::AfterField;
                         return Ok(self);
                     }
+
+                    Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
+                        let struct_id = ModuleAddress::new(
+                            self.module.get_name().unwrap().to_owned(),
+                            self.identifier.clone().unwrap()
+                        );
+
+                        let mut prototype = Struct::new(struct_id);
+
+                        let members = prototype.get_members_mut();
+
+                        for field in self.fields {
+                            members.insert_member(field.0, Value::Null, field.1)?;
+                        }
+
+                        self.module.get_module_mut().insert_struct(self.identifier.unwrap(), prototype, false);
+
+                        return Ok(Box::new(self.module) as Box<dyn CompilerState>);
+                    }
                     
                     other => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token. Expected identifier, found {:?}!", other)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
                     }
                 }
             },
@@ -91,30 +106,26 @@ impl CompilerState for CompilerStructState {
                         let members = prototype.get_members_mut();
 
                         for field in self.fields {
-                            members.insert_member(field.0, Value::Null, field.1).map_err(|err| CompilerError {
-                                message: format!("Error while parsing struct prototype: {:?}", err)
-                            })?;
+                            members.insert_member(field.0, Value::Null, field.1)?;
                         }
 
                         self.module.get_module_mut().insert_struct(self.identifier.unwrap(), prototype, false);
 
-                        return Ok(Box::new(self.module));
+                        return Ok(Box::new(self.module) as Box<dyn CompilerState>);
                     }
 
                     other => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token. Expected ',' or '}}', found {:?}!", other)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: None, found: other }.boxed());
                     }
                 }
             }
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment, crate::compiler::CompilerError> {
-        Err(CompilerError {
+    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
+        Err(CompilerError::Unknown {
             message: "Unfinished module declaration!".into()
-        })
+        }.boxed())
     }
 }
 

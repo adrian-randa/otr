@@ -4,12 +4,15 @@ use super::Value;
 
 use super::RuntimeError;
 
+use crate::error::Error;
 use crate::runtime::Struct;
 use crate::runtime::module::Module;
 use crate::runtime::procedures::Procedure;
-use crate::runtime::procedures::builtin::{arrays, numbers, strings};
+use crate::runtime::procedures::builtin::{arrays, debug, numbers, strings};
 
 use super::ModuleAddress;
+
+use crate::error::Result;
 
 use std::rc::Rc;
 
@@ -31,6 +34,7 @@ impl Default for Environment {
                 ("Arrays".into(), Rc::new(arrays::get_module())),
                 ("Strings".into(), Rc::new(strings::get_module())),
                 ("Numbers".into(), Rc::new(numbers::get_module())),
+                ("Debug".into(), Rc::new(debug::get_module())),
             ].into_iter()),
             scope: Default::default()
         }
@@ -46,16 +50,15 @@ impl Environment {
         }
     }
 
-    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<&Box<dyn Procedure>, RuntimeError> {
+    pub fn get_loaded_module(&self, module_id: &String) -> Option<&Module> {
+        self.loaded_modules.get(module_id).map(|module| module.as_ref())
+    }
+
+    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<&Box<dyn Procedure>> {
         let module = self
             .loaded_modules
             .get(address.get_module_id())
-            .ok_or(RuntimeError {
-                message: format!(
-                    "Module \"{}\" not loaded in this environment!",
-                    address.get_module_id()
-                ),
-            })?;
+            .ok_or(RuntimeError::ModuleNotLoaded { module_identifier: address.get_module_id().clone() }.boxed())?;
 
         module.get_procedure(
             address.get_identifier(),
@@ -63,16 +66,11 @@ impl Environment {
         )
     }
 
-    pub fn get_struct_by_address(&self, address: &ModuleAddress) -> Result<Struct, RuntimeError> {
+    pub fn get_struct_by_address(&self, address: &ModuleAddress) -> Result<Struct> {
         let module = self
             .loaded_modules
             .get(address.get_module_id())
-            .ok_or(RuntimeError {
-                message: format!(
-                    "Module '{}' not loaded in this environment!",
-                    address.get_module_id()
-                ),
-            })?;
+            .ok_or(RuntimeError::ModuleNotLoaded { module_identifier: address.get_module_id().clone() }.boxed())?;
 
         module.get_struct(
             address.get_identifier(),
@@ -92,7 +90,7 @@ impl Environment {
         self.scope.insert_members(members);
     }
 
-    pub fn query_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
+    pub fn query_variable(&self, address: ScopeAddress) -> Result<Value> {
         let address = address.try_bake(self)?;
 
         self.scope.query_variable(address, &self.contained_module_id)
@@ -102,22 +100,28 @@ impl Environment {
         &mut self,
         address: ScopeAddress,
         new_value: Value,
-    ) -> Result<(), RuntimeError> {
+    ) -> Result<()> {
         let address = address.try_bake(self)?;
 
         self.scope.set_variable(address, &self.contained_module_id, new_value)
     }
 
-    pub fn reference_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
+    pub fn reference_variable(&self, address: ScopeAddress) -> Result<Value> {
         let address = address.try_bake(self)?;
 
         self.scope.reference_variable(address, &self.contained_module_id)
     }
 
-    pub(crate) fn clone_variable(&self, address: ScopeAddress) -> Result<Value, RuntimeError> {
+    pub(crate) fn clone_variable(&self, address: ScopeAddress) -> Result<Value> {
         let address = address.try_bake(self)?;
 
         self.scope.clone_variable(address, &self.contained_module_id)
+    }
+
+    pub(crate) fn get_variable_type(&self, address: ScopeAddress) -> Result<Value> {
+        let address = address.try_bake(self)?;
+
+        self.scope.query_type(address, &self.contained_module_id)
     }
 
     pub fn load_module(&mut self, module_identifier: String, module: Rc<Module>) { 

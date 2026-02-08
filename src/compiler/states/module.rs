@@ -1,6 +1,8 @@
 use std::rc::Rc;
 
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState, r#struct::CompilerStructState}}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::{RuntimeError, module::Module}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, states::{CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState, r#struct::CompilerStructState}}, error::context::HintContextDecorator, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, runtime::module::Module};
+
+use crate::error::Result;
 
 #[derive(Debug, PartialEq, Eq)]
 enum ModuleSubstate {
@@ -36,7 +38,7 @@ impl CompilerModuleState {
 }
 
 impl CompilerState for CompilerModuleState {
-    fn read(mut self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>, crate::compiler::CompilerError> {
+    fn read(mut self: Box<Self>, token: Token, _compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
 
         match self.substate {
             ModuleSubstate::PreScope => {
@@ -45,9 +47,7 @@ impl CompilerState for CompilerModuleState {
                         self.module_name = Some(ident);
                         return Ok(self);
                     } else {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token! Expected identifier, found {:?}", token)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: token }.boxed());
                     }
                 }
 
@@ -55,9 +55,7 @@ impl CompilerState for CompilerModuleState {
                     self.substate = ModuleSubstate::InScope;
                     return Ok(self);
                 } else {
-                    return Err(CompilerError {
-                        message: format!("Unexpected token! Expected '{{', found {:?}", token)
-                    });
+                    return Err(CompilerError::UnexpectedToken { expected: Some("{".into()), found: token }.boxed());
                 }
             },
             ModuleSubstate::InScope => {
@@ -89,10 +87,19 @@ impl CompilerState for CompilerModuleState {
                         return Ok(self);
                     }
 
+                    Token::Identifier(_) => {
+                        return Err(HintContextDecorator {
+                            error: CompilerError::UnexpectedToken {
+                                expected: Some("Procedure/Struct Declaration".into()),
+                                found: token,
+                            }.boxed(),
+
+                            message: "Specify what you want to declare: Use 'proc' or 'struct'!".into()
+                        }.boxed())
+                    }
+
                     _ => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token! Expected procedure/struct declaration, found {:?}", token)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Procedure/Struct Declaration".into()), found: token }.boxed());
                     }
                 }
             },
@@ -113,9 +120,7 @@ impl CompilerState for CompilerModuleState {
                     }
 
                     other => {
-                        return Err(CompilerError {
-                            message: format!("Unexpected token. Expected identifier, found {:?}!", other)
-                        });
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
                     }
                 }
             },
@@ -124,9 +129,9 @@ impl CompilerState for CompilerModuleState {
         
     }
 
-    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment, crate::compiler::CompilerError> {
-        Err(CompilerError {
+    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
+        Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into()
-        })
+        }.boxed())
     }
 }
