@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{compiler::CompilerError, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress,Type, Value, expressions::{ArrayIndexExpression, AssociatedProcedureCallExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}, scope::{ScopeAddress, ScopeAddressant}}};
+use crate::{compiler::{CompilerError, parenthesis::ParenthesisStack}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress,Type, Value, expressions::{ArrayIndexExpression, AssociatedProcedureCallExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}, scope::{ScopeAddress, ScopeAddressant}}};
 
 use crate::error::Result;
 
@@ -118,17 +118,17 @@ impl ExpressionParser {
     pub fn take_until_closing(tokens: impl IntoIterator<Item = Token>, parenthesis: Token) -> Result<Vec<Token>> {
         use PunctuationToken::*;
 
-        let mut stack = Vec::new();
+        let mut stack = ParenthesisStack::new();
 
         match parenthesis {
             Token::Punctuation(PunctuationToken::Parenthesis(_)) => {
-                stack.push(Parenthesis(ParenthesisType::Opening));
+                stack.read(Token::Punctuation(Parenthesis(ParenthesisType::Opening)));
             }
             Token::Punctuation(PunctuationToken::SquareBrackets(_)) => {
-                stack.push(SquareBrackets(ParenthesisType::Opening));
+                stack.read(Token::Punctuation(SquareBrackets(ParenthesisType::Opening)));
             }
             Token::Punctuation(PunctuationToken::CurlyBraces(_)) => {
-                stack.push(CurlyBraces(ParenthesisType::Opening));
+                stack.read(Token::Punctuation(CurlyBraces(ParenthesisType::Opening)));
             }
 
             _ => panic!("Unsupported parenthesis type!")
@@ -142,40 +142,8 @@ impl ExpressionParser {
             if stack.len() == 1 && &token == &parenthesis {
                 return Ok(slice);
             }
-            match token.clone() {
-                Token::Punctuation(punct) => {
-                    
-                    match &punct {
-                        Parenthesis(p) |
-                        SquareBrackets(p) |
-                        CurlyBraces(p) => {
-                            match p {
-                                ParenthesisType::Opening => stack.push(punct),
-                                ParenthesisType::Closing => {
-                                    let top = stack.pop().ok_or(CompilerError::InvalidParenthesisStructure.boxed())?;
-
-                                    match (&top, &punct) {
-                                        (Parenthesis(_), Parenthesis(_)) |
-                                        (SquareBrackets(_), SquareBrackets(_)) |
-                                        (CurlyBraces(_), CurlyBraces(_)) => {}
-                                        _ => {
-                                            return Err(CompilerError::InvalidParenthesisStructure.boxed());
-                                        }                                        
-                                    }
-                                },
-                            }
-                        }
-
-                        _ => {}
-                    };
-
-                    slice.push(token);
-                }
-
-                token => {
-                    slice.push(token);
-                }
-            }
+            stack.read(token.clone())?;
+            slice.push(token);
         }
 
         if !stack.is_empty() {
@@ -186,7 +154,7 @@ impl ExpressionParser {
     }
 
 
-    pub fn split_by_commas(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<Vec<Token>>> {
+    fn split_by_commas(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<Vec<Token>>> {
 
         let mut iter = tokens.into_iter();
 
@@ -243,7 +211,7 @@ impl ExpressionParser {
         Ok(slices)
     }
 
-    pub fn split(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<RawExpressionAtom>> {
+    fn split(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<RawExpressionAtom>> {
         let mut tokens = tokens.into_iter();
 
         let mut atoms = Vec::new();
@@ -309,196 +277,6 @@ impl ExpressionParser {
                 RawExpressionAtom::Operator(operator_token) => ExpressionAtom::Operator(operator_token),
             }  
         )      
-    }
-
-    fn old_parse_raw_atom(atom: RawExpressionAtom) -> Result<ExpressionAtom> {
-        match atom {
-            RawExpressionAtom::Operator(operator) => Ok(ExpressionAtom::Operator(operator)),
-            RawExpressionAtom::Subexpression(tokens) => {
-                // Epmpty
-                if tokens.len() == 0 {
-                    return Err(CompilerError::InvalidExpression {
-                        message: "Found empty subexpression atom!".into()
-                    }.boxed());
-                }
-
-                // Single token
-                if tokens.len() == 1 {
-                    let token = &tokens[0];
-                    match token {
-                        Token::Literal(literal) => {
-                            return Ok(ExpressionAtom::Subexpression(Box::new(Value::try_from(literal.to_owned())?)))
-                        }
-                        Token::Identifier(ident) => {
-                            return Ok(ExpressionAtom::Subexpression(Box::new(VariableExpression {
-                                variable_address: vec![ScopeAddressant::Identifier(ident.to_owned())]
-                                    .try_into()
-                                    .map_err(|_| CompilerError::InvalidExpression {
-                                        message: format!("Could not resolve identifier '{}'!", ident)
-                                    }.boxed())?
-                            })))
-                        }
-                        _ => {
-                            return Err(CompilerError::UnexpectedToken { expected: None, found: token.clone() }.boxed());
-                        }
-                    }
-                }
-
-                // Parenthesis
-                if let Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) = tokens[0] {
-                    let mut tokens = tokens.into_iter().skip(1);
-                    let subexpression = Self::take_until_closing(
-                        &mut tokens,
-                        Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
-                    )?;
-
-                    if let Some(token) = tokens.next() {
-                        Err(CompilerError::UnexpectedToken { expected: Some("Operator".into()), found: token }.boxed())?;
-                    }
-
-                    return Ok(ExpressionAtom::Subexpression(Self::parse(subexpression)?));
-                }
-
-
-                let first_token = tokens[0].to_owned();
-                match first_token {
-                    Token::Identifier(base_ident) => {
-                        let first_separator = tokens[1].to_owned();
-
-                        // Member of a module
-                        if let Token::Punctuation(PunctuationToken::DoubleColon) = first_separator {
-                            let mut tokens = tokens.into_iter().skip(2);
-
-                            let member_ident = tokens.next();
-                            if let Some(Token::Identifier(member_ident)) = member_ident {
-                                match tokens.next() {
-                                    
-                                    // Procedure
-                                    Some(Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening))) => {
-                                        let arguments = Self::take_until_closing(
-                                            &mut tokens,
-                                            Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
-                                        )?;
-
-                                        let arguments = Self::split_by_commas(arguments)?;
-                                        let mut argument_expressions = Vec::new();
-                                        for argument in arguments {
-                                            argument_expressions.push(Self::parse(argument)?);
-                                        }
-
-                                        let module_address = ModuleAddress::new(base_ident, member_ident);
-
-                                        return Ok(ExpressionAtom::Subexpression(Box::new(ProcedureCallExpression {
-                                            procedure_id: module_address,
-                                            arguments: argument_expressions
-                                        })));
-                                    }
-
-                                    // Struct construction
-                                    Some(Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening))) => {
-                                        let fields = Self::take_until_closing(
-                                            &mut tokens,
-                                            Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing))
-                                        )?;
-                                        let fields = Self::split_by_commas(fields)?;
-
-                                        let mut field_overrides = Vec::new();
-
-                                        for field in fields {
-                                            let mut field = field.into_iter();
-                                            let field_ident = field.next();
-                                            if let Some(Token::Identifier(field_ident)) = field_ident {
-                                                let separator = field.next();
-                                                if let Some(Token::Punctuation(PunctuationToken::Colon)) = separator {
-                                                    field_overrides.push((
-                                                        field_ident,
-                                                        Self::parse(field)?
-                                                    ));
-                                                } else {
-                                                    return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: separator.unwrap_or(Token::Identifier("".into())) }.boxed());
-                                                }
-                                            } else {
-                                                return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: field_ident.unwrap_or(Token::Identifier("".into())) }.boxed());
-                                            }
-                                        }
-
-                                        let module_address = ModuleAddress::new(base_ident, member_ident);
-
-                                        return Ok(ExpressionAtom::Subexpression(Box::new(StructConstructionExpression {
-                                            struct_id: module_address,
-                                            field_overrides
-                                        })));
-                                    }
-
-                                    other => {
-                                        return Err(CompilerError::UnexpectedToken { expected: None, found: other.unwrap_or(Token::Identifier("".into())) }.boxed());
-                                    }
-                                }
-                            } else {
-                                return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: member_ident.unwrap_or(Token::Identifier("".into())) }.boxed());
-                            }
-                        } else {
-                            return Self::parse_variable_address(tokens);
-                        }
-                    }
-                    Token::Keyword(KeywordToken::Ref) => {
-                        let mut tokens = tokens;
-                        let tokens: Vec<Token> = tokens.drain(1..).collect();
-
-                        let variable_address = ScopeAddress::try_from(tokens)?;
-
-                        Ok(ExpressionAtom::Subexpression(Box::new(ReferenceExpression { variable_address })))
-                    }
-                    Token::Keyword(KeywordToken::Clone) => {
-                        let mut tokens = tokens;
-                        let tokens: Vec<Token> = tokens.drain(1..).collect();
-
-                        let variable_address = ScopeAddress::try_from(tokens)?;
-
-                        Ok(ExpressionAtom::Subexpression(Box::new(CloneExpression { variable_address })))
-                    }
-                    _ => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: first_token }.boxed());
-                    }
-                }
-            },
-        }
-
-    }
-
-    fn parse_variable_address(tokens: impl IntoIterator<Item = Token>) -> Result<ExpressionAtom> {
-
-        let mut address = Vec::new();
-
-        let mut tokens = tokens.into_iter();
-
-        while let Some(next) = tokens.next() {
-            match next {
-                Token::Identifier(ident) => {
-                    address.push(ScopeAddressant::Identifier(ident));
-                }
-                Token::Punctuation(PunctuationToken::Dot) => {}
-                Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
-                    let inner = Self::take_until_closing(
-                        &mut tokens,
-                        Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
-                    )?;
-
-                    let index_expression = Self::parse(inner)?;
-
-                    address.push(ScopeAddressant::DynamicIndex(index_expression.into()));
-                }
-
-                _ => Err(CompilerError::UnexpectedToken { expected: Some("Addressant".into()), found: next }.boxed())?
-            }
-        }
-
-
-        Ok(ExpressionAtom::Subexpression(Box::new(VariableExpression {
-            variable_address: address.try_into().map_err(|_| CompilerError::InvalidExpression {
-                message: "Could not resolve variable's address!".into()
-            }.boxed())?
-        })))
     }
 
     fn get_precedence(operator: &OperatorToken) -> usize {
@@ -923,7 +701,7 @@ impl ExpressionAtomParser {
                         }
                     })
                 ),
-            ExpressionAtomParserState::ScopeAddressMember { address, access } => Err(
+            ExpressionAtomParserState::ScopeAddressMember { address: _, access: _ } => Err(
                 CompilerError::InvalidExpression { message: "Missing token. Expected identifier after '.'!".into() }.boxed()
             ),
             ExpressionAtomParserState::Subexpression { subexpression } => Ok(
@@ -945,12 +723,12 @@ impl ExpressionAtomParser {
                 }
             }
             
-            ExpressionAtomParserState::StructMember { subexpression } => Err(
+            ExpressionAtomParserState::StructMember { subexpression: _ } => Err(
                 CompilerError::InvalidExpression {
                     message: "Missing token. Expected identifier after '.'!".into()
                 }.boxed()
             ),
-            ExpressionAtomParserState::AssociatedProcedureCall { subexpression, ident } => Err(CompilerError::InvalidExpression {
+            ExpressionAtomParserState::AssociatedProcedureCall { subexpression: _, ident: _ } => Err(CompilerError::InvalidExpression {
                 message: "Incomplete associated procedure call!".into()
             }.boxed()),
         }

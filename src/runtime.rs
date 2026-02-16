@@ -11,6 +11,7 @@ use itertools::Itertools;
 
 use crate::error::Error;
 use crate::error::compiler_error::CompilerError;
+use crate::error::context::HintContextDecorator;
 use crate::error::runtime_error::RuntimeError;
 use crate::lexer::token::{LiteralToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token};
 use crate::runtime::environment::Environment;
@@ -786,7 +787,12 @@ impl RuntimeObject {
     }
 
     pub fn execute(self) -> Result<Value> {
-        let entrypoint = self.entrypoint.ok_or(RuntimeError::NoEntrypoint.boxed())?;
+        let entrypoint = self.entrypoint.ok_or(
+            HintContextDecorator {
+                error: RuntimeError::NoEntrypoint.boxed(),
+                message: "If you want to run the specified file as a script, please annotate a procedure as the entrypoint.".into()
+            }.boxed()
+        )?;
 
         let main_expression = ProcedureCallExpression::new(
             entrypoint,

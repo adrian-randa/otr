@@ -1,6 +1,6 @@
 use std::{collections::{HashSet, VecDeque}, fmt::Display, fs, path::{Path, PathBuf}, str::FromStr};
 
-use crate::{compiler::CompilerError, lexer::{FragmentStream, Tokenizer, token::{ContextualizedToken, ContextualizedTokenStream, Token, TokenStream}}};
+use crate::{compiler::CompilerError, lexer::{fragmenter::FragmentStream, Tokenizer, token::{ContextualizedToken, ContextualizedTokenStream, Token, TokenStream}}};
 
 use crate::error::Result;
 

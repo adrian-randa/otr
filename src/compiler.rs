@@ -1,6 +1,6 @@
 use std::{collections::HashSet, str::FromStr};
 
-use crate::{compiler::{file_reader::FileReader, states::CompilerBaseState}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{FragmentStream, Tokenizer, token::Token}, runtime::{RuntimeObject, environment::Environment}};
+use crate::{compiler::{file_reader::FileReader, states::CompilerBaseState}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{fragmenter::FragmentStream, Tokenizer, token::Token}, runtime::{RuntimeObject, environment::Environment}};
 
 use crate::error::Result;
 
@@ -96,3 +96,4 @@ pub mod states;
 pub mod expression_parser;
 pub mod decorators;
 pub mod file_reader;
+pub mod parenthesis;
