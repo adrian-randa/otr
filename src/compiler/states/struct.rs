@@ -20,7 +20,7 @@ pub struct CompilerStructState {
 }
 
 impl CompilerState for CompilerStructState {
-    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, _compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
+    fn read(mut self: Box<Self>, token: crate::lexer::token::Token, compiler_environment: &mut crate::compiler::CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
         match self.substate {
             CompilerStructSubstate::Identifier => {
                 match token {
@@ -68,7 +68,9 @@ impl CompilerState for CompilerStructState {
                             self.identifier.clone().unwrap()
                         );
 
-                        let mut prototype = Struct::new(struct_id);
+                        let mut prototype = Struct::new(struct_id.clone());
+                        compiler_environment.register_struct_ident(struct_id);
+
 
                         let members = prototype.get_members_mut();
 
@@ -101,7 +103,8 @@ impl CompilerState for CompilerStructState {
                             self.identifier.clone().unwrap()
                         );
 
-                        let mut prototype = Struct::new(struct_id);
+                        let mut prototype = Struct::new(struct_id.clone());
+                        compiler_environment.register_struct_ident(struct_id);
 
                         let members = prototype.get_members_mut();
 
@@ -110,6 +113,7 @@ impl CompilerState for CompilerStructState {
                         }
 
                         self.module.get_module_mut().insert_struct(self.identifier.unwrap(), prototype, false);
+
 
                         return Ok(Box::new(self.module) as Box<dyn CompilerState>);
                     }

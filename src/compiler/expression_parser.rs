@@ -1,6 +1,6 @@
 use std::{collections::HashMap, rc::Rc};
 
-use crate::{compiler::{CompilerError, parenthesis::ParenthesisStack}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress,Type, Value, expressions::{ArrayIndexExpression, AssociatedProcedureCallExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}, scope::{ScopeAddress, ScopeAddressant}}};
+use crate::{compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{Expression, ModuleAddress,Type, Value, expressions::{ArrayIndexExpression, AssociatedProcedureCallExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression, MultiplyExpression, PowerExpression, SubtractExpression}, boolean::{AndExpression, NotExpression, OrExpression}}, scope::{ScopeAddress, ScopeAddressant}}};
 
 use crate::error::Result;
 
@@ -28,8 +28,11 @@ pub enum RawExpressionAtom {
 pub struct ExpressionParser;
 
 impl ExpressionParser {
-    pub fn parse(expression: impl IntoIterator<Item = Token>) -> Result<Box<dyn Expression>> {
-        let atoms = Self::atomize(expression)?;
+    pub fn parse(
+        expression: impl IntoIterator<Item = Token>,
+        environment: &dyn ExpressionParseEnvironment
+    ) -> Result<Box<dyn Expression>> {
+        let atoms = Self::atomize(expression, environment)?;
 
         let mut operator_order = Vec::new();
         for i in 0..atoms.len() {
@@ -103,13 +106,13 @@ impl ExpressionParser {
         Ok(atoms[0].take().unwrap().unwrap_subexpression())
     }
 
-    pub fn atomize(expression: impl IntoIterator<Item = Token>) -> Result<Vec<ExpressionAtom>> {
+    pub fn atomize(expression: impl IntoIterator<Item = Token>, environment: &dyn ExpressionParseEnvironment) -> Result<Vec<ExpressionAtom>> {
         let raw_atoms = Self::split(expression)?;
 
         let mut atoms = Vec::new();
 
         for atom in raw_atoms {
-           atoms.push(Self::parse_raw_atom(atom)?);
+           atoms.push(Self::parse_raw_atom(atom, environment)?);
         }
 
         Ok(atoms)
@@ -122,13 +125,13 @@ impl ExpressionParser {
 
         match parenthesis {
             Token::Punctuation(PunctuationToken::Parenthesis(_)) => {
-                stack.read(Token::Punctuation(Parenthesis(ParenthesisType::Opening)));
+                stack.read(Token::Punctuation(Parenthesis(ParenthesisType::Opening)))?;
             }
             Token::Punctuation(PunctuationToken::SquareBrackets(_)) => {
-                stack.read(Token::Punctuation(SquareBrackets(ParenthesisType::Opening)));
+                stack.read(Token::Punctuation(SquareBrackets(ParenthesisType::Opening)))?;
             }
             Token::Punctuation(PunctuationToken::CurlyBraces(_)) => {
-                stack.read(Token::Punctuation(CurlyBraces(ParenthesisType::Opening)));
+                stack.read(Token::Punctuation(CurlyBraces(ParenthesisType::Opening)))?;
             }
 
             _ => panic!("Unsupported parenthesis type!")
@@ -270,10 +273,10 @@ impl ExpressionParser {
         Ok(atoms)
     }
 
-    fn parse_raw_atom(atom: RawExpressionAtom) -> Result<ExpressionAtom> {
+    fn parse_raw_atom(atom: RawExpressionAtom, environment: &dyn ExpressionParseEnvironment) -> Result<ExpressionAtom> {
         Ok(
             match atom {
-                RawExpressionAtom::Subexpression(tokens) => ExpressionAtomParser::new().parse(tokens)?,
+                RawExpressionAtom::Subexpression(tokens) => ExpressionAtomParser::new().parse(tokens, environment)?,
                 RawExpressionAtom::Operator(operator_token) => ExpressionAtom::Operator(operator_token),
             }  
         )      
@@ -384,7 +387,11 @@ impl ExpressionAtomParser {
         }
     }
 
-    fn parse(mut self, tokens: impl IntoIterator<Item = Token>) -> Result<ExpressionAtom> {
+    fn parse(
+        mut self,
+        tokens: impl IntoIterator<Item = Token>,
+        environment: &dyn ExpressionParseEnvironment
+    ) -> Result<ExpressionAtom> {
 
         let mut tokens = tokens.into_iter();
 
@@ -424,7 +431,7 @@ impl ExpressionAtomParser {
                                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
                             )?;
                             self.state = Subexpression { 
-                                subexpression: ExpressionParser::parse(inner)?
+                                subexpression: ExpressionParser::parse(inner, environment)?
                             }
                         }
                         other=> {
@@ -447,7 +454,7 @@ impl ExpressionAtomParser {
                                 &mut tokens,
                                 Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
                             )?;
-                            let index_expression = ExpressionParser::parse(inner)?;
+                            let index_expression = ExpressionParser::parse(inner, environment)?;
 
                             self.state = ScopeAddress {
                                 address: vec![
@@ -473,6 +480,71 @@ impl ExpressionAtomParser {
                                 ident: None,
                             }
                         }
+
+                        Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
+                            let module_address = environment.resolve_procedure_identifier(ident)?;
+
+                            let inner = ExpressionParser::take_until_closing(
+                                &mut tokens,
+                                Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing))
+                            )?;
+                            let raw_args = ExpressionParser::split_by_commas(inner)?;
+                            let mut arguments = Vec::new();
+                            for arg in raw_args {
+                                arguments.push(ExpressionParser::parse(arg, environment)?);
+                            }
+
+                            self.state = Subexpression {
+                                subexpression: Box::new(ProcedureCallExpression {
+                                    procedure_id: module_address,
+                                    arguments
+                                })
+                            };
+                        }
+
+                        Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) => {
+                            let module_address = environment.resolve_struct_identifier(ident)?;
+
+                            let inner = ExpressionParser::take_until_closing(
+                                &mut tokens,
+                                Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing))
+                            )?;
+                            let raw_field_overrides = ExpressionParser::split_by_commas(inner)?;
+                            let mut field_overrides = Vec::new();
+                            for field_override in raw_field_overrides {
+                                let mut tokens = field_override.into_iter();
+
+                                let field_name = tokens.next();
+                                let field_name = match field_name {
+                                    Some(Token::Identifier(ident)) => {
+                                        ident
+                                    },
+                                    other => {
+                                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other.unwrap_or(Token::Identifier("".into())) }.boxed());
+                                    }
+                                };
+
+                                match tokens.next() {
+                                    Some(Token::Punctuation(PunctuationToken::Colon)) => {},
+                                    other => {
+                                        return Err(CompilerError::UnexpectedToken { expected: Some(":".into()), found: other.unwrap_or(Token::Identifier("".into())) }.boxed());
+                                    }
+                                };
+
+                                field_overrides.push((
+                                    field_name,
+                                    ExpressionParser::parse(tokens, environment)?
+                                ));
+                            }
+
+                            self.state = Subexpression {
+                                subexpression: Box::new(StructConstructionExpression {
+                                    struct_id: module_address,
+                                    field_overrides,
+                                })
+                            };
+                        }
+
                         other => {
                             return Err(CompilerError::UnexpectedToken { expected: Some("Scope Address, Module Member or Associated Procedure Call".into()), found: other }.boxed());
                         }
@@ -488,7 +560,7 @@ impl ExpressionAtomParser {
                                 &mut tokens,
                                 Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
                             )?;
-                            let index_expression = ExpressionParser::parse(inner)?;
+                            let index_expression = ExpressionParser::parse(inner, environment)?;
 
                             address.push(ScopeAddressant::DynamicIndex(index_expression.into()));
 
@@ -532,7 +604,7 @@ impl ExpressionAtomParser {
                                 &mut tokens,
                                 Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
                             )?;
-                            let index_expression = ExpressionParser::parse(inner)?;
+                            let index_expression = ExpressionParser::parse(inner, environment)?;
 
                             self.state = Subexpression {
                                 subexpression: Box::new(ArrayIndexExpression { subexpression, index_expression })
@@ -560,7 +632,7 @@ impl ExpressionAtomParser {
                                 let raw_args = ExpressionParser::split_by_commas(inner)?;
                                 let mut arguments = Vec::new();
                                 for arg in raw_args {
-                                    arguments.push(ExpressionParser::parse(arg)?);
+                                    arguments.push(ExpressionParser::parse(arg, environment)?);
                                 }
 
                                 self.state = Subexpression {
@@ -599,7 +671,7 @@ impl ExpressionAtomParser {
 
                                     field_overrides.push((
                                         field_name,
-                                        ExpressionParser::parse(tokens)?
+                                        ExpressionParser::parse(tokens, environment)?
                                     ));
                                 }
 
@@ -650,7 +722,7 @@ impl ExpressionAtomParser {
                                 let raw_args = ExpressionParser::split_by_commas(inner)?;
                                 let mut arguments = Vec::new();
                                 for arg in raw_args {
-                                    arguments.push(ExpressionParser::parse(arg)?);
+                                    arguments.push(ExpressionParser::parse(arg, environment)?);
                                 }
 
                                 self.state = Subexpression {

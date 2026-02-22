@@ -2,7 +2,7 @@ use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use derive_more::{Deref, IntoIterator};
 
-use crate::{compiler::expression_parser::ExpressionParser, error::{Error, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{Expression, RuntimeError, Value, environment::Environment}};
+use crate::{compiler::{NoExpressionEnvironment, expression_parser::ExpressionParser}, error::{Error, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{Expression, RuntimeError, Value, environment::Environment}};
 
 use crate::error::Result;
 
@@ -66,7 +66,7 @@ impl TryFrom<Vec<Token>> for ScopeAddress {
                         Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
                     )?;
 
-                    let index_expression = ExpressionParser::parse(index_expression)?;
+                    let index_expression = ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
 
                     addressants.push(ScopeAddressant::DynamicIndex(index_expression.into()));
                 }

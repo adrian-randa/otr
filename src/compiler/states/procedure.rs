@@ -1,6 +1,4 @@
-use std::fmt::Arguments;
-
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, decorators::EntrypointDecorator, states::{decorator::{self, RawDecorator}, module::CompilerModuleState}}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{ModuleAddress, procedures::CompiledProcedureBuilder}};
+use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, NoExpressionEnvironment, decorators::EntrypointDecorator, states::{decorator::{self, RawDecorator}, module::CompilerModuleState}}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{ModuleAddress, procedures::CompiledProcedureBuilder}};
 
 use crate::error::Result;
 
@@ -176,6 +174,13 @@ impl CompilerState for CompilerProcedureState {
                                     Box::new(procedure),
                                     false
                                 );
+                                let module_id = self.module.get_name().ok_or(
+                                    CompilerError::Unknown { message: "Missing module name!".into() }.boxed()
+                                )?.to_owned();
+                                let identifier = ident.to_owned();
+                                compiler_environment.register_procedure_ident(
+                                    ModuleAddress::new(module_id, identifier)
+                                );
                             },
                             ProcedureIdentifier::AssociatedProcedure { struct_ident, procedure_ident } => {
                                 self.module.get_module_mut().insert_associated_procedure(
@@ -186,8 +191,6 @@ impl CompilerState for CompilerProcedureState {
                                 );
                             },
                         }
-
-                        
 
                         for decorator in self.decorators {
                             match decorator.get_ident() as &str {
@@ -223,7 +226,7 @@ impl CompilerState for CompilerProcedureState {
                     }
                 }
 
-                self.procedure = self.procedure.read(token)?;
+                self.procedure = self.procedure.read(token, compiler_environment)?;
                 Ok(self)
             },
         }

@@ -1,6 +1,6 @@
 use std::{any::Any, collections::HashMap};
 
-use crate::{compiler::expression_parser::ExpressionParser, error::{Error, compiler_error::CompilerError}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{
+use crate::{compiler::{ExpressionParseEnvironment, expression_parser::ExpressionParser}, error::{Error, compiler_error::CompilerError}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}, runtime::{
     Environment, Expression, RuntimeError, ScopeAddressant, Value, expressions::{AssociatedProcedureCallExpression, EqualityExpression, ReferenceExpression, TypeofVariableExpression, VariableExpression, boolean::NotExpression}, scope::ScopeAddress
 }};
 
@@ -238,7 +238,6 @@ enum CompiledProcedureBuilderState {
     }
 }
 
-#[derive(Debug)]
 pub struct CompiledProcedureBuilder {
     procedure: CompiledProcedure,
     state: CompiledProcedureBuilderState,
@@ -273,10 +272,10 @@ impl CompiledProcedureBuilder {
         self.scope_stack.len()
     }
 
-    pub fn read(mut self, token: Token) -> Result<Self> {
+    pub fn read(mut self, token: Token, expression_parse_environment: &dyn ExpressionParseEnvironment) -> Result<Self> {
 
         if let Token::Punctuation(PunctuationToken::Semicolon) = token {
-            return self.finish_current_instruction()
+            return self.finish_current_instruction(expression_parse_environment)
         }
 
         use CompiledProcedureBuilderState::*;
@@ -348,7 +347,7 @@ impl CompiledProcedureBuilder {
                     }
                 }
             },
-            Assignment { address, expression } => {
+            Assignment { address: _, expression } => {
                 expression.push(token);
             },
             IfStatement { condition_expression, parenthesis_index } => {
@@ -365,7 +364,7 @@ impl CompiledProcedureBuilder {
 
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
                     if *parenthesis_index == 0 {
-                        return self.finish_current_instruction()
+                        return self.finish_current_instruction(expression_parse_environment)
                     }
                 }
 
@@ -374,7 +373,7 @@ impl CompiledProcedureBuilder {
             ElseStatement { original_jump: _ } => {
                 match token {
                     Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) => {
-                        return self.finish_current_instruction();
+                        return self.finish_current_instruction(expression_parse_environment);
                     }
 
                     other => {
@@ -396,7 +395,7 @@ impl CompiledProcedureBuilder {
 
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
                     if *parenthesis_index == 0 {
-                        return self.finish_current_instruction()
+                        return self.finish_current_instruction(expression_parse_environment)
                     }
                 }
 
@@ -426,7 +425,7 @@ impl CompiledProcedureBuilder {
 
                     if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
                         if *parenthesis_index == 0 {
-                            return self.finish_current_instruction()
+                            return self.finish_current_instruction(expression_parse_environment)
                         }
                     }
 
@@ -460,7 +459,7 @@ impl CompiledProcedureBuilder {
         Ok(self)
     }
 
-    fn finish_current_instruction(mut self) -> Result<Self> {
+    fn finish_current_instruction(mut self, expression_parse_environment: &dyn ExpressionParseEnvironment) -> Result<Self> {
         match &mut self.state {
             CompiledProcedureBuilderState::Base => {
             },
@@ -472,7 +471,7 @@ impl CompiledProcedureBuilder {
                     Instruction::PushVarToScope { identifier: ident.clone() }
                 );
                 if let Some(expression) = expression {
-                    let expression = ExpressionParser::parse(expression.to_owned())?;
+                    let expression = ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?;
 
                     self.procedure.instructions.push(
                         Instruction::EvaluateExpression { expression, target: Some(vec![
@@ -484,7 +483,7 @@ impl CompiledProcedureBuilder {
             CompiledProcedureBuilderState::Assignment { address, expression } => {
                 let target = Some(ScopeAddress::try_from(address.to_owned())?);
 
-                let expression = ExpressionParser::parse(expression.to_owned())?;
+                let expression = ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?;
 
                 self.procedure.instructions.push(Instruction::EvaluateExpression { expression, target });
             },
@@ -494,7 +493,7 @@ impl CompiledProcedureBuilder {
                 }
 
                 let condition_expression = Box::new(NotExpression::new(
-                    ExpressionParser::parse(condition_expression.to_owned())?
+                    ExpressionParser::parse(condition_expression.to_owned(), expression_parse_environment)?
                 ));
 
                 self.scope_stack.push(
@@ -542,7 +541,7 @@ impl CompiledProcedureBuilder {
                 }
 
                 let condition_expression = Box::new(NotExpression::new(
-                    ExpressionParser::parse(condition_expression.to_owned())?
+                    ExpressionParser::parse(condition_expression.to_owned(), expression_parse_environment)?
                 ));
 
                 
@@ -560,7 +559,7 @@ impl CompiledProcedureBuilder {
                     return Err(CompilerError::InvalidParenthesisStructure.boxed());
                 }
 
-                let iterator_expression =  ExpressionParser::parse(iterator_expression.to_owned())?;
+                let iterator_expression =  ExpressionParser::parse(iterator_expression.to_owned(), expression_parse_environment)?;
 
                 let iterator_expression = Box::new(AssociatedProcedureCallExpression {
                     callee_expression: iterator_expression,
@@ -615,7 +614,7 @@ impl CompiledProcedureBuilder {
                 }));
             }
             CompiledProcedureBuilderState::Indeterminate { tokens } => {
-                let expression = ExpressionParser::parse(tokens.to_owned())?;
+                let expression = ExpressionParser::parse(tokens.to_owned(), expression_parse_environment)?;
 
                 self.procedure.instructions.push(
                     Instruction::EvaluateExpression { expression, target: None }
@@ -625,7 +624,7 @@ impl CompiledProcedureBuilder {
                 let expression = if expression.is_empty() {
                     Box::new(Value::Null)
                 } else {
-                    ExpressionParser::parse(expression.to_owned())?
+                    ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?
                 };
 
                 self.procedure.instructions.push(
