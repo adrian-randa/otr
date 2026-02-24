@@ -8,7 +8,20 @@ use crate::error::Result;
 enum ModuleSubstate {
     PreScope,
     InScope,
-    Export,
+    Export(ModuleExportSubstate),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum ModuleExportSubstate {
+    Base,
+    SingleIdent(String),
+    Arrow {
+        struct_ident: String,
+    },
+    AssociatedProcedure {
+        struct_ident: String,
+        member_ident: String,
+    }
 }
 
 pub struct CompilerModuleState {
@@ -83,7 +96,7 @@ impl CompilerState for CompilerModuleState {
                     }
 
                     Token::Keyword(KeywordToken::Export) => {
-                        self.substate = ModuleSubstate::Export;
+                        self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
                         return Ok(self);
                     }
 
@@ -103,8 +116,81 @@ impl CompilerState for CompilerModuleState {
                     }
                 }
             },
-            ModuleSubstate::Export => {
-                match token {
+            ModuleSubstate::Export(substate) => {
+                match substate {
+                    ModuleExportSubstate::Base => {
+                        match token {
+                            Token::Identifier(ident) => {
+                                self.substate = ModuleSubstate::Export(ModuleExportSubstate::SingleIdent(ident));
+                                Ok(self)
+                            }
+
+                            other => {
+                                Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed())
+                            }
+                        }
+                    },
+                    ModuleExportSubstate::SingleIdent(ident) => {
+                        match token {
+                            Token::Punctuation(PunctuationToken::Comma) => {
+                                if let Err(_) = self.module.set_procedure_visibility(&ident, true) {
+                                    self.module.set_struct_visibility(&ident, true)?;
+                                }
+                                self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
+                                Ok(self)
+                            }
+
+                            Token::Punctuation(PunctuationToken::ThinArrow) => {
+                                self.substate = ModuleSubstate::Export(ModuleExportSubstate::Arrow { struct_ident: ident });
+                                Ok(self)
+                            }
+
+                            Token::Punctuation(PunctuationToken::Semicolon) => {
+                                if let Err(_) = self.module.set_procedure_visibility(&ident, true) {
+                                    self.module.set_struct_visibility(&ident, true)?;
+                                }
+                                self.substate = ModuleSubstate::InScope;
+                                Ok(self)
+                            }
+
+                            other => {
+                                Err(CompilerError::UnexpectedToken { expected: Some("',', ';' or '->'".into()), found: other }.boxed())
+                            }
+                        }
+                    },
+                    ModuleExportSubstate::Arrow { struct_ident } => {
+                        match token {
+                            Token::Identifier(member_ident) => {
+                                self.substate = ModuleSubstate::Export(ModuleExportSubstate::AssociatedProcedure { struct_ident, member_ident });
+                                Ok(self)
+                            }
+
+                            other => {
+                                Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed())
+                            }
+                        }
+                    },
+                    ModuleExportSubstate::AssociatedProcedure { struct_ident, member_ident } => {
+                        match token {
+                            Token::Punctuation(PunctuationToken::Comma) => {
+                                self.module.set_associated_precedure_visibility(&struct_ident, &member_ident, true)?;
+                                self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
+                                Ok(self)
+                            }
+
+                            Token::Punctuation(PunctuationToken::Semicolon) => {
+                                self.module.set_associated_precedure_visibility(&struct_ident, &member_ident, true)?;
+                                self.substate = ModuleSubstate::InScope;
+                                Ok(self)
+                            }
+
+                            other => {
+                                Err(CompilerError::UnexpectedToken { expected: Some("',' or ';'".into()), found: other }.boxed())
+                            }
+                        }
+                    },
+                }
+                /* match token {
                     Token::Punctuation(PunctuationToken::Comma) => {
                         return Ok(self);
                     }
@@ -122,7 +208,7 @@ impl CompilerState for CompilerModuleState {
                     other => {
                         return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
                     }
-                }
+                } */
             },
         }
 

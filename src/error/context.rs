@@ -102,3 +102,25 @@ impl HintContextDecorator {
         Box::new(self)
     }
 }
+
+
+pub(crate) struct VariableContextDecorator {
+    pub(crate) error: Box<dyn Error>,
+
+    pub(crate) member_ident: String
+}
+
+impl Error for VariableContextDecorator {}
+
+impl std::fmt::Display for VariableContextDecorator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = format!("While trying to access {}", self.member_ident);
+        write!(f, "{}\n\t{}", self.error, (&message as &str).bright_red())
+    }
+}
+
+impl VariableContextDecorator {
+    pub(crate) fn boxed(self) -> Box<dyn Error> {
+        Box::new(self)
+    }
+}

@@ -76,17 +76,34 @@ impl Module {
         }
     }
 
-    pub fn set_member_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
-
+    pub fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
         if let Some(member) = self.procedures.get_mut(member_ident) {
             member.1 = visibility;
             return Ok(());
         }
+        Err(CompilerError::NoSuchMember { member_identifier: member_ident.clone() }.boxed())
+    }
+
+    pub fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
         if let Some(member) = self.struct_prototypes.get_mut(member_ident) {
             member.1 = visibility;
             return Ok(());
         }
-
         Err(CompilerError::NoSuchMember { member_identifier: member_ident.clone() }.boxed())
+    }
+
+    pub fn set_associated_precedure_visibility(
+        &mut self,
+        struct_ident: &String,
+        member_ident: &String,
+        visibility: bool
+    ) -> Result<()> {
+        if let Some(member) = self.associated_procedures.get_mut(
+            &(struct_ident.to_owned(), member_ident.to_owned())
+        ) {
+            member.1 = visibility;
+            return Ok(());
+        }
+        Err(CompilerError::NoSuchMember { member_identifier: format!("{struct_ident}->{member_ident}") }.boxed())
     }
 }
