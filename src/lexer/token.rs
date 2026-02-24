@@ -94,6 +94,7 @@ pub enum LiteralToken {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PrimitiveTypeToken {
+    Null,
     Integer,
     Float,
     Bool,

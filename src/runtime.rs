@@ -84,6 +84,7 @@ impl std::fmt::Display for Type {
 impl From<PrimitiveTypeToken> for Type {
     fn from(value: PrimitiveTypeToken) -> Self {
         match value {
+            PrimitiveTypeToken::Null => Self::Null,
             PrimitiveTypeToken::Integer => Self::Integer,
             PrimitiveTypeToken::Float => Self::Float,
             PrimitiveTypeToken::Bool => Self::Bool,

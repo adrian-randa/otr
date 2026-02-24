@@ -101,7 +101,8 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("clone".into(), Keyword(Clone)))
             .with_rule(KeywordRule::new("typeof".into(), Keyword(Typeof)))
 
-            .with_rule(KeywordRule::new("Null".into(), Literal(LiteralToken::Null)))
+            .with_rule(KeywordRule::new("null".into(), Literal(LiteralToken::Null)))
+            .with_rule(KeywordRule::new("Null".into(), Literal(Type(PrimitiveTypeToken::Null))))
             .with_rule(KeywordRule::new("Integer".into(), Literal(Type(PrimitiveTypeToken::Integer))))
             .with_rule(KeywordRule::new("Float".into(), Literal(Type(PrimitiveTypeToken::Float))))
             .with_rule(KeywordRule::new("Bool".into(), Literal(Type(PrimitiveTypeToken::Bool))))
