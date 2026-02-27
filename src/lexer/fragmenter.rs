@@ -2,7 +2,7 @@ use std::str::{Chars, FromStr};
 
 use derive_more::IntoIterator;
 
-use crate::error::{Error, fragmenter_error::FragmentationError};
+use crate::error::{fragmenter_error::FragmentationError, Error};
 
 struct CharCoordinateIterator<'a> {
     iter: Chars<'a>,
@@ -74,7 +74,8 @@ impl FromStr for FragmentStream {
             iter: s.chars(),
             line: 1,
             column: 1,
-        }.collect();
+        }
+        .collect();
 
         let (_, line, column) = chars.last().unwrap();
 
@@ -87,13 +88,11 @@ impl FromStr for FragmentStream {
 
             if c == '\'' {
                 if !current.is_empty() {
-                    stream.push(
-                        Fragment {
-                            fragment: current,
-                            line_index: current_pos.0,
-                            column_index: current_pos.1,
-                        }
-                    );
+                    stream.push(Fragment {
+                        fragment: current,
+                        line_index: current_pos.0,
+                        column_index: current_pos.1,
+                    });
                     current_pos = (line, column);
                     current = String::new();
                 }
@@ -144,22 +143,28 @@ impl FromStr for FragmentStream {
                             '\\' => {
                                 current.push('\\');
                             }
-                            _ => return Err(FragmentationError::InvalidControlCharacter {
-                                line_index: line,
-                                column_index: column
-                            }.boxed()),
+                            _ => {
+                                return Err(FragmentationError::InvalidControlCharacter {
+                                    line_index: line,
+                                    column_index: column,
+                                }
+                                .boxed())
+                            }
                         }
                         i = i + 2;
                         continue;
                     }
                     if chars[i].0 == '\n' {
-                        return Err(FragmentationError::LinebreakInStringLiteral { line_index: line, column_index: column }.boxed())
+                        return Err(FragmentationError::LinebreakInStringLiteral {
+                            line_index: line,
+                            column_index: column,
+                        }
+                        .boxed());
                     }
 
                     current.push(chars[i].0);
 
                     i += 1;
-                    
                 }
 
                 current.push('\"');

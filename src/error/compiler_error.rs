@@ -37,35 +37,42 @@ impl super::Error for CompilerError {}
 impl std::fmt::Display for CompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = match self {
-            CompilerError::LiteralParseError { ty, literal } => 
-                format!("Could not parse '{literal}' as {ty}!"),
-            CompilerError::NoSuchMember { member_identifier } => 
-                format!("No member labeled '{member_identifier}'!"),
-            CompilerError::InvalidScopeAddress { unexpected_token } =>
-                format!("Invalid scope address!{}",
-                    match unexpected_token {
-                        Some(token) => format!(" Unexpected token: {:?}.", token),
-                        None => "".to_string(),
-                    }
-                ),
-            CompilerError::NoScopeToClose => 
-                format!("There is no scope to close!"),
-            CompilerError::UnexpectedToken { expected, found } =>
-                match expected {
-                    Some(expected) => format!("Unexpected token! Expected {expected}, found {:?}.", found),
-                    None => format!("Unexpected token: {:?}!", found),
-                },
-            CompilerError::InvalidParenthesisStructure =>
-                format!("Invalid parenthesis structure!"),
-            CompilerError::InvalidExpression { message } =>
-                format!("Invalid expression! {message}"),
-            CompilerError::InvalidDefinition { message } => 
-                format!("Invalid definition! {message}"),
-            CompilerError::Unknown { message } => 
-                format!("{message}"),
+            CompilerError::LiteralParseError { ty, literal } => {
+                format!("Could not parse '{literal}' as {ty}!")
+            }
+            CompilerError::NoSuchMember { member_identifier } => {
+                format!("No member labeled '{member_identifier}'!")
+            }
+            CompilerError::InvalidScopeAddress { unexpected_token } => format!(
+                "Invalid scope address!{}",
+                match unexpected_token {
+                    Some(token) => format!(" Unexpected token: {:?}.", token),
+                    None => "".to_string(),
+                }
+            ),
+            CompilerError::NoScopeToClose => format!("There is no scope to close!"),
+            CompilerError::UnexpectedToken { expected, found } => match expected {
+                Some(expected) => {
+                    format!("Unexpected token! Expected {expected}, found {:?}.", found)
+                }
+                None => format!("Unexpected token: {:?}!", found),
+            },
+            CompilerError::InvalidParenthesisStructure => format!("Invalid parenthesis structure!"),
+            CompilerError::InvalidExpression { message } => {
+                format!("Invalid expression! {message}")
+            }
+            CompilerError::InvalidDefinition { message } => {
+                format!("Invalid definition! {message}")
+            }
+            CompilerError::Unknown { message } => format!("{message}"),
         };
 
-        write!(f, "{} {}", "Compiler Error!".on_red(), (&message as &str).red())
+        write!(
+            f,
+            "{} {}",
+            "Compiler Error!".on_red(),
+            (&message as &str).red()
+        )
     }
 }
 

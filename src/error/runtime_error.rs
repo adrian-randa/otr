@@ -2,7 +2,6 @@ use colored::Colorize;
 
 use crate::runtime::Type;
 
-
 #[derive(Debug)]
 pub enum RuntimeError {
     IndexingNotAccepted {
@@ -19,7 +18,7 @@ pub enum RuntimeError {
         index: usize,
     },
     NoSuchMember {
-        member_identifier: String
+        member_identifier: String,
     },
     UseOfMovedValue,
     UseOfDroppedValue,
@@ -65,10 +64,9 @@ pub enum RuntimeError {
         module_identifier: String,
     },
 
-
     Unknown {
         message: String,
-    }
+    },
 }
 
 impl super::Error for RuntimeError {}
@@ -122,7 +120,12 @@ impl std::fmt::Display for RuntimeError {
                 format!("{message}"),
         };
 
-        write!(f, "{} {}", "Runtime Error!".on_red(), (&message as &str).red())
+        write!(
+            f,
+            "{} {}",
+            "Runtime Error!".on_red(),
+            (&message as &str).red()
+        )
     }
 }
 

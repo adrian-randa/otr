@@ -13,7 +13,7 @@ pub enum Token {
     Operator(OperatorToken),
     Punctuation(PunctuationToken),
     Identifier(String),
-    Literal(LiteralToken)
+    Literal(LiteralToken),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

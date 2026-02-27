@@ -1,4 +1,15 @@
-use crate::{compiler::{Compiler, CompilerEnvironment, CompilerError, CompilerState, NoExpressionEnvironment, decorators::EntrypointDecorator, states::{decorator::{self, RawDecorator}, module::CompilerModuleState}}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{ModuleAddress, procedures::CompiledProcedureBuilder}};
+use crate::{
+    compiler::{
+        decorators::EntrypointDecorator,
+        states::{
+            decorator::{self, RawDecorator},
+            module::CompilerModuleState,
+        },
+        Compiler, CompilerEnvironment, CompilerError, CompilerState, NoExpressionEnvironment,
+    },
+    lexer::token::{ParenthesisType, PunctuationToken, Token},
+    runtime::{module::Module, procedures::CompiledProcedureBuilder, ModuleAddress},
+};
 
 use crate::error::Result;
 
@@ -21,7 +32,7 @@ enum ProcedureIdentifier {
     AssociatedProcedure {
         struct_ident: String,
         procedure_ident: String,
-    }
+    },
 }
 
 pub struct CompilerProcedureState {
@@ -36,7 +47,8 @@ pub struct CompilerProcedureState {
 impl CompilerProcedureState {
     pub fn new(module: CompilerModuleState, decorators: Vec<RawDecorator>) -> Self {
         Self {
-            module, decorators,
+            module,
+            decorators,
             procedure_identifier: None,
             procedure: CompiledProcedureBuilder::new(),
 
@@ -46,7 +58,11 @@ impl CompilerProcedureState {
 }
 
 impl CompilerState for CompilerProcedureState {
-    fn read(mut self: Box<Self>, token: Token, compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>> {
+    fn read(
+        mut self: Box<Self>,
+        token: Token,
+        compiler_environment: &mut CompilerEnvironment,
+    ) -> Result<Box<dyn CompilerState>> {
         match self.substate {
             ProcedureSubstate::Base => {
                 if self.procedure_identifier.is_none() {
@@ -55,186 +71,236 @@ impl CompilerState for CompilerProcedureState {
                         self.substate = ProcedureSubstate::FirstIdent;
                         return Ok(self);
                     } else {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: token }.boxed());
+                        return Err(CompilerError::UnexpectedToken {
+                            expected: Some("Identifier".into()),
+                            found: token,
+                        }
+                        .boxed());
                     }
                 } else {
                     return Err(CompilerError::InvalidDefinition {
-                        message: "Procedure already has an identifier!".into()
-                    }.boxed());
+                        message: "Procedure already has an identifier!".into(),
+                    }
+                    .boxed());
                 }
             }
-            ProcedureSubstate::FirstIdent => {
-                match token {
-                    Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
-                        self.substate = ProcedureSubstate::PreArgument;
-                        return Ok(self);
-                    }
-
-                    Token::Punctuation(PunctuationToken::ThinArrow) => {
-                        self.substate = ProcedureSubstate::PreSecondIdent;
-                        self.procedure = self.procedure.push_argument_identifier("this".into());
-                        return Ok(self);
-                    }
-
-                    other => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("(".into()), found: other }.boxed())
-                    }
+            ProcedureSubstate::FirstIdent => match token {
+                Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
+                    self.substate = ProcedureSubstate::PreArgument;
+                    return Ok(self);
                 }
-            }
-            ProcedureSubstate::PreSecondIdent => {
-                match token {
-                    Token::Identifier(procedure_ident) => {
-                        if let Some(ProcedureIdentifier::Procedure { ident: struct_ident }) = self.procedure_identifier {
-                            self.procedure_identifier = Some(ProcedureIdentifier::AssociatedProcedure {
-                                struct_ident,
-                                procedure_ident
-                            });
-                            self.substate = ProcedureSubstate::SecondIdent;
-                            return Ok(self);
-                        } else {
-                            return Err(CompilerError::InvalidDefinition {
-                                message: "Procedure already associated to a struct!".into()
-                            }.boxed());
-                        }
-                    }
 
-                    other => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
-                    }
+                Token::Punctuation(PunctuationToken::ThinArrow) => {
+                    self.substate = ProcedureSubstate::PreSecondIdent;
+                    self.procedure = self.procedure.push_argument_identifier("this".into());
+                    return Ok(self);
                 }
-            }
-            ProcedureSubstate::SecondIdent => {
-                match token {
-                    Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
-                        self.substate = ProcedureSubstate::PreArgument;
-                        return Ok(self);
-                    }
 
-                    other => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("(".into()), found: other }.boxed())
+                other => {
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some("(".into()),
+                        found: other,
                     }
-                }
-            }
-            ProcedureSubstate::PreArgument => {
-                match token {
-                    Token::Identifier(ident) => {
-                        self.procedure = self.procedure.push_argument_identifier(ident);
-                        self.substate = ProcedureSubstate::Argument;
-                        return Ok(self)
-                    }
-
-                    Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
-                        self.substate = ProcedureSubstate::PreInstructions;
-                        return Ok(self);
-                    }
-
-
-                    other => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
-                    }
+                    .boxed())
                 }
             },
-            ProcedureSubstate::Argument => {
-                match token {
-                    Token::Punctuation(PunctuationToken::Comma) => {
-                        self.substate = ProcedureSubstate::PreArgument;
+            ProcedureSubstate::PreSecondIdent => match token {
+                Token::Identifier(procedure_ident) => {
+                    if let Some(ProcedureIdentifier::Procedure {
+                        ident: struct_ident,
+                    }) = self.procedure_identifier
+                    {
+                        self.procedure_identifier =
+                            Some(ProcedureIdentifier::AssociatedProcedure {
+                                struct_ident,
+                                procedure_ident,
+                            });
+                        self.substate = ProcedureSubstate::SecondIdent;
                         return Ok(self);
-                    }
-
-                    Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
-                        self.substate = ProcedureSubstate::PreInstructions;
-                        return Ok(self)
-                    }
-
-                    _ => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some(", or )".into()), found: token }.boxed());
+                    } else {
+                        return Err(CompilerError::InvalidDefinition {
+                            message: "Procedure already associated to a struct!".into(),
+                        }
+                        .boxed());
                     }
                 }
-            }
+
+                other => {
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some("Identifier".into()),
+                        found: other,
+                    }
+                    .boxed());
+                }
+            },
+            ProcedureSubstate::SecondIdent => match token {
+                Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
+                    self.substate = ProcedureSubstate::PreArgument;
+                    return Ok(self);
+                }
+
+                other => {
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some("(".into()),
+                        found: other,
+                    }
+                    .boxed())
+                }
+            },
+            ProcedureSubstate::PreArgument => match token {
+                Token::Identifier(ident) => {
+                    self.procedure = self.procedure.push_argument_identifier(ident);
+                    self.substate = ProcedureSubstate::Argument;
+                    return Ok(self);
+                }
+
+                Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
+                    self.substate = ProcedureSubstate::PreInstructions;
+                    return Ok(self);
+                }
+
+                other => {
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some("Identifier".into()),
+                        found: other,
+                    }
+                    .boxed());
+                }
+            },
+            ProcedureSubstate::Argument => match token {
+                Token::Punctuation(PunctuationToken::Comma) => {
+                    self.substate = ProcedureSubstate::PreArgument;
+                    return Ok(self);
+                }
+
+                Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
+                    self.substate = ProcedureSubstate::PreInstructions;
+                    return Ok(self);
+                }
+
+                _ => {
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some(", or )".into()),
+                        found: token,
+                    }
+                    .boxed());
+                }
+            },
             ProcedureSubstate::PreInstructions => {
-                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) = token {
+                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) =
+                    token
+                {
                     self.substate = ProcedureSubstate::Instructions;
                     return Ok(self);
                 } else {
-                    return Err(CompilerError::UnexpectedToken { expected: Some("{".into()), found: token }.boxed());
+                    return Err(CompilerError::UnexpectedToken {
+                        expected: Some("{".into()),
+                        found: token,
+                    }
+                    .boxed());
                 }
-            },
+            }
             ProcedureSubstate::Instructions => {
-                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) = token {
+                if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) =
+                    token
+                {
                     if self.procedure.scope_stack_size() == 0 && !self.procedure.is_scanning() {
                         let procedure = self.procedure.build()?;
-                        let name = self.procedure_identifier.ok_or(CompilerError::InvalidDefinition {
-                            message: "Missing procedure name!".into()
-                        }.boxed())?;
+                        let name = self.procedure_identifier.ok_or(
+                            CompilerError::InvalidDefinition {
+                                message: "Missing procedure name!".into(),
+                            }
+                            .boxed(),
+                        )?;
 
                         match &name {
                             ProcedureIdentifier::Procedure { ident } => {
                                 self.module.get_module_mut().insert_procedure(
                                     ident.clone(),
                                     Box::new(procedure),
-                                    false
+                                    false,
                                 );
-                                let module_id = self.module.get_name().ok_or(
-                                    CompilerError::Unknown { message: "Missing module name!".into() }.boxed()
-                                )?.to_owned();
+                                let module_id = self
+                                    .module
+                                    .get_name()
+                                    .ok_or(
+                                        CompilerError::Unknown {
+                                            message: "Missing module name!".into(),
+                                        }
+                                        .boxed(),
+                                    )?
+                                    .to_owned();
                                 let identifier = ident.to_owned();
-                                compiler_environment.register_procedure_ident(
-                                    ModuleAddress::new(module_id, identifier)
-                                );
-                            },
-                            ProcedureIdentifier::AssociatedProcedure { struct_ident, procedure_ident } => {
+                                compiler_environment.register_procedure_ident(ModuleAddress::new(
+                                    module_id, identifier,
+                                ));
+                            }
+                            ProcedureIdentifier::AssociatedProcedure {
+                                struct_ident,
+                                procedure_ident,
+                            } => {
                                 self.module.get_module_mut().insert_associated_procedure(
                                     struct_ident.clone(),
                                     procedure_ident.clone(),
                                     Box::new(procedure),
-                                    false
+                                    false,
                                 );
-                            },
+                            }
                         }
 
                         for decorator in self.decorators {
                             match decorator.get_ident() as &str {
                                 "entrypoint" => {
-                                    let name = if let ProcedureIdentifier::Procedure { ref ident } = name {
+                                    let name = if let ProcedureIdentifier::Procedure { ref ident } =
+                                        name
+                                    {
                                         ident
                                     } else {
                                         return Err(CompilerError::InvalidDefinition {
                                             message: "Associated procedures cannot be used as an entrypoint!".into()
-                                        }.boxed())
+                                        }.boxed());
                                     };
 
-                                    compiler_environment.push_decorator(
-                                        Box::new(EntrypointDecorator::new(
-                                            ModuleAddress::new(
-                                                self.module
-                                                    .get_name().ok_or(CompilerError::InvalidDefinition {
-                                                        message: "Contained module has no name!".into()
-                                                    }.boxed())?.to_owned(),
-                                                    name.clone()
-                                                )
-                                        ))
-                                    );
+                                    compiler_environment.push_decorator(Box::new(
+                                        EntrypointDecorator::new(ModuleAddress::new(
+                                            self.module
+                                                .get_name()
+                                                .ok_or(
+                                                    CompilerError::InvalidDefinition {
+                                                        message: "Contained module has no name!"
+                                                            .into(),
+                                                    }
+                                                    .boxed(),
+                                                )?
+                                                .to_owned(),
+                                            name.clone(),
+                                        )),
+                                    ));
                                 }
 
-                                other => {return Err(CompilerError::InvalidDefinition {
-                                    message: format!("Unsupported decorator '{}'!", other)
-                                }.boxed())}
+                                other => {
+                                    return Err(CompilerError::InvalidDefinition {
+                                        message: format!("Unsupported decorator '{}'!", other),
+                                    }
+                                    .boxed())
+                                }
                             }
                         }
 
-                        return Ok(Box::new(self.module))
+                        return Ok(Box::new(self.module));
                     }
                 }
 
                 self.procedure = self.procedure.read(token, compiler_environment)?;
                 Ok(self)
-            },
+            }
         }
     }
 
     fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
         Err(CompilerError::InvalidDefinition {
-            message: "Unfinished module declaration!".into()
-        }.boxed())
+            message: "Unfinished module declaration!".into(),
+        }
+        .boxed())
     }
 }

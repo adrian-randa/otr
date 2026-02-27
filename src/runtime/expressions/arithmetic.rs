@@ -34,7 +34,8 @@ impl Expression for AddExpression {
 
             (l, r) => Err(RuntimeError::Unknown {
                 message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -68,7 +69,8 @@ impl Expression for SubtractExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -102,7 +104,8 @@ impl Expression for MultiplyExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -131,12 +134,9 @@ impl Expression for DivideExpression {
             (Float(l), Float(r)) => Ok(Float(l / r)),
 
             (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot divide {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }.boxed()),
+                message: format!("Cannot divide {} and {}!", l.get_type_id(), r.get_type_id()),
+            }
+            .boxed()),
         }
     }
 }
@@ -162,12 +162,18 @@ impl Expression for PowerExpression {
 
         match (base, exponent) {
             (Integer(l), Integer(r)) => Ok(Integer(
-                l.checked_pow(r.try_into().map_err(|_| RuntimeError::Unknown {
-                    message: "Could not compute power; the exponent was too large!".into(),
-                }.boxed())?)
-                .ok_or(RuntimeError::Unknown {
-                    message: "Overflow occured while computing power!".into(),
-                }.boxed())?,
+                l.checked_pow(r.try_into().map_err(|_| {
+                    RuntimeError::Unknown {
+                        message: "Could not compute power; the exponent was too large!".into(),
+                    }
+                    .boxed()
+                })?)
+                .ok_or(
+                    RuntimeError::Unknown {
+                        message: "Overflow occured while computing power!".into(),
+                    }
+                    .boxed(),
+                )?,
             )),
             (Float(l), Float(r)) => Ok(Float(l.powf(r))),
 
@@ -177,7 +183,8 @@ impl Expression for PowerExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -211,7 +218,8 @@ impl Expression for ModuloExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -245,7 +253,8 @@ impl Expression for GreaterThanExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }

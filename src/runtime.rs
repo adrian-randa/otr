@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::cell::{Cell, RefCell};
-use std::fmt::{Display, format};
+use std::fmt::{format, Display};
 use std::ops::Deref;
 use std::rc::Weak;
 use std::vec::IntoIter;
@@ -9,11 +9,13 @@ use std::{collections::HashMap, rc::Rc};
 use derive_more::{Deref, IntoIterator};
 use itertools::Itertools;
 
-use crate::error::Error;
 use crate::error::compiler_error::CompilerError;
 use crate::error::context::{HintContextDecorator, VariableContextDecorator};
 use crate::error::runtime_error::RuntimeError;
-use crate::lexer::token::{LiteralToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token};
+use crate::error::Error;
+use crate::lexer::token::{
+    LiteralToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token,
+};
 use crate::runtime::environment::Environment;
 use crate::runtime::expressions::ProcedureCallExpression;
 use crate::runtime::procedures::{CompiledProcedure, Procedure};
@@ -53,9 +55,7 @@ pub enum Type {
     Char,
     Bool,
     Array,
-    Struct {
-        struct_id: ModuleAddress
-    },
+    Struct { struct_id: ModuleAddress },
     Moved,
     Dropped,
     Type,
@@ -108,13 +108,9 @@ impl Clone for Value {
             Self::Char(arg0) => Self::Char(arg0.clone()),
             Self::Bool(arg0) => Self::Bool(arg0.clone()),
             Self::Array(arg0) => Self::Array(arg0.clone()),
-            Self::Struct(arg0) => {
-                Value::Struct(Rc::new(RefCell::new(
-                    arg0.borrow().as_ref().map(|obj| {
-                        obj.clone()
-                    })
-                )))
-            },
+            Self::Struct(arg0) => Value::Struct(Rc::new(RefCell::new(
+                arg0.borrow().as_ref().map(|obj| obj.clone()),
+            ))),
             Self::StructRef(arg0) => Self::StructRef(arg0.clone()),
             Self::Type(arg0) => Self::Type(arg0.clone()),
         }
@@ -131,12 +127,8 @@ impl PartialEq for Value {
             (Self::Bool(l0), Self::Bool(r0)) => l0 == r0,
             (Self::Array(l0), Self::Array(r0)) => l0 == r0,
             (Self::Struct(l0), Self::Struct(r0)) => l0 == r0,
-            (Self::StructRef(l0), Self::StructRef(r0)) => {
-                l0.upgrade() == r0.upgrade()
-            },
-            (Self::Type(l0), Self::Type(r0)) => {
-                l0 == r0
-            }
+            (Self::StructRef(l0), Self::StructRef(r0)) => l0.upgrade() == r0.upgrade(),
+            (Self::Type(l0), Self::Type(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -147,35 +139,41 @@ impl TryFrom<LiteralToken> for Value {
 
     fn try_from(value: LiteralToken) -> std::result::Result<Self, Self::Error> {
         match value {
-            LiteralToken::Null => {
-                Ok(Self::Null)
-            }
-            LiteralToken::Integer(num) => {
-                Ok(Self::Integer(
-                    num.parse().map_err(|_| CompilerError::LiteralParseError { ty: Type::Integer, literal: num }.boxed())?
-                ))
-            },
-            LiteralToken::Float(num) => {
-                Ok(Self::Float(
-                    num.parse().map_err(|_| CompilerError::LiteralParseError { ty: Type::Float, literal: num }.boxed())?
-                ))
-            },
-            LiteralToken::Boolean(b) => {
-                match &b as &str {
-                    "true" => Ok(Self::Bool(true)),
-                    "false" => Ok(Self::Bool(false)),
-                    _ => Err(CompilerError::LiteralParseError { ty: Type::Bool, literal: b }.boxed())
+            LiteralToken::Null => Ok(Self::Null),
+            LiteralToken::Integer(num) => Ok(Self::Integer(num.parse().map_err(|_| {
+                CompilerError::LiteralParseError {
+                    ty: Type::Integer,
+                    literal: num,
                 }
+                .boxed()
+            })?)),
+            LiteralToken::Float(num) => Ok(Self::Float(num.parse().map_err(|_| {
+                CompilerError::LiteralParseError {
+                    ty: Type::Float,
+                    literal: num,
+                }
+                .boxed()
+            })?)),
+            LiteralToken::Boolean(b) => match &b as &str {
+                "true" => Ok(Self::Bool(true)),
+                "false" => Ok(Self::Bool(false)),
+                _ => Err(CompilerError::LiteralParseError {
+                    ty: Type::Bool,
+                    literal: b,
+                }
+                .boxed()),
             },
-            LiteralToken::Char(c) => {
-                Ok(Self::Char(c.chars().next().ok_or(CompilerError::LiteralParseError { ty: Type::Char, literal: c }.boxed())?))
-            },
-            LiteralToken::String(str) => {
-                Ok(Self::String(str))
-            },
-            LiteralToken::Type(ty) => {
-                Ok(Self::Type(Type::from(ty)))
-            }
+            LiteralToken::Char(c) => Ok(Self::Char(
+                c.chars().next().ok_or(
+                    CompilerError::LiteralParseError {
+                        ty: Type::Char,
+                        literal: c,
+                    }
+                    .boxed(),
+                )?,
+            )),
+            LiteralToken::String(str) => Ok(Self::String(str)),
+            LiteralToken::Type(ty) => Ok(Self::Type(Type::from(ty))),
         }
     }
 }
@@ -193,20 +191,30 @@ impl Value {
             Value::Struct(object) => object
                 .borrow()
                 .as_ref()
-                .map(|obj| Type::Struct { struct_id: obj.get_struct_id().clone() })
+                .map(|obj| Type::Struct {
+                    struct_id: obj.get_struct_id().clone(),
+                })
                 .unwrap_or(Type::Moved),
             Value::StructRef(weak) => weak
                 .upgrade()
-                .map(|obj| obj.borrow()
-                    .as_ref()
-                    .map(|obj| Type::Struct { struct_id: obj.get_struct_id().clone() })
-                    .unwrap_or(Type::Moved))
+                .map(|obj| {
+                    obj.borrow()
+                        .as_ref()
+                        .map(|obj| Type::Struct {
+                            struct_id: obj.get_struct_id().clone(),
+                        })
+                        .unwrap_or(Type::Moved)
+                })
                 .unwrap_or(Type::Dropped),
             Value::Type(_) => Type::Type,
         }
     }
 
-    pub fn query(&self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String) -> Result<Value> {
+    pub fn query(
+        &self,
+        address: impl IntoIterator<Item = ScopeAddressant>,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
         if let Some(addressant) = address.next() {
             let member_ident = format!("{:?}", addressant);
@@ -214,76 +222,102 @@ impl Value {
                 match self {
                     Value::Array(arr) => {
                         if let ScopeAddressant::Index(i) = addressant {
-                            arr.get(i).ok_or(RuntimeError::IndexOutOfBounds {
-                                array_length: arr.len(),
-                                index: i
-                            }.boxed())?.query(address, contained_module_id)
+                            arr.get(i)
+                                .ok_or(
+                                    RuntimeError::IndexOutOfBounds {
+                                        array_length: arr.len(),
+                                        index: i,
+                                    }
+                                    .boxed(),
+                                )?
+                                .query(address, contained_module_id)
                         } else {
                             Err(RuntimeError::MembersNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::Struct(ref_cell) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
                             let reference = ref_cell.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.query(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .query(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.query(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .query(address, contained_module_id)
                             }
                         } else {
                             Err(RuntimeError::IndexingNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::StructRef(weak) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
-                            let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
-                            
+                            let rc = weak
+                                .upgrade()
+                                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+
                             let reference = rc.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.query(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .query(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.query(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .query(address, contained_module_id)
                             }
                         } else {
                             Err(RuntimeError::IndexingNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     _ => Err(RuntimeError::AddressantsNotAccepted {
-                        ty: self.get_type_id()
-                    }.boxed()),
+                        ty: self.get_type_id(),
+                    }
+                    .boxed()),
                 }
             };
 
             result.map_err(|error| {
-                VariableContextDecorator {
-                    error,
-                    member_ident
+                {
+                    VariableContextDecorator {
+                        error,
+                        member_ident,
+                    }
                 }
-            }.boxed())
+                .boxed()
+            })
         } else {
             match self {
                 Value::Struct(ref_cell) => {
                     if ref_cell.borrow().is_none() {
                         return Err(RuntimeError::UseOfMovedValue.boxed());
                     }
-                    
+
                     // Move value
                     let value = ref_cell.replace(None);
-                    
+
                     Ok(Value::Struct(Rc::new(RefCell::new(value))))
                 }
                 _ => Ok(self.clone()),
@@ -291,7 +325,11 @@ impl Value {
         }
     }
 
-    pub fn reference(&self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String) -> Result<Value> {
+    pub fn reference(
+        &self,
+        address: impl IntoIterator<Item = ScopeAddressant>,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
         if let Some(addressant) = address.next() {
             let member_ident = format!("{:?}", addressant);
@@ -299,66 +337,92 @@ impl Value {
                 match self {
                     Value::Array(arr) => {
                         if let ScopeAddressant::Index(i) = addressant {
-                            arr.get(i).ok_or(RuntimeError::IndexOutOfBounds {
-                                array_length: arr.len(),
-                                index: i
-                            }.boxed())?.reference(address, contained_module_id)
+                            arr.get(i)
+                                .ok_or(
+                                    RuntimeError::IndexOutOfBounds {
+                                        array_length: arr.len(),
+                                        index: i,
+                                    }
+                                    .boxed(),
+                                )?
+                                .reference(address, contained_module_id)
                         } else {
                             Err(RuntimeError::MembersNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::Struct(ref_cell) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
                             let reference = ref_cell.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.reference(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .reference(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.reference(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .reference(address, contained_module_id)
                             }
                         } else {
                             Err(RuntimeError::IndexingNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::StructRef(weak) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
-                            let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+                            let rc = weak
+                                .upgrade()
+                                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                             let reference = rc.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.reference(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .reference(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.reference(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .reference(address, contained_module_id)
                             }
                         } else {
                             Err(RuntimeError::IndexingNotAccepted {
-                                ty: self.get_type_id()
-                            }.boxed())
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
-                    _  => Err(RuntimeError::AddressantsNotAccepted {
-                        ty: self.get_type_id()
-                    }.boxed()),
+                    }
+                    _ => Err(RuntimeError::AddressantsNotAccepted {
+                        ty: self.get_type_id(),
+                    }
+                    .boxed()),
                 }
             };
 
             result.map_err(|error| {
-                VariableContextDecorator {
-                    error,
-                    member_ident
+                {
+                    VariableContextDecorator {
+                        error,
+                        member_ident,
+                    }
                 }
-            }.boxed())
+                .boxed()
+            })
         } else {
             match self {
                 Value::Struct(ref_cell) => {
@@ -372,13 +436,18 @@ impl Value {
                     Ok(Value::StructRef(weak))
                 }
                 _ => Err(RuntimeError::CannotReference {
-                    ty: self.get_type_id()
-                }.boxed()),
+                    ty: self.get_type_id(),
+                }
+                .boxed()),
             }
         }
     }
 
-    pub fn query_type(&self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String) -> Result<Value> {
+    pub fn query_type(
+        &self,
+        address: impl IntoIterator<Item = ScopeAddressant>,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
         if let Some(addressant) = address.next() {
             let member_ident = format!("{:?}", addressant);
@@ -386,64 +455,103 @@ impl Value {
                 match self {
                     Value::Array(arr) => {
                         if let ScopeAddressant::Index(i) = addressant {
-                            arr.get(i).ok_or(RuntimeError::IndexOutOfBounds {
-                                array_length: arr.len(),
-                                index: i
-                            }.boxed())?.query_type(address, contained_module_id)
+                            arr.get(i)
+                                .ok_or(
+                                    RuntimeError::IndexOutOfBounds {
+                                        array_length: arr.len(),
+                                        index: i,
+                                    }
+                                    .boxed(),
+                                )?
+                                .query_type(address, contained_module_id)
                         } else {
-                            Err(RuntimeError::MembersNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::MembersNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::Struct(ref_cell) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
                             let reference = ref_cell.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.query_type(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .query_type(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.query_type(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .query_type(address, contained_module_id)
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::StructRef(weak) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
-                            let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+                            let rc = weak
+                                .upgrade()
+                                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                             let reference = rc.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.query_type(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .query_type(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.query_type(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .query_type(address, contained_module_id)
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
-                    _  => Err(RuntimeError::AddressantsNotAccepted { ty: self.get_type_id() }.boxed()),
+                    }
+                    _ => Err(RuntimeError::AddressantsNotAccepted {
+                        ty: self.get_type_id(),
+                    }
+                    .boxed()),
                 }
             };
 
             result.map_err(|error| {
-                VariableContextDecorator {
-                    error,
-                    member_ident
+                {
+                    VariableContextDecorator {
+                        error,
+                        member_ident,
+                    }
                 }
-            }.boxed())
+                .boxed()
+            })
         } else {
             Ok(Value::Type(self.get_type_id()))
         }
     }
 
-    pub fn set(&mut self, address: impl IntoIterator<Item = ScopeAddressant>, contained_module_id: &String, value: Value) -> Result<()> {
+    pub fn set(
+        &mut self,
+        address: impl IntoIterator<Item = ScopeAddressant>,
+        contained_module_id: &String,
+        value: Value,
+    ) -> Result<()> {
         let mut address = address.into_iter();
         if let Some(addressant) = address.next() {
             let member_ident = format!("{:?}", addressant);
@@ -452,69 +560,115 @@ impl Value {
                     Value::Array(arr) => {
                         if let ScopeAddressant::Index(i) = addressant {
                             let len = arr.len();
-                            arr.get_mut(i).ok_or(RuntimeError::IndexOutOfBounds {
-                                array_length: len,
-                                index: i
-                            }.boxed())?.set(address, contained_module_id, value)
+                            arr.get_mut(i)
+                                .ok_or(
+                                    RuntimeError::IndexOutOfBounds {
+                                        array_length: len,
+                                        index: i,
+                                    }
+                                    .boxed(),
+                                )?
+                                .set(address, contained_module_id, value)
                         } else {
-                            Err(RuntimeError::MembersNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::MembersNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::Struct(ref_cell) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
                             let mut reference = ref_cell.borrow_mut();
-                            let obj = reference.as_mut().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_mut()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let module_id = obj.get_struct_id().get_module_id().clone();
 
                             let members = obj.get_members_mut();
-                            
+
                             if &module_id == contained_module_id {
-                                members.get_member_mut(&ident)?.set(address, contained_module_id, value)
+                                members.get_member_mut(&ident)?.set(
+                                    address,
+                                    contained_module_id,
+                                    value,
+                                )
                             } else {
-                                members.get_public_member_mut(&ident)?.set(address, contained_module_id, value)
+                                members.get_public_member_mut(&ident)?.set(
+                                    address,
+                                    contained_module_id,
+                                    value,
+                                )
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::StructRef(weak) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
-                            let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
-                            
+                            let rc = weak
+                                .upgrade()
+                                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+
                             let mut reference = rc.borrow_mut();
-                            let obj = reference.as_mut().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+                            let obj = reference
+                                .as_mut()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
                             let module_id = obj.get_struct_id().get_module_id().clone();
 
                             let members = obj.get_members_mut();
-                            
+
                             if &module_id == contained_module_id {
-                                members.get_member_mut(&ident)?.set(address, contained_module_id, value)
+                                members.get_member_mut(&ident)?.set(
+                                    address,
+                                    contained_module_id,
+                                    value,
+                                )
                             } else {
-                                members.get_public_member_mut(&ident)?.set(address, contained_module_id, value)
+                                members.get_public_member_mut(&ident)?.set(
+                                    address,
+                                    contained_module_id,
+                                    value,
+                                )
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
-                    _  => Err(RuntimeError::AddressantsNotAccepted { ty: self.get_type_id() }.boxed()),
+                    }
+                    _ => Err(RuntimeError::AddressantsNotAccepted {
+                        ty: self.get_type_id(),
+                    }
+                    .boxed()),
                 }
             };
 
             result.map_err(|error| {
-                VariableContextDecorator {
-                    error,
-                    member_ident
+                {
+                    VariableContextDecorator {
+                        error,
+                        member_ident,
+                    }
                 }
-            }.boxed())
+                .boxed()
+            })
         } else {
             *self = value;
             Ok(())
         }
     }
-    
-    fn clone_variable(&self, address: IntoIter<ScopeAddressant>, contained_module_id: &String) -> Result<Value> {
+
+    fn clone_variable(
+        &self,
+        address: IntoIter<ScopeAddressant>,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
         if let Some(addressant) = address.next() {
             let member_ident = format!("{:?}", addressant);
@@ -522,61 +676,97 @@ impl Value {
                 match self {
                     Value::Array(arr) => {
                         if let ScopeAddressant::Index(i) = addressant {
-                            arr.get(i).ok_or(RuntimeError::IndexOutOfBounds {
-                                array_length: arr.len(),
-                                index: i
-                            }.boxed())?.clone_variable(address, contained_module_id)
+                            arr.get(i)
+                                .ok_or(
+                                    RuntimeError::IndexOutOfBounds {
+                                        array_length: arr.len(),
+                                        index: i,
+                                    }
+                                    .boxed(),
+                                )?
+                                .clone_variable(address, contained_module_id)
                         } else {
-                            Err(RuntimeError::MembersNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::MembersNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::Struct(ref_cell) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
                             let reference = ref_cell.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.clone_variable(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .clone_variable(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.clone_variable(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .clone_variable(address, contained_module_id)
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
+                    }
                     Value::StructRef(weak) => {
                         if let ScopeAddressant::Identifier(ident) = addressant {
-                            let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+                            let rc = weak
+                                .upgrade()
+                                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                             let reference = rc.borrow();
-                            let obj = reference.as_ref().ok_or(RuntimeError::UseOfMovedValue.boxed())?;
-                            
+                            let obj = reference
+                                .as_ref()
+                                .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                             let members = obj.get_members();
-                            
+
                             if obj.get_struct_id().get_module_id() == contained_module_id {
-                                members.get_member(&ident)?.clone_variable(address, contained_module_id)
+                                members
+                                    .get_member(&ident)?
+                                    .clone_variable(address, contained_module_id)
                             } else {
-                                members.get_public_member(&ident)?.clone_variable(address, contained_module_id)
+                                members
+                                    .get_public_member(&ident)?
+                                    .clone_variable(address, contained_module_id)
                             }
                         } else {
-                            Err(RuntimeError::IndexingNotAccepted { ty: self.get_type_id() }.boxed())
+                            Err(RuntimeError::IndexingNotAccepted {
+                                ty: self.get_type_id(),
+                            }
+                            .boxed())
                         }
-                    },
-                    _  => Err(RuntimeError::AddressantsNotAccepted { ty: self.get_type_id() }.boxed()),
+                    }
+                    _ => Err(RuntimeError::AddressantsNotAccepted {
+                        ty: self.get_type_id(),
+                    }
+                    .boxed()),
                 }
             };
 
             result.map_err(|error| {
-                VariableContextDecorator {
-                    error,
-                    member_ident
+                {
+                    VariableContextDecorator {
+                        error,
+                        member_ident,
+                    }
                 }
-            }.boxed())
+                .boxed()
+            })
         } else {
             if let Value::StructRef(weak) = self {
-                let rc = weak.upgrade().ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+                let rc = weak
+                    .upgrade()
+                    .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                 Ok(Value::Struct(rc).clone())
             } else {
@@ -601,19 +791,24 @@ impl std::fmt::Display for Value {
             Value::String(s) => write!(f, "{}", s),
             Value::Char(c) => write!(f, "{}", c),
             Value::Bool(b) => write!(f, "{}", b),
-            Value::Array(values) => write!(f, "[{}]", values.into_iter()
-                .map(|item| item.to_string())
-                .join(", ")
+            Value::Array(values) => write!(
+                f,
+                "[{}]",
+                values.into_iter().map(|item| item.to_string()).join(", ")
             ),
-            Value::Struct(ref_cell) => write!(f, "{}",
-                ref_cell.borrow()
+            Value::Struct(ref_cell) => write!(
+                f,
+                "{}",
+                ref_cell
+                    .borrow()
                     .as_ref()
                     .map(|obj| obj.to_string())
                     .unwrap_or("Moved".to_string())
             ),
-            Value::StructRef(weak) => write!(f, "{}",
-                weak
-                    .upgrade()
+            Value::StructRef(weak) => write!(
+                f,
+                "{}",
+                weak.upgrade()
                     .map(|rc| {
                         rc.borrow()
                             .as_ref()
@@ -622,7 +817,7 @@ impl std::fmt::Display for Value {
                     })
                     .unwrap_or("Dropped".to_string())
             ),
-            Value::Type(t) => write!(f, "{}", t)
+            Value::Type(t) => write!(f, "{}", t),
         }
     }
 }
@@ -676,7 +871,7 @@ impl Member {
             Err(RuntimeError::FieldIsPrivate.boxed())
         }
     }
-    
+
     fn set(&mut self, value: Value) -> Result<()> {
         self.value = value;
         Ok(())
@@ -696,45 +891,79 @@ impl MemberMap {
     }
 
     pub fn insert_member(&mut self, ident: String, value: Value, is_public: bool) -> Result<()> {
-        if self.members.insert(ident.clone(), Member { value, is_public }).is_some() {
-            return Err(RuntimeError::KeyAlreadyPresent { key: ident }.boxed())
+        if self
+            .members
+            .insert(ident.clone(), Member { value, is_public })
+            .is_some()
+        {
+            return Err(RuntimeError::KeyAlreadyPresent { key: ident }.boxed());
         }
 
         Ok(())
     }
 
     pub fn get_member(&self, ident: &String) -> Result<&Value> {
-        let member = self.members.get(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         Ok(member.get_value())
     }
 
     pub fn get_member_mut(&mut self, ident: &String) -> Result<&mut Value> {
-        let member = self.members.get_mut(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get_mut(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         Ok(member.get_value_mut())
     }
 
     pub fn get_public_member(&self, ident: &String) -> Result<&Value> {
-        let member = self.members.get(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         member.get_value_if_public()
     }
 
     pub fn get_public_member_mut(&mut self, ident: &String) -> Result<&mut Value> {
-        let member = self.members.get_mut(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get_mut(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         member.get_value_mut_if_public()
     }
 
     pub fn set_public_member(&mut self, ident: &String, value: Value) -> Result<()> {
-        let member = self.members.get_mut(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get_mut(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         member.set_if_public(value)
     }
 
     pub fn set_member(&mut self, ident: &String, value: Value) -> Result<()> {
-        let member = self.members.get_mut(ident).ok_or(RuntimeError::NoSuchMember { member_identifier: ident.clone() }.boxed())?;
+        let member = self.members.get_mut(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
 
         member.set(value)
     }
@@ -812,21 +1041,23 @@ impl Struct {
 
 impl std::fmt::Display for Struct {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {{{}}}", self.get_struct_id().to_string(), self.get_members().members
-            .iter()
-            .map(|(label, value)| {
-                label.to_string() + ": " + &value.get_value().to_string()
-            })
-            .join(", ")
+        write!(
+            f,
+            "{} {{{}}}",
+            self.get_struct_id().to_string(),
+            self.get_members()
+                .members
+                .iter()
+                .map(|(label, value)| { label.to_string() + ": " + &value.get_value().to_string() })
+                .join(", ")
         )
     }
 }
 
-
 #[derive(Debug)]
 pub struct RuntimeObject {
     pub(crate) base_environement: Environment,
-    pub(crate) entrypoint: Option<ModuleAddress>
+    pub(crate) entrypoint: Option<ModuleAddress>,
 }
 
 impl RuntimeObject {
@@ -845,10 +1076,7 @@ impl RuntimeObject {
             }.boxed()
         )?;
 
-        let main_expression = ProcedureCallExpression::new(
-            entrypoint,
-            Vec::new()
-        );
+        let main_expression = ProcedureCallExpression::new(entrypoint, Vec::new());
 
         main_expression.eval(&self.base_environement)
     }

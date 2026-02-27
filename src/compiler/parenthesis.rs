@@ -1,42 +1,41 @@
-use crate::{error::{Result, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}};
+use crate::{
+    error::{compiler_error::CompilerError, Result},
+    lexer::token::{ParenthesisType, PunctuationToken, Token},
+};
 
 pub(crate) struct ParenthesisStack {
-    stack: Vec<PunctuationToken>
+    stack: Vec<PunctuationToken>,
 }
 
 impl ParenthesisStack {
-    
     pub(crate) fn new() -> Self {
-        Self {
-            stack: Vec::new(),
-        }
+        Self { stack: Vec::new() }
     }
 
     pub(crate) fn read(&mut self, token: Token) -> Result<()> {
-        use PunctuationToken::*;
         use ParenthesisType::*;
+        use PunctuationToken::*;
 
         if let Token::Punctuation(punct) = token {
             match &punct {
-                Parenthesis(p) |
-                SquareBrackets(p) |
-                CurlyBraces(p) => {
-                    match p {
-                        Opening => self.stack.push(punct),
-                        Closing => {
-                            let top = self.stack.pop().ok_or(CompilerError::InvalidParenthesisStructure.boxed())?;
+                Parenthesis(p) | SquareBrackets(p) | CurlyBraces(p) => match p {
+                    Opening => self.stack.push(punct),
+                    Closing => {
+                        let top = self
+                            .stack
+                            .pop()
+                            .ok_or(CompilerError::InvalidParenthesisStructure.boxed())?;
 
-                            match (&top, &punct) {
-                                (Parenthesis(_), Parenthesis(_)) |
-                                (SquareBrackets(_), SquareBrackets(_)) |
-                                (CurlyBraces(_), CurlyBraces(_)) => {}
-                                _ => {
-                                    return Err(CompilerError::InvalidParenthesisStructure.boxed());
-                                }                                        
+                        match (&top, &punct) {
+                            (Parenthesis(_), Parenthesis(_))
+                            | (SquareBrackets(_), SquareBrackets(_))
+                            | (CurlyBraces(_), CurlyBraces(_)) => {}
+                            _ => {
+                                return Err(CompilerError::InvalidParenthesisStructure.boxed());
                             }
-                        },
+                        }
                     }
-                }
+                },
 
                 _ => {}
             };

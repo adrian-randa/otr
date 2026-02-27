@@ -1,10 +1,35 @@
-use std::{cell::RefCell, collections::HashMap, env, fs::{self, read_to_string}, rc::Rc, str::FromStr};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    env,
+    fs::{self, read_to_string},
+    rc::Rc,
+    str::FromStr,
+};
 
-use otr::{compiler::{Compiler, expression_parser::ExpressionParser, file_reader::{FileReader, ImportAddress}}, lexer::{fragmenter::FragmentStream, Tokenizer, token::{PunctuationToken, Token}}, runtime::{
-    Expression, ModuleAddress, scope::{Scope, ScopeAddressant}, Struct, Value, environment::Environment, expressions::{
-        EqualityExpression, ProcedureCallExpression, VariableExpression, arithmetic::AddExpression, boolean::NotExpression
-    }, module::Module, procedures::{CompiledProcedure, CompiledProcedureBuilder, Instruction, Procedure}
-}};
+use otr::{
+    compiler::{
+        expression_parser::ExpressionParser,
+        file_reader::{FileReader, ImportAddress},
+        Compiler,
+    },
+    lexer::{
+        fragmenter::FragmentStream,
+        token::{PunctuationToken, Token},
+        Tokenizer,
+    },
+    runtime::{
+        environment::Environment,
+        expressions::{
+            arithmetic::AddExpression, boolean::NotExpression, EqualityExpression,
+            ProcedureCallExpression, VariableExpression,
+        },
+        module::CompiledModule,
+        procedures::{CompiledProcedure, CompiledProcedureBuilder, Instruction, Procedure},
+        scope::{Scope, ScopeAddressant},
+        Expression, ModuleAddress, Struct, Value,
+    },
+};
 
 fn main() {
     let mut file_reader = FileReader::new(Tokenizer::default(), env::current_dir().unwrap());
@@ -32,7 +57,7 @@ fn main() {
             return;
         }
     };
-    
+
     if let Err(error) = runtime_object.execute() {
         println!("{error}");
     }

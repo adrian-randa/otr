@@ -15,10 +15,7 @@ impl AndExpression {
 }
 
 impl Expression for AndExpression {
-    fn eval(
-        &self,
-        environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value> {
+    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -33,7 +30,8 @@ impl Expression for AndExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -51,10 +49,7 @@ impl OrExpression {
 }
 
 impl Expression for OrExpression {
-    fn eval(
-        &self,
-        environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value> {
+    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
@@ -69,7 +64,8 @@ impl Expression for OrExpression {
                     l.get_type_id(),
                     r.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }
@@ -86,10 +82,7 @@ impl NotExpression {
 }
 
 impl Expression for NotExpression {
-    fn eval(
-        &self,
-        environment: &crate::runtime::Environment,
-    ) -> Result<crate::runtime::Value> {
+    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
         use super::Value::*;
 
         let value = self.expr.eval(environment)?;
@@ -102,7 +95,8 @@ impl Expression for NotExpression {
                     "Cannot perform boolean nor operation on {}!",
                     value.get_type_id()
                 ),
-            }.boxed()),
+            }
+            .boxed()),
         }
     }
 }

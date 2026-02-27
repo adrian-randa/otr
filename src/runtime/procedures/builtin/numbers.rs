@@ -1,12 +1,13 @@
-use crate::runtime::{RuntimeError, Value, module::Module, procedures::Procedure};
+use crate::runtime::module::Module;
+use crate::runtime::{module::CompiledModule, procedures::Procedure, RuntimeError, Value};
 
 use crate::error::Result;
 
-pub(crate) fn get_module() -> Module {
-    let mut module = Module::default();
+pub(crate) fn get_module() -> CompiledModule {
+    let mut module = CompiledModule::default();
 
     module.insert_procedure("parse".into(), Box::new(NumberParseProcedure), true);
-    
+
     module
 }
 
@@ -14,18 +15,27 @@ pub(crate) fn get_module() -> Module {
 pub(crate) struct NumberParseProcedure;
 
 impl Procedure for NumberParseProcedure {
-    fn call(&self, _environment: crate::runtime::environment::Environment, arguments: Vec<crate::runtime::Value>) -> Result<crate::runtime::Value> {
-        let value = arguments.get(0).ok_or(RuntimeError::NoSuchVariable { variable_identifier: "number".into() }.boxed())?;
+    fn call(
+        &self,
+        _environment: crate::runtime::environment::Environment,
+        arguments: Vec<crate::runtime::Value>,
+    ) -> Result<crate::runtime::Value> {
+        let value = arguments.get(0).ok_or(
+            RuntimeError::NoSuchVariable {
+                variable_identifier: "number".into(),
+            }
+            .boxed(),
+        )?;
 
         match value {
-
             Value::Char(c) => {
                 let n = *c as u8;
 
                 if n < '0' as u8 || n > '9' as u8 {
                     Err(RuntimeError::Unknown {
-                        message: format!("'{}' is not a valid digit!", c)
-                    }.boxed())
+                        message: format!("'{}' is not a valid digit!", c),
+                    }
+                    .boxed())
                 } else {
                     Ok(Value::Integer((n - '0' as u8) as i64))
                 }
@@ -37,12 +47,17 @@ impl Procedure for NumberParseProcedure {
                     Ok(Value::Float(float))
                 } else {
                     Err(RuntimeError::Unknown {
-                        message: format!("'{}' is not a valid number!", str)
-                    }.boxed())
+                        message: format!("'{}' is not a valid number!", str),
+                    }
+                    .boxed())
                 }
             }
 
-            other => Err(RuntimeError::TypeMismatch { expected: crate::runtime::Type::String, found: other.get_type_id() }.boxed())
+            other => Err(RuntimeError::TypeMismatch {
+                expected: crate::runtime::Type::String,
+                found: other.get_type_id(),
+            }
+            .boxed()),
         }
     }
 }

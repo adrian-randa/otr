@@ -6,13 +6,16 @@ use crate::error::{Error, Result};
 
 use crate::lexer::fragmenter::{Fragment, FragmentStream};
 use crate::lexer::token::{ContextualizedToken, ContextualizedTokenStream};
-use crate::{error::{fragmenter_error::FragmentationError, tokenizer_error::TokenizerError}, lexer::{
-    rules::{
-        BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
-        PatternRule, StringLiteralRule,
+use crate::{
+    error::{fragmenter_error::FragmentationError, tokenizer_error::TokenizerError},
+    lexer::{
+        rules::{
+            BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
+            PatternRule, StringLiteralRule,
+        },
+        token::{Token, TokenStream},
     },
-    token::{Token, TokenStream},
-}};
+};
 
 pub mod fragmenter;
 pub mod rules;
@@ -48,9 +51,9 @@ impl Tokenizer {
                     let line = frag.line_index;
                     let column = frag.column_index;
                     frag = Fragment {
-                       fragment: remainder,
-                       line_index: frag.line_index,
-                       column_index: frag.column_index + frag_len - rem_len,
+                        fragment: remainder,
+                        line_index: frag.line_index,
+                        column_index: frag.column_index + frag_len - rem_len,
                     };
 
                     if let Some(token) = token {
@@ -73,11 +76,11 @@ impl Default for Tokenizer {
     fn default() -> Self {
         use token::*;
         use KeywordToken::*;
+        use LiteralToken::*;
         use OperatorToken::*;
         use ParenthesisType::*;
         use PunctuationToken::*;
         use Token::*;
-        use LiteralToken::*;
 
         Self::new()
             .with_rule(KeywordRule::new("break".into(), Keyword(Break)))
@@ -100,19 +103,47 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("ref".into(), Keyword(Ref)))
             .with_rule(KeywordRule::new("clone".into(), Keyword(Clone)))
             .with_rule(KeywordRule::new("typeof".into(), Keyword(Typeof)))
-
             .with_rule(KeywordRule::new("null".into(), Literal(LiteralToken::Null)))
-            .with_rule(KeywordRule::new("Null".into(), Literal(Type(PrimitiveTypeToken::Null))))
-            .with_rule(KeywordRule::new("Integer".into(), Literal(Type(PrimitiveTypeToken::Integer))))
-            .with_rule(KeywordRule::new("Float".into(), Literal(Type(PrimitiveTypeToken::Float))))
-            .with_rule(KeywordRule::new("Bool".into(), Literal(Type(PrimitiveTypeToken::Bool))))
-            .with_rule(KeywordRule::new("Char".into(), Literal(Type(PrimitiveTypeToken::Char))))
-            .with_rule(KeywordRule::new("String".into(), Literal(Type(PrimitiveTypeToken::String))))
-            .with_rule(KeywordRule::new("Array".into(), Literal(Type(PrimitiveTypeToken::Array))))
-            .with_rule(KeywordRule::new("Type".into(), Literal(Type(PrimitiveTypeToken::Type))))
-            .with_rule(KeywordRule::new("Moved".into(), Literal(Type(PrimitiveTypeToken::Moved))))
-            .with_rule(KeywordRule::new("Dropeed".into(), Literal(Type(PrimitiveTypeToken::Dropped))))
-
+            .with_rule(KeywordRule::new(
+                "Null".into(),
+                Literal(Type(PrimitiveTypeToken::Null)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Integer".into(),
+                Literal(Type(PrimitiveTypeToken::Integer)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Float".into(),
+                Literal(Type(PrimitiveTypeToken::Float)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Bool".into(),
+                Literal(Type(PrimitiveTypeToken::Bool)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Char".into(),
+                Literal(Type(PrimitiveTypeToken::Char)),
+            ))
+            .with_rule(KeywordRule::new(
+                "String".into(),
+                Literal(Type(PrimitiveTypeToken::String)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Array".into(),
+                Literal(Type(PrimitiveTypeToken::Array)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Type".into(),
+                Literal(Type(PrimitiveTypeToken::Type)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Moved".into(),
+                Literal(Type(PrimitiveTypeToken::Moved)),
+            ))
+            .with_rule(KeywordRule::new(
+                "Dropeed".into(),
+                Literal(Type(PrimitiveTypeToken::Dropped)),
+            ))
             .with_rule(PatternRule::new("&&".into(), Operator(And)))
             .with_rule(PatternRule::new("||".into(), Operator(Or)))
             .with_rule(PatternRule::new("==".into(), Operator(Equality)))

@@ -1,11 +1,23 @@
-use std::{collections::{HashMap, HashSet}, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    str::FromStr,
+};
 
-use crate::{compiler::{file_reader::FileReader, states::CompilerBaseState}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{Tokenizer, fragmenter::FragmentStream, token::Token}, runtime::{ModuleAddress, RuntimeObject, environment::Environment}};
+use crate::{
+    compiler::{file_reader::FileReader, states::CompilerBaseState},
+    error::{compiler_error::CompilerError, context::SourceFileContextDecorator},
+    lexer::{fragmenter::FragmentStream, token::Token, Tokenizer},
+    runtime::{environment::Environment, ModuleAddress, RuntimeObject},
+};
 
 use crate::error::Result;
 
 pub trait CompilerState {
-    fn read(self: Box<Self>, token: Token, compiler_environment: &mut CompilerEnvironment) -> Result<Box<dyn CompilerState>>;
+    fn read(
+        self: Box<Self>,
+        token: Token,
+        compiler_environment: &mut CompilerEnvironment,
+    ) -> Result<Box<dyn CompilerState>>;
 
     fn finalize(self: Box<Self>) -> Result<Environment>;
 }
@@ -23,10 +35,16 @@ pub struct NoExpressionEnvironment;
 
 impl ExpressionParseEnvironment for NoExpressionEnvironment {
     fn resolve_procedure_identifier(&self, ident: String) -> Result<ModuleAddress> {
-        Err(CompilerError::InvalidExpression { message: format!("Single identifier '{ident}' could not be mapped to procedure!") }.boxed())
+        Err(CompilerError::InvalidExpression {
+            message: format!("Single identifier '{ident}' could not be mapped to procedure!"),
+        }
+        .boxed())
     }
     fn resolve_struct_identifier(&self, ident: String) -> Result<ModuleAddress> {
-        Err(CompilerError::InvalidExpression { message: format!("Single identifier '{ident}' could not be mapped to struct!") }.boxed())
+        Err(CompilerError::InvalidExpression {
+            message: format!("Single identifier '{ident}' could not be mapped to struct!"),
+        }
+        .boxed())
     }
 }
 
@@ -39,7 +57,7 @@ impl Compiler {
     pub fn new(file_reader: FileReader) -> Self {
         Self {
             state: Box::new(CompilerBaseState::new()),
-            compiler_environment: CompilerEnvironment::new(file_reader)
+            compiler_environment: CompilerEnvironment::new(file_reader),
         }
     }
 
@@ -65,7 +83,11 @@ impl Compiler {
             let line = token.line_index;
             let column = token.column_index;
             let token = token.token;
-            let path = self.compiler_environment.file_reader.get_current_file()?.clone();
+            let path = self
+                .compiler_environment
+                .file_reader
+                .get_current_file()?
+                .clone();
             self = match self.read(token) {
                 Ok(s) => Ok(s),
                 Err(error) => Err(SourceFileContextDecorator {
@@ -73,7 +95,8 @@ impl Compiler {
                     path,
                     line,
                     column,
-                }.boxed())
+                }
+                .boxed()),
             }?;
         }
 
@@ -127,24 +150,36 @@ impl CompilerEnvironment {
 
 impl ExpressionParseEnvironment for CompilerEnvironment {
     fn resolve_procedure_identifier(&self, ident: String) -> Result<ModuleAddress> {
-        self.procedure_ident_map.get(&ident).ok_or(
-            CompilerError::InvalidExpression {
-                message: format!("Single identifier '{ident}' could not be mapped to a procedure!")
-            }.boxed()
-        ).map(|address| address.to_owned())
+        self.procedure_ident_map
+            .get(&ident)
+            .ok_or(
+                CompilerError::InvalidExpression {
+                    message: format!(
+                        "Single identifier '{ident}' could not be mapped to a procedure!"
+                    ),
+                }
+                .boxed(),
+            )
+            .map(|address| address.to_owned())
     }
 
     fn resolve_struct_identifier(&self, ident: String) -> Result<ModuleAddress> {
-        self.struct_ident_map.get(&ident).ok_or(
-            CompilerError::InvalidExpression {
-                message: format!("Single identifier '{ident}' could not be mapped to a struct!")
-            }.boxed()
-        ).map(|address| address.to_owned())
+        self.struct_ident_map
+            .get(&ident)
+            .ok_or(
+                CompilerError::InvalidExpression {
+                    message: format!(
+                        "Single identifier '{ident}' could not be mapped to a struct!"
+                    ),
+                }
+                .boxed(),
+            )
+            .map(|address| address.to_owned())
     }
 }
 
-pub mod states;
-pub mod expression_parser;
 pub mod decorators;
+pub mod expression_parser;
 pub mod file_reader;
 pub mod parenthesis;
+pub mod states;

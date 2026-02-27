@@ -2,7 +2,12 @@ use std::{collections::HashMap, ops::Deref, rc::Rc};
 
 use derive_more::{Deref, IntoIterator};
 
-use crate::{compiler::{NoExpressionEnvironment, expression_parser::ExpressionParser}, error::{Error, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}, runtime::{Expression, RuntimeError, Value, environment::Environment}};
+use crate::{
+    compiler::{expression_parser::ExpressionParser, NoExpressionEnvironment},
+    error::{compiler_error::CompilerError, Error},
+    lexer::token::{ParenthesisType, PunctuationToken, Token},
+    runtime::{environment::Environment, Expression, RuntimeError, Value},
+};
 
 use crate::error::Result;
 
@@ -51,7 +56,7 @@ impl TryFrom<Vec<Token>> for ScopeAddress {
 
     fn try_from(value: Vec<Token>) -> std::result::Result<Self, Self::Error> {
         let mut tokens = value.into_iter();
-        
+
         let mut addressants = Vec::new();
 
         while let Some(token) = tokens.next() {
@@ -63,22 +68,32 @@ impl TryFrom<Vec<Token>> for ScopeAddress {
                 Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
                     let index_expression = ExpressionParser::take_until_closing(
                         &mut tokens,
-                        Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing))
+                        Token::Punctuation(PunctuationToken::SquareBrackets(
+                            ParenthesisType::Closing,
+                        )),
                     )?;
 
-                    let index_expression = ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
+                    let index_expression =
+                        ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
 
                     addressants.push(ScopeAddressant::DynamicIndex(index_expression.into()));
                 }
 
                 other => {
-                    return Err(CompilerError::InvalidScopeAddress { unexpected_token: Some(other) }.boxed());
+                    return Err(CompilerError::InvalidScopeAddress {
+                        unexpected_token: Some(other),
+                    }
+                    .boxed());
                 }
             }
         }
 
-
-        addressants.try_into().map_err(|_| CompilerError::InvalidScopeAddress { unexpected_token: None }.boxed())
+        addressants.try_into().map_err(|_| {
+            CompilerError::InvalidScopeAddress {
+                unexpected_token: None,
+            }
+            .boxed()
+        })
     }
 }
 
@@ -94,13 +109,16 @@ impl ScopeAddress {
                     let value = expression.eval(environment)?;
                     let idx: usize = match value {
                         Value::Integer(value) => {
-                            let idx =
-                                value.try_into().unwrap();
+                            let idx = value.try_into().unwrap();
 
                             idx
                         }
                         _ => {
-                            return Err(RuntimeError::TypeMismatch { expected: super::Type::Integer, found: value.get_type_id() }.boxed())
+                            return Err(RuntimeError::TypeMismatch {
+                                expected: super::Type::Integer,
+                                found: value.get_type_id(),
+                            }
+                            .boxed())
                         }
                     };
 
@@ -119,7 +137,7 @@ impl ScopeAddress {
 pub(crate) struct BakedScopeAddress(Vec<ScopeAddressant>);
 
 #[derive(Debug, Clone)]
-struct Stack (Vec<HashMap<String, Value>>);
+struct Stack(Vec<HashMap<String, Value>>);
 
 impl Default for Stack {
     fn default() -> Self {
@@ -129,7 +147,7 @@ impl Default for Stack {
 
 impl Stack {
     fn new() -> Self {
-        Self(vec![HashMap::new()])    
+        Self(vec![HashMap::new()])
     }
 
     fn from_members(members: HashMap<String, Value>) -> Self {
@@ -140,7 +158,7 @@ impl Stack {
         let last = self.0.len() - 1;
         self.0[last].extend(members.into_iter());
     }
-    
+
     fn grow(&mut self) {
         self.0.push(HashMap::new());
     }
@@ -152,7 +170,10 @@ impl Stack {
     fn push(&mut self, identifier: String, value: Value) -> Result<()> {
         let last = self.0.len() - 1;
         if self.0[last].insert(identifier.clone(), value).is_some() {
-            return Err(RuntimeError::VariableAlreadyPresent { variable_identifier: identifier }.boxed());
+            return Err(RuntimeError::VariableAlreadyPresent {
+                variable_identifier: identifier,
+            }
+            .boxed());
         }
 
         Ok(())
@@ -161,7 +182,10 @@ impl Stack {
     fn pop(&mut self, identifier: &String) -> Result<()> {
         let last = self.0.len() - 1;
         if self.0[last].remove(identifier).is_none() {
-            return Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed());
+            return Err(RuntimeError::NoSuchVariable {
+                variable_identifier: identifier.clone(),
+            }
+            .boxed());
         }
 
         Ok(())
@@ -174,12 +198,15 @@ impl Stack {
             }
         }
 
-        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
+        Err(RuntimeError::NoSuchVariable {
+            variable_identifier: identifier.clone(),
+        }
+        .boxed())
     }
 
     fn get_mut(&mut self, identifier: &String) -> Result<&mut Value> {
         let last = self.0.len() - 1;
-        
+
         let mut idx = None;
 
         for i in (0..=last).rev() {
@@ -192,7 +219,10 @@ impl Stack {
         if let Some(i) = idx {
             return Ok(self.0[i].get_mut(identifier).unwrap());
         }
-        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
+        Err(RuntimeError::NoSuchVariable {
+            variable_identifier: identifier.clone(),
+        }
+        .boxed())
     }
 
     fn set(&mut self, identifier: &String, new_value: Value) -> Result<()> {
@@ -203,7 +233,10 @@ impl Stack {
             }
         }
 
-        Err(RuntimeError::NoSuchVariable { variable_identifier: identifier.clone() }.boxed())
+        Err(RuntimeError::NoSuchVariable {
+            variable_identifier: identifier.clone(),
+        }
+        .boxed())
     }
 }
 
@@ -221,7 +254,9 @@ impl Scope {
     }
 
     pub fn from_members(members: HashMap<String, Value>) -> Self {
-        Self { stack: Stack::from_members(members) }
+        Self {
+            stack: Stack::from_members(members),
+        }
     }
 
     pub fn insert_members(&mut self, members: HashMap<String, Value>) {
@@ -263,10 +298,17 @@ impl Scope {
             }
         };
 
-        self.stack.get(&first_identifier)?.query(address, contained_module_id)
+        self.stack
+            .get(&first_identifier)?
+            .query(address, contained_module_id)
     }
 
-    pub(crate) fn set_variable(&mut self, address: BakedScopeAddress, contained_module_id: &String, value: Value) -> Result<()> {
+    pub(crate) fn set_variable(
+        &mut self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+        value: Value,
+    ) -> Result<()> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -281,10 +323,16 @@ impl Scope {
             }
         };
 
-        self.stack.get_mut(&first_identifier)?.set(address, contained_module_id, value)
+        self.stack
+            .get_mut(&first_identifier)?
+            .set(address, contained_module_id, value)
     }
 
-    pub(crate) fn reference_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
+    pub(crate) fn reference_variable(
+        &self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -299,10 +347,16 @@ impl Scope {
             }
         };
 
-        self.stack.get(&first_identifier)?.reference(address, contained_module_id)
+        self.stack
+            .get(&first_identifier)?
+            .reference(address, contained_module_id)
     }
 
-    pub(crate) fn clone_variable(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
+    pub(crate) fn clone_variable(
+        &self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -317,10 +371,16 @@ impl Scope {
             }
         };
 
-        self.stack.get(&first_identifier)?.clone_variable(address, contained_module_id)
+        self.stack
+            .get(&first_identifier)?
+            .clone_variable(address, contained_module_id)
     }
 
-    pub(crate) fn query_type(&self, address: BakedScopeAddress, contained_module_id: &String) -> Result<Value> {
+    pub(crate) fn query_type(
+        &self,
+        address: BakedScopeAddress,
+        contained_module_id: &String,
+    ) -> Result<Value> {
         let mut address = address.into_iter();
 
         let first_addressant = address.next().unwrap();
@@ -335,6 +395,8 @@ impl Scope {
             }
         };
 
-        self.stack.get(&first_identifier)?.query_type(address, contained_module_id)
+        self.stack
+            .get(&first_identifier)?
+            .query_type(address, contained_module_id)
     }
 }
