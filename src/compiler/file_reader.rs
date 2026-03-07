@@ -115,7 +115,7 @@ impl FileReader {
         Ok(())
     }
 
-    pub fn get_current_file(&self) -> Result<&PathBuf> {
+    pub fn get_current_file(&self) -> Result<&Path> {
         Ok(&self
             .source_stack
             .last()

@@ -78,7 +78,7 @@ impl Expression for StructConstructionExpression {
 
 #[derive(Debug)]
 pub struct ArrayConstructionExpression {
-    pub items: Vec<Box<dyn Expression>>
+    pub items: Vec<Box<dyn Expression>>,
 }
 
 impl Expression for ArrayConstructionExpression {

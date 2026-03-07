@@ -198,7 +198,9 @@ impl ScopeExcapeHandler for ForScopeEscapeHandler {
         let end_of_body = instructions.len();
 
         instructions.push(Instruction::ShrinkStack);
-        instructions.push(Instruction::PopVarFromScope { identifier: "$CF_FOR_ITER".into() });
+        instructions.push(Instruction::PopVarFromScope {
+            identifier: "$CF_FOR_ITER".into(),
+        });
 
         if let Some(Instruction::JumpConditional {
             condition_expression: _,

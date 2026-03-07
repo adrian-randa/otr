@@ -81,20 +81,20 @@ impl std::fmt::Display for Type {
     }
 }
 
+macro_rules! id {
+    ($value:ident: $id0:ident $(, $id:ident)+) => {
+        match $value {
+            PrimitiveTypeToken::$id0 => Self::$id0,
+            $(
+                PrimitiveTypeToken::$id => Self::$id,
+            )+
+        }
+    };
+}
+
 impl From<PrimitiveTypeToken> for Type {
     fn from(value: PrimitiveTypeToken) -> Self {
-        match value {
-            PrimitiveTypeToken::Null => Self::Null,
-            PrimitiveTypeToken::Integer => Self::Integer,
-            PrimitiveTypeToken::Float => Self::Float,
-            PrimitiveTypeToken::Bool => Self::Bool,
-            PrimitiveTypeToken::Char => Self::String,
-            PrimitiveTypeToken::String => Self::String,
-            PrimitiveTypeToken::Array => Self::Array,
-            PrimitiveTypeToken::Moved => Self::Moved,
-            PrimitiveTypeToken::Dropped => Self::Dropped,
-            PrimitiveTypeToken::Type => Self::Type,
-        }
+        id!(value: Null, Integer, Float, Bool, Char, String, Array, Moved, Dropped, Type)
     }
 }
 

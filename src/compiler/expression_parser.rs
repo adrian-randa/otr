@@ -1,15 +1,22 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack},
+    compiler::{parenthesis::ParenthesisStack, CompilerError, ExpressionParseEnvironment},
     lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
     runtime::{
-        Expression, ModuleAddress, Type, Value, expressions::{
-            ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{
+        expressions::{
+            arithmetic::{
                 AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression,
                 MultiplyExpression, PowerExpression, SubtractExpression,
-            }, boolean::{AndExpression, NotExpression, OrExpression}
-        }, scope::{ScopeAddress, ScopeAddressant}
+            },
+            boolean::{AndExpression, NotExpression, OrExpression},
+            ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression,
+            CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression,
+            StructConstructionExpression, StructMemberExpression, TypeofVariableExpression,
+            VariableExpression,
+        },
+        scope::{ScopeAddress, ScopeAddressant},
+        Expression, ModuleAddress, Type, Value,
     },
 };
 
@@ -474,7 +481,9 @@ impl ExpressionAtomParser {
                             subexpression: ExpressionParser::parse(inner, environment)?,
                         }
                     }
-                    Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
+                    Token::Punctuation(PunctuationToken::SquareBrackets(
+                        ParenthesisType::Opening,
+                    )) => {
                         let inner = ExpressionParser::take_until_closing(
                             &mut tokens,
                             Token::Punctuation(PunctuationToken::SquareBrackets(
@@ -487,7 +496,7 @@ impl ExpressionAtomParser {
                             items.push(ExpressionParser::parse(raw_item, environment)?);
                         }
                         self.state = Subexpression {
-                            subexpression: Box::new(ArrayConstructionExpression { items })
+                            subexpression: Box::new(ArrayConstructionExpression { items }),
                         }
                     }
                     other => {

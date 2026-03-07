@@ -87,7 +87,7 @@ impl Compiler {
                 .compiler_environment
                 .file_reader
                 .get_current_file()?
-                .clone();
+                .to_path_buf();
             self = match self.read(token) {
                 Ok(s) => Ok(s),
                 Err(error) => Err(SourceFileContextDecorator {
