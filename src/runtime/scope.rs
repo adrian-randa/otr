@@ -300,7 +300,7 @@ impl Scope {
 
         self.stack
             .get(&first_identifier)?
-            .query(address, contained_module_id)
+            .get(address, contained_module_id)
     }
 
     pub(crate) fn set_variable(
@@ -373,7 +373,7 @@ impl Scope {
 
         self.stack
             .get(&first_identifier)?
-            .clone_variable(address, contained_module_id)
+            .clone_member(address, contained_module_id)
     }
 
     pub(crate) fn query_type(
@@ -397,6 +397,6 @@ impl Scope {
 
         self.stack
             .get(&first_identifier)?
-            .query_type(address, contained_module_id)
+            .get_type(address, contained_module_id)
     }
 }

@@ -167,8 +167,8 @@ pub(crate) struct StructMemberExpression {
 
 impl Expression for StructMemberExpression {
     fn eval(&self, environment: &Environment) -> Result<Value> {
-        self.subexpression.eval(environment)?.query(
-            vec![ScopeAddressant::Identifier(self.member_ident.clone())],
+        self.subexpression.eval(environment)?.get(
+            vec![ScopeAddressant::Identifier(self.member_ident.clone())].into_iter(),
             environment.get_contained_module_id(),
         )
     }
@@ -194,8 +194,8 @@ impl Expression for ArrayIndexExpression {
             .boxed());
         };
 
-        self.subexpression.eval(environment)?.query(
-            vec![ScopeAddressant::Index(index.try_into().unwrap())],
+        self.subexpression.eval(environment)?.get(
+            vec![ScopeAddressant::Index(index.try_into().unwrap())].into_iter(),
             environment.get_contained_module_id(),
         )
     }
