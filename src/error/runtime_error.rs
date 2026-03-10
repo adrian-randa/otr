@@ -129,8 +129,8 @@ impl super::Error for RuntimeError {
     fn to_value(&self) -> Value {
         let err = |variant: &str| {
             Value::Struct(Rc::new(RefCell::new(Some(
-                Struct::new(ModuleAddress::new("Errors".into(), variant.into()))
-                    .with_member("message".into(), Value::String(self.get_message() + "Error"), false).unwrap()
+                Struct::new(ModuleAddress::new("Errors".into(), variant.to_string() + "Error"))
+                    .with_member("message".into(), Value::String(self.get_message()), false).unwrap()
             ))))
         };
 
