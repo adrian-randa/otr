@@ -1,8 +1,5 @@
-use std::collections::HashMap;
-
 use crate::{
     compiler::{CompilerError, Decorator},
-    lexer::token::Token,
     runtime::{ModuleAddress, RuntimeObject},
 };
 

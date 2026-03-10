@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
 use crate::{
-    error::{compiler_error::CompilerError, Error},
+    error::compiler_error::CompilerError,
     runtime::{
-        environment::Environment, procedures::Procedure, ModuleAddress, RuntimeError, Struct,
+        procedures::Procedure, RuntimeError, Struct,
     },
 };
 

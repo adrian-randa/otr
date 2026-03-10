@@ -20,7 +20,7 @@ impl std::fmt::Display for TokenizerError {
 }
 
 impl TokenizerError {
-    pub(crate) fn boxed(self) -> Box<dyn super::Error> {
+    pub(crate) fn _boxed(self) -> Box<dyn super::Error> {
         Box::new(self)
     }
 }

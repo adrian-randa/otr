@@ -4,7 +4,6 @@ use super::Value;
 
 use super::RuntimeError;
 
-use crate::error::Error;
 use crate::runtime::module::{CompiledModule, Module};
 use crate::runtime::procedures::builtin::{arrays, debug, files, numbers, strings};
 use crate::runtime::procedures::Procedure;
@@ -20,10 +19,9 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Environment {
-    //TODO: Remove public visibility
-    pub contained_module_id: String,
-    pub loaded_modules: HashMap<String, Rc<CompiledModule>>,
-    pub scope: Scope,
+    contained_module_id: String,
+    loaded_modules: HashMap<String, Rc<CompiledModule>>,
+    scope: Scope,
 }
 
 impl Default for Environment {
@@ -140,5 +138,13 @@ impl Environment {
 
     pub fn get_contained_module_id(&self) -> &String {
         &self.contained_module_id
+    }
+
+    pub(crate) fn _get_scope(&self) -> &Scope {
+        &self.scope
+    }
+
+    pub(crate) fn get_scope_mut(&mut self) -> &mut Scope {
+        &mut self.scope
     }
 }

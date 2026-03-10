@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 use derive_more::{Deref, IntoIterator};
 
@@ -225,7 +225,7 @@ impl Stack {
         .boxed())
     }
 
-    fn set(&mut self, identifier: &String, new_value: Value) -> Result<()> {
+    fn _set(&mut self, identifier: &String, new_value: Value) -> Result<()> {
         for i in (0..self.0.len()).rev() {
             if let Some(value) = self.0[i].get_mut(identifier) {
                 *value = new_value;
@@ -242,8 +242,7 @@ impl Stack {
 
 #[derive(Debug, Default, Clone)]
 pub struct Scope {
-    //TODO: Remove public visibility
-    pub stack: Stack,
+    stack: Stack,
 }
 
 impl Scope {

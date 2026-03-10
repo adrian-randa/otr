@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashSet, VecDeque},
+    collections::HashSet,
     fmt::Display,
     fs,
     path::{Path, PathBuf},
@@ -10,7 +10,7 @@ use crate::{
     compiler::CompilerError,
     lexer::{
         fragmenter::FragmentStream,
-        token::{ContextualizedToken, ContextualizedTokenStream, Token, TokenStream},
+        token::{ContextualizedToken, ContextualizedTokenStream},
         Tokenizer,
     },
 };

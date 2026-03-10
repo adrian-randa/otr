@@ -5,8 +5,7 @@ use crate::{
         states::{
             decorator::CompilerDecoratorState, procedure::CompilerProcedureState,
             r#struct::CompilerStructState, CompilerBaseState,
-        },
-        Compiler, CompilerEnvironment, CompilerError, CompilerState,
+        }, CompilerEnvironment, CompilerError, CompilerState,
     },
     error::context::HintContextDecorator,
     lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token},

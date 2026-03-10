@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use colored::Colorize;
 
-use crate::runtime::{module::CompiledModule, ModuleAddress};
+use crate::runtime::ModuleAddress;
 
 use super::Error;
 

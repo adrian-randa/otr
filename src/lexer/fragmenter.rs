@@ -77,7 +77,7 @@ impl FromStr for FragmentStream {
         }
         .collect();
 
-        let (_, line, column) = chars.last().unwrap();
+        let (_, _, _) = chars.last().unwrap();
 
         let mut i = 0;
 

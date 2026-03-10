@@ -1,12 +1,12 @@
 use crate::{
     compiler::{
         states::{
-            import::CompilerImportState, module::CompilerModuleState, r#struct::CompilerStructState,
+            import::CompilerImportState, module::CompilerModuleState
         },
-        Compiler, CompilerEnvironment, CompilerError, CompilerState,
+        CompilerEnvironment, CompilerError, CompilerState,
     },
     lexer::token::{KeywordToken, Token},
-    runtime::environment::{self, Environment},
+    runtime::environment::Environment,
 };
 
 use crate::error::Result;

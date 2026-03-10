@@ -1,7 +1,6 @@
 use crate::{
     compiler::{
-        states::{module::CompilerModuleState, procedure::CompilerProcedureState},
-        Compiler, CompilerEnvironment, CompilerError, CompilerState,
+        states::{module::CompilerModuleState, procedure::CompilerProcedureState}, CompilerEnvironment, CompilerError, CompilerState,
     },
     lexer::token::{KeywordToken, PunctuationToken, Token},
     runtime::environment::Environment,

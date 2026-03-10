@@ -1,12 +1,11 @@
 use std::{
-    collections::{HashMap, HashSet},
-    str::FromStr,
+    collections::HashMap,
 };
 
 use crate::{
     compiler::{file_reader::FileReader, states::CompilerBaseState},
     error::{compiler_error::CompilerError, context::SourceFileContextDecorator},
-    lexer::{fragmenter::FragmentStream, token::Token, Tokenizer},
+    lexer::token::Token,
     runtime::{environment::Environment, ModuleAddress, RuntimeObject},
 };
 

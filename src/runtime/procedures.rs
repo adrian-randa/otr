@@ -2,11 +2,11 @@ use std::{any::Any, collections::HashMap};
 
 use crate::{
     compiler::{ExpressionParseEnvironment, expression_parser::ExpressionParser},
-    error::{Error, compiler_error::CompilerError, value_error::ValueError},
+    error::{compiler_error::CompilerError, value_error::ValueError},
     lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
     runtime::{
         Environment, Expression, RuntimeError, ScopeAddressant, Value, expressions::{
-            AssociatedProcedureCallExpression, EqualityExpression, ReferenceExpression, TypeofVariableExpression, VariableExpression, boolean::NotExpression
+            AssociatedProcedureCallExpression, EqualityExpression, ReferenceExpression, TypeofVariableExpression, boolean::NotExpression
         }, scope::ScopeAddress
     },
 };
@@ -65,16 +65,16 @@ impl Procedure for CompiledProcedure {
         while pc < self.instructions.len() {
             match &self.instructions[pc] {
                 Instruction::PushVarToScope { identifier } => {
-                    environment.scope.push(identifier.clone())?;
+                    environment.get_scope_mut().push(identifier.clone())?;
                 }
                 Instruction::PopVarFromScope { identifier } => {
-                    environment.scope.pop(identifier)?;
+                    environment.get_scope_mut().pop(identifier)?;
                 }
                 Instruction::GrowStack => {
-                    environment.scope.grow_stack();
+                    environment.get_scope_mut().grow_stack();
                 }
                 Instruction::ShrinkStack => {
-                    environment.scope.shrink_stack();
+                    environment.get_scope_mut().shrink_stack();
                 }
                 Instruction::EvaluateExpression { expression, target } => {
                     let eval_result = expression.eval(&environment)?;
@@ -693,7 +693,7 @@ impl CompiledProcedureBuilder {
             }
             CompiledProcedureBuilderState::ForStatement {
                 variable_ident,
-                in_keyword_read,
+                in_keyword_read: _,
                 iterator_expression,
                 parenthesis_index,
             } => {

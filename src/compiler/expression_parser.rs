@@ -1,5 +1,3 @@
-use std::{collections::HashMap, rc::Rc};
-
 use crate::{
     compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack},
     lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
@@ -9,7 +7,7 @@ use crate::{
                 AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression,
                 MultiplyExpression, PowerExpression, SubtractExpression,
             }, boolean::{AndExpression, NotExpression, OrExpression}
-        }, scope::{ScopeAddress, ScopeAddressant}
+        }, scope::ScopeAddressant
     },
 };
 

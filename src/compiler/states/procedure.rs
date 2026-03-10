@@ -2,10 +2,10 @@ use crate::{
     compiler::{
         decorators::EntrypointDecorator,
         states::{
-            decorator::{self, RawDecorator},
+            decorator::RawDecorator,
             module::CompilerModuleState,
         },
-        Compiler, CompilerEnvironment, CompilerError, CompilerState, NoExpressionEnvironment,
+        CompilerEnvironment, CompilerError, CompilerState,
     },
     lexer::token::{ParenthesisType, PunctuationToken, Token},
     runtime::{module::Module, procedures::CompiledProcedureBuilder, ModuleAddress},

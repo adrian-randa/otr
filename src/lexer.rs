@@ -1,19 +1,14 @@
-use std::str::{Chars, FromStr};
-
-use derive_more::IntoIterator;
-
-use crate::error::{Error, Result};
+use crate::error::Result;
 
 use crate::lexer::fragmenter::{Fragment, FragmentStream};
 use crate::lexer::token::{ContextualizedToken, ContextualizedTokenStream};
 use crate::{
-    error::{fragmenter_error::FragmentationError, tokenizer_error::TokenizerError},
     lexer::{
         rules::{
             BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
             PatternRule, StringLiteralRule,
         },
-        token::{Token, TokenStream},
+        token::Token,
     },
 };
 

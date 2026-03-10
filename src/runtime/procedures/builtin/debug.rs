@@ -1,3 +1,4 @@
+use crate::runtime::environment::Environment;
 use crate::runtime::module::Module;
 use crate::runtime::{module::CompiledModule, procedures::Procedure, RuntimeError, Value};
 
@@ -18,7 +19,7 @@ pub(crate) struct DebugPrintProcedure;
 impl Procedure for DebugPrintProcedure {
     fn call(
         &self,
-        environment: crate::runtime::environment::Environment,
+        _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
         let arg = arguments.get(0).ok_or(
@@ -40,7 +41,7 @@ pub(crate) struct DebugPrintlnProcedure;
 impl Procedure for DebugPrintlnProcedure {
     fn call(
         &self,
-        environment: crate::runtime::environment::Environment,
+        _environment: crate::runtime::environment::Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
         let arg = arguments.get(0).ok_or(

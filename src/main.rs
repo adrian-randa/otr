@@ -1,35 +1,6 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    env,
-    fs::{self, read_to_string},
-    rc::Rc,
-    str::FromStr,
-};
+use std::env;
 
-use otr::{
-    compiler::{
-        expression_parser::ExpressionParser,
-        file_reader::{FileReader, ImportAddress},
-        Compiler,
-    },
-    lexer::{
-        fragmenter::FragmentStream,
-        token::{PunctuationToken, Token},
-        Tokenizer,
-    },
-    runtime::{
-        environment::Environment,
-        expressions::{
-            arithmetic::AddExpression, boolean::NotExpression, EqualityExpression,
-            ProcedureCallExpression, VariableExpression,
-        },
-        module::CompiledModule,
-        procedures::{CompiledProcedure, CompiledProcedureBuilder, Instruction, Procedure},
-        scope::{Scope, ScopeAddressant},
-        Expression, ModuleAddress, Struct, Value,
-    },
-};
+use otr::{compiler::{Compiler, file_reader::{FileReader, ImportAddress}}, lexer::Tokenizer};
 
 fn main() {
     let mut file_reader = FileReader::new(Tokenizer::default(), env::current_dir().unwrap());

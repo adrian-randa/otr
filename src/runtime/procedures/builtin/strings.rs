@@ -1,5 +1,6 @@
 use num::ToPrimitive;
 
+use crate::runtime::environment::Environment;
 use crate::runtime::module::Module;
 use crate::runtime::Type;
 use crate::runtime::{module::CompiledModule, procedures::Procedure, RuntimeError, Value};
@@ -153,7 +154,7 @@ pub(crate) struct FromBytesProcedure;
 impl Procedure for FromBytesProcedure {
     fn call(
         &self,
-        environment: crate::runtime::environment::Environment,
+        _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
         let value = arguments.get(0).ok_or(
