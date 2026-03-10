@@ -179,7 +179,7 @@ impl TryFrom<LiteralToken> for Value {
 }
 
 impl Value {
-    pub fn get_type_id(&self) -> Type {
+    pub(crate) fn get_type_id(&self) -> Type {
         match self {
             Value::Null => Type::Null,
             Value::Integer(_) => Type::Integer,
@@ -218,7 +218,7 @@ impl Value {
         self.apply_to_submember(Self::get_value, address, contained_module_id, ())
     }
 
-    fn get_value(&self, _: ()) -> Result<Value> {
+    pub(crate) fn get_value(&self, _: ()) -> Result<Value> {
         match self {
             Value::Struct(ref_cell) => {
                 if ref_cell.borrow().is_none() {
@@ -242,7 +242,7 @@ impl Value {
         self.apply_to_submember(Self::reference_value, address, contained_module_id, ())
     }
 
-    fn reference_value(&self, _: ()) -> Result<Value> {
+    pub(crate) fn reference_value(&self, _: ()) -> Result<Value> {
         match self {
             Value::Struct(ref_cell) => {
                 if ref_cell.borrow().is_none() {
@@ -269,7 +269,7 @@ impl Value {
         self.apply_to_submember(Self::get_value_type, address, contained_module_id, ())
     }
 
-    fn get_value_type(&self, _: ()) -> Result<Value> {
+    pub(crate) fn get_value_type(&self, _: ()) -> Result<Value> {
         Ok(Value::Type(self.get_type_id()))
     }
 
@@ -287,7 +287,7 @@ impl Value {
         Ok(())
     }
 
-    fn clone_value(&self, _: ()) -> Result<Value> {
+    pub(crate) fn clone_value(&self, _: ()) -> Result<Value> {
         if let Value::StructRef(weak) = self {
             let rc = weak
                 .upgrade()
@@ -303,7 +303,7 @@ impl Value {
         self.apply_to_submember(Self::clone_value, address, contained_module_id, ())
     }
 
-    fn apply_to_submember<Args, T>(
+    pub(crate) fn apply_to_submember<Args, T>(
         &self,
         function: impl Fn(&Self, Args) -> Result<T>,
         mut address: IntoIter<ScopeAddressant>,
@@ -346,11 +346,11 @@ impl Value {
 
                             if module_id_matches {
                                 members
-                                    .get_member(&ident)?
+                                    .get_unchecked(&ident)?
                                     .apply_to_submember(function, address, contained_module_id, args)
                             } else {
                                 members
-                                    .get_public_member(&ident)?
+                                    .get(&ident)?
                                     .apply_to_submember(function, address, contained_module_id, args)
                             }
                         } else {
@@ -377,11 +377,11 @@ impl Value {
 
                             if module_id_matches {
                                 members
-                                    .get_member(&ident)?
+                                    .get_unchecked(&ident)?
                                     .apply_to_submember(function, address, contained_module_id, args)
                             } else {
                                 members
-                                    .get_public_member(&ident)?
+                                    .get(&ident)?
                                     .apply_to_submember(function, address, contained_module_id, args)
                             }
                         } else {
@@ -412,7 +412,7 @@ impl Value {
         }
     }
 
-    fn apply_to_submember_mut<Args, T>(
+    pub(crate) fn apply_to_submember_mut<Args, T>(
         &mut self,
         function: impl Fn(&mut Self, Args) -> Result<T>,
         mut address: IntoIter<ScopeAddressant>,
@@ -455,11 +455,11 @@ impl Value {
 
                             if module_id_matches {
                                 members
-                                    .get_member_mut(&ident)?
+                                    .get_unchecked_mut(&ident)?
                                     .apply_to_submember_mut(function, address, contained_module_id, args)
                             } else {
                                 members
-                                    .get_public_member_mut(&ident)?
+                                    .get_mut(&ident)?
                                     .apply_to_submember_mut(function, address, contained_module_id, args)
                             }
                         } else {
@@ -486,11 +486,11 @@ impl Value {
 
                             if module_id_matches {
                                 members
-                                    .get_member_mut(&ident)?
+                                    .get_unchecked_mut(&ident)?
                                     .apply_to_submember_mut(function, address, contained_module_id, args)
                             } else {
                                 members
-                                    .get_public_member_mut(&ident)?
+                                    .get_mut(&ident)?
                                     .apply_to_submember_mut(function, address, contained_module_id, args)
                             }
                         } else {
@@ -581,15 +581,15 @@ impl From<(bool, Value)> for Member {
 }
 
 impl Member {
-    pub fn get_value(&self) -> &Value {
+    pub fn get_unchecked(&self) -> &Value {
         &self.value
     }
 
-    pub fn get_value_mut(&mut self) -> &mut Value {
+    pub fn get_unchecked_mut(&mut self) -> &mut Value {
         &mut self.value
     }
 
-    pub fn get_value_if_public(&self) -> Result<&Value> {
+    pub fn get(&self) -> Result<&Value> {
         if self.is_public {
             Ok(&self.value)
         } else {
@@ -597,30 +597,24 @@ impl Member {
         }
     }
 
-    pub fn get_value_mut_if_public(&mut self) -> Result<&mut Value> {
+    pub fn get_mut(&mut self) -> Result<&mut Value> {
         if self.is_public {
-            Ok(&mut self.value)
+            Ok(self.get_unchecked_mut())
         } else {
             Err(RuntimeError::FieldIsPrivate.boxed())
         }
     }
 
-    pub fn set_value(&mut self, value: Value) {
+    fn set_unchecked(&mut self, value: Value) {
         self.value = value;
     }
 
-    pub fn set_if_public(&mut self, value: Value) -> Result<()> {
+    pub fn set(&mut self, value: Value) -> Result<()> {
         if self.is_public {
-            self.value = value;
-            Ok(())
+            Ok(self.set_unchecked(value))
         } else {
             Err(RuntimeError::FieldIsPrivate.boxed())
         }
-    }
-
-    fn set(&mut self, value: Value) -> Result<()> {
-        self.value = value;
-        Ok(())
     }
 }
 
@@ -636,7 +630,7 @@ impl MemberMap {
         }
     }
 
-    pub fn insert_member(&mut self, ident: String, value: Value, is_public: bool) -> Result<()> {
+    pub fn insert(&mut self, ident: String, value: Value, is_public: bool) -> Result<()> {
         if self
             .members
             .insert(ident.clone(), Member { value, is_public })
@@ -648,7 +642,7 @@ impl MemberMap {
         Ok(())
     }
 
-    pub fn get_member(&self, ident: &String) -> Result<&Value> {
+    pub fn get_unchecked(&self, ident: &String) -> Result<&Value> {
         let member = self.members.get(ident).ok_or(
             RuntimeError::NoSuchMember {
                 member_identifier: ident.clone(),
@@ -656,10 +650,10 @@ impl MemberMap {
             .boxed(),
         )?;
 
-        Ok(member.get_value())
+        Ok(member.get_unchecked())
     }
 
-    pub fn get_member_mut(&mut self, ident: &String) -> Result<&mut Value> {
+    pub fn get_unchecked_mut(&mut self, ident: &String) -> Result<&mut Value> {
         let member = self.members.get_mut(ident).ok_or(
             RuntimeError::NoSuchMember {
                 member_identifier: ident.clone(),
@@ -667,10 +661,10 @@ impl MemberMap {
             .boxed(),
         )?;
 
-        Ok(member.get_value_mut())
+        Ok(member.get_unchecked_mut())
     }
 
-    pub fn get_public_member(&self, ident: &String) -> Result<&Value> {
+    pub fn get(&self, ident: &String) -> Result<&Value> {
         let member = self.members.get(ident).ok_or(
             RuntimeError::NoSuchMember {
                 member_identifier: ident.clone(),
@@ -678,10 +672,10 @@ impl MemberMap {
             .boxed(),
         )?;
 
-        member.get_value_if_public()
+        member.get()
     }
 
-    pub fn get_public_member_mut(&mut self, ident: &String) -> Result<&mut Value> {
+    pub fn get_mut(&mut self, ident: &String) -> Result<&mut Value> {
         let member = self.members.get_mut(ident).ok_or(
             RuntimeError::NoSuchMember {
                 member_identifier: ident.clone(),
@@ -689,21 +683,10 @@ impl MemberMap {
             .boxed(),
         )?;
 
-        member.get_value_mut_if_public()
+        member.get_mut()
     }
 
-    pub fn set_public_member(&mut self, ident: &String, value: Value) -> Result<()> {
-        let member = self.members.get_mut(ident).ok_or(
-            RuntimeError::NoSuchMember {
-                member_identifier: ident.clone(),
-            }
-            .boxed(),
-        )?;
-
-        member.set_if_public(value)
-    }
-
-    pub fn set_member(&mut self, ident: &String, value: Value) -> Result<()> {
+    pub fn set(&mut self, ident: &String, value: Value) -> Result<()> {
         let member = self.members.get_mut(ident).ok_or(
             RuntimeError::NoSuchMember {
                 member_identifier: ident.clone(),
@@ -712,6 +695,18 @@ impl MemberMap {
         )?;
 
         member.set(value)
+    }
+
+    pub fn set_unchecked(&mut self, ident: &String, value: Value) -> Result<()> {
+        let member = self.members.get_mut(ident).ok_or(
+            RuntimeError::NoSuchMember {
+                member_identifier: ident.clone(),
+            }
+            .boxed(),
+        )?;
+
+        member.set_unchecked(value);
+        Ok(())
     }
 
     pub fn len(&self) -> usize {
@@ -741,47 +736,51 @@ impl Display for ModuleAddress {
 }
 
 impl ModuleAddress {
-    pub fn new(module_id: String, identifier: String) -> Self {
+    pub(crate) fn new(module_id: String, identifier: String) -> Self {
         Self {
             module_id,
             identifier,
         }
     }
 
-    pub fn get_module_id(&self) -> &String {
+    pub(crate) fn get_module_id(&self) -> &String {
         &self.module_id
     }
 
-    pub fn get_identifier(&self) -> &String {
+    pub(crate) fn get_identifier(&self) -> &String {
         &self.identifier
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
-    //TODO: Remove public visibility
-    pub struct_id: ModuleAddress,
-    pub members: MemberMap,
+    struct_id: ModuleAddress,
+    members: MemberMap,
 }
 
 impl Struct {
-    pub fn new(struct_id: ModuleAddress) -> Self {
+    pub(crate) fn new(struct_id: ModuleAddress) -> Self {
         Self {
             struct_id,
             members: MemberMap::new(),
         }
     }
 
-    pub fn get_struct_id(&self) -> &ModuleAddress {
+    pub(crate) fn get_struct_id(&self) -> &ModuleAddress {
         &self.struct_id
     }
 
-    pub fn get_members(&self) -> &MemberMap {
+    pub(crate) fn get_members(&self) -> &MemberMap {
         &self.members
     }
 
-    pub fn get_members_mut(&mut self) -> &mut MemberMap {
+    pub(crate) fn get_members_mut(&mut self) -> &mut MemberMap {
         &mut self.members
+    }
+
+    pub(crate) fn with_member(mut self, ident: String, value: Value, is_public: bool) -> Result<Self> {
+        self.get_members_mut().insert(ident, value, is_public)?;
+        Ok(self)
     }
 }
 
@@ -794,7 +793,7 @@ impl std::fmt::Display for Struct {
             self.get_members()
                 .members
                 .iter()
-                .map(|(label, value)| { label.to_string() + ": " + &value.get_value().to_string() })
+                .map(|(label, value)| { label.to_string() + ": " + &value.get_unchecked().to_string() })
                 .join(", ")
         )
     }

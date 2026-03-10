@@ -23,6 +23,8 @@ pub enum KeywordToken {
     Proc,
     Struct,
     Return,
+    Throw,
+    Catch,
     For,
     While,
     If,

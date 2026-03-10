@@ -1,16 +1,13 @@
 use std::{any::Any, collections::HashMap};
 
 use crate::{
-    compiler::{expression_parser::ExpressionParser, ExpressionParseEnvironment},
-    error::{compiler_error::CompilerError, Error},
+    compiler::{ExpressionParseEnvironment, expression_parser::ExpressionParser},
+    error::{Error, compiler_error::CompilerError, value_error::ValueError},
     lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
     runtime::{
-        expressions::{
-            boolean::NotExpression, AssociatedProcedureCallExpression, EqualityExpression,
-            ReferenceExpression, TypeofVariableExpression, VariableExpression,
-        },
-        scope::ScopeAddress,
-        Environment, Expression, RuntimeError, ScopeAddressant, Value,
+        Environment, Expression, RuntimeError, ScopeAddressant, Value, expressions::{
+            AssociatedProcedureCallExpression, EqualityExpression, ReferenceExpression, TypeofVariableExpression, VariableExpression, boolean::NotExpression
+        }, scope::ScopeAddress
     },
 };
 
@@ -22,7 +19,6 @@ pub trait Procedure: std::fmt::Debug {
 
 #[derive(Debug)]
 pub enum Instruction {
-    //TODO: Remove public viisibility
     PushVarToScope {
         identifier: String,
     },
@@ -42,13 +38,15 @@ pub enum Instruction {
     Return {
         expression: Box<dyn Expression>,
     },
+    Throw {
+        expression: Box<dyn Expression>,
+    }
 }
 
 #[derive(Debug)]
 pub struct CompiledProcedure {
-    //TODO: Remove public visibility
-    pub arguments_identifiers: Vec<String>,
-    pub instructions: Vec<Instruction>,
+    arguments_identifiers: Vec<String>,
+    instructions: Vec<Instruction>,
 }
 
 impl Procedure for CompiledProcedure {
@@ -89,7 +87,7 @@ impl Procedure for CompiledProcedure {
                     condition_expression: procedure,
                     jump_target,
                 } => {
-                    let returned_value = procedure.eval(&mut environment)?;
+                    let returned_value = procedure.eval(&environment)?;
 
                     match returned_value {
                         Value::Bool(value) => {
@@ -107,9 +105,10 @@ impl Procedure for CompiledProcedure {
                         }
                     }
                 }
-                Instruction::Return {
-                    expression: procedure,
-                } => return procedure.eval(&mut environment),
+                Instruction::Return { expression} => return expression.eval(&environment),
+                Instruction::Throw { expression } => {
+                    return Err(Box::new(ValueError::new(expression.eval(&environment)?)))
+                },
             }
 
             pc += 1;
@@ -252,6 +251,9 @@ enum CompiledProcedureBuilderState {
     Return {
         expression: Vec<Token>,
     },
+    Throw {
+        expression: Vec<Token>,
+    },
 }
 
 pub struct CompiledProcedureBuilder {
@@ -353,6 +355,11 @@ impl CompiledProcedureBuilder {
                 }
                 Token::Keyword(KeywordToken::Return) => {
                     self.state = Return {
+                        expression: Vec::new(),
+                    };
+                }
+                Token::Keyword(KeywordToken::Throw) => {
+                    self.state = Throw {
                         expression: Vec::new(),
                     };
                 }
@@ -551,6 +558,9 @@ impl CompiledProcedureBuilder {
             Return { expression } => {
                 expression.push(token);
             }
+            Throw { expression } => {
+                expression.push(token);
+            },
         }
 
         Ok(self)
@@ -802,6 +812,17 @@ impl CompiledProcedureBuilder {
                     .instructions
                     .push(Instruction::Return { expression });
             }
+            CompiledProcedureBuilderState::Throw { expression } => {
+                let expression = if expression.is_empty() {
+                    Box::new(Value::Null)
+                } else {
+                    ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?
+                };
+
+                self.procedure
+                    .instructions
+                    .push(Instruction::Throw { expression });
+            },
         }
         self.state = CompiledProcedureBuilderState::Base;
         Ok(self)

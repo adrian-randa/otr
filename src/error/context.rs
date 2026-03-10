@@ -6,12 +6,17 @@ use crate::runtime::{module::CompiledModule, ModuleAddress};
 
 use super::Error;
 
+#[derive(Debug)]
 pub(crate) struct ProcedureContextDecorator {
     error: Box<dyn Error>,
     procedure_id: ModuleAddress,
 }
 
-impl Error for ProcedureContextDecorator {}
+impl Error for ProcedureContextDecorator {
+    fn to_value(&self) -> crate::runtime::Value {
+        self.error.to_value()
+    }
+}
 
 impl std::fmt::Display for ProcedureContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -34,13 +39,18 @@ impl ProcedureContextDecorator {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct AssociatedProcedureContextDecorator {
     error: Box<dyn Error>,
     struct_id: ModuleAddress,
     procedure_identifier: String,
 }
 
-impl Error for AssociatedProcedureContextDecorator {}
+impl Error for AssociatedProcedureContextDecorator {
+    fn to_value(&self) -> crate::runtime::Value {
+        self.error.to_value()
+    }
+}
 
 impl std::fmt::Display for AssociatedProcedureContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -69,6 +79,7 @@ impl AssociatedProcedureContextDecorator {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct SourceFileContextDecorator {
     pub(crate) error: Box<dyn Error>,
 
@@ -77,7 +88,11 @@ pub(crate) struct SourceFileContextDecorator {
     pub(crate) column: usize,
 }
 
-impl Error for SourceFileContextDecorator {}
+impl Error for SourceFileContextDecorator {
+    fn to_value(&self) -> crate::runtime::Value {
+        self.error.to_value()
+    }
+}
 
 impl std::fmt::Display for SourceFileContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -96,13 +111,18 @@ impl SourceFileContextDecorator {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct HintContextDecorator {
     pub(crate) error: Box<dyn Error>,
 
     pub(crate) message: String,
 }
 
-impl Error for HintContextDecorator {}
+impl Error for HintContextDecorator {
+    fn to_value(&self) -> crate::runtime::Value {
+        self.error.to_value()
+    }
+}
 
 impl std::fmt::Display for HintContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -122,13 +142,18 @@ impl HintContextDecorator {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct VariableContextDecorator {
     pub(crate) error: Box<dyn Error>,
 
     pub(crate) member_ident: String,
 }
 
-impl Error for VariableContextDecorator {}
+impl Error for VariableContextDecorator {
+    fn to_value(&self) -> crate::runtime::Value {
+        self.error.to_value()
+    }
+}
 
 impl std::fmt::Display for VariableContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

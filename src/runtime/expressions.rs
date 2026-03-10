@@ -69,7 +69,7 @@ impl Expression for StructConstructionExpression {
 
         for (field, expr) in &self.field_overrides {
             let value = expr.eval(environment)?;
-            instance.get_members_mut().set_member(field, value)?;
+            instance.get_members_mut().set_unchecked(field, value)?;
         }
 
         Ok(Value::Struct(Rc::new(RefCell::new(Some(instance)))))
@@ -270,6 +270,28 @@ impl Expression for AssociatedProcedureCallExpression {
                 self.procedure_ident.clone(),
             )
         })?)
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct CatchExpression {
+    expression: Box<dyn Expression>,
+}
+
+impl Expression for CatchExpression {
+    fn eval(&self, environment: &Environment) -> Result<Value> {
+        Ok(
+            match self.expression.eval(environment) {
+                Ok(value) => value,
+                Err(err) => err.to_value(),
+            }
+        )
+    }
+}
+
+impl CatchExpression {
+    pub(crate) fn new(expression: Box<dyn Expression>) -> Self {
+        Self { expression }
     }
 }
 

@@ -14,7 +14,11 @@ pub enum FragmentationError {
     },
 }
 
-impl Error for FragmentationError {}
+impl Error for FragmentationError {
+    fn to_value(&self) -> crate::runtime::Value {
+        panic!("Fragmentation Errors cannot be turned into values!")
+    }
+}
 
 impl std::fmt::Display for FragmentationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

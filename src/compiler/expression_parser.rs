@@ -1,22 +1,15 @@
 use std::{collections::HashMap, rc::Rc};
 
 use crate::{
-    compiler::{parenthesis::ParenthesisStack, CompilerError, ExpressionParseEnvironment},
+    compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack},
     lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
     runtime::{
-        expressions::{
-            arithmetic::{
+        Expression, ModuleAddress, Type, Value, expressions::{
+            ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{
                 AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression,
                 MultiplyExpression, PowerExpression, SubtractExpression,
-            },
-            boolean::{AndExpression, NotExpression, OrExpression},
-            ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression,
-            CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression,
-            StructConstructionExpression, StructMemberExpression, TypeofVariableExpression,
-            VariableExpression,
-        },
-        scope::{ScopeAddress, ScopeAddressant},
-        Expression, ModuleAddress, Type, Value,
+            }, boolean::{AndExpression, NotExpression, OrExpression}
+        }, scope::{ScopeAddress, ScopeAddressant}
     },
 };
 
@@ -444,6 +437,14 @@ impl ExpressionAtomParser {
 
             match self.state {
                 Base => match token {
+                    Token::Keyword(KeywordToken::Catch) => {
+                        self.state = Subexpression {
+                            subexpression: Box::new(CatchExpression::new(
+                                ExpressionParser::parse(&mut tokens, environment)?
+                            ))
+                        };
+                    }
+
                     Token::Literal(literal) => {
                         self.state = Subexpression {
                             subexpression: Box::new(Value::try_from(literal)?),

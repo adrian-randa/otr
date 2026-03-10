@@ -28,7 +28,7 @@ fn directory(path: String) -> Struct {
     let mut dir = Struct::new(ModuleAddress::new("Files".into(), "Directory".into()));
     let _ = dir
         .get_members_mut()
-        .insert_member("path".into(), Value::String(path), true);
+        .insert("path".into(), Value::String(path), true);
     dir
 }
 
@@ -36,7 +36,7 @@ fn file(path: String) -> Struct {
     let mut f = Struct::new(ModuleAddress::new("Files".into(), "File".into()));
     let _ = f
         .get_members_mut()
-        .insert_member("path".into(), Value::String(path), true);
+        .insert("path".into(), Value::String(path), true);
     f
 }
 

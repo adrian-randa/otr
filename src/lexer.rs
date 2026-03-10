@@ -91,6 +91,8 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("let".into(), Keyword(Let)))
             .with_rule(KeywordRule::new("proc".into(), Keyword(Proc)))
             .with_rule(KeywordRule::new("return".into(), Keyword(Return)))
+            .with_rule(KeywordRule::new("throw".into(), Keyword(Throw)))
+            .with_rule(KeywordRule::new("catch".into(), Keyword(Catch)))
             .with_rule(KeywordRule::new("struct".into(), Keyword(Struct)))
             .with_rule(KeywordRule::new("while".into(), Keyword(While)))
             .with_rule(KeywordRule::new("if".into(), Keyword(If)))

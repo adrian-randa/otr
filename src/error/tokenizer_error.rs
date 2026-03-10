@@ -3,7 +3,11 @@ use colored::{Color, Colorize};
 #[derive(Debug)]
 pub enum TokenizerError {}
 
-impl super::Error for TokenizerError {}
+impl super::Error for TokenizerError {
+    fn to_value(&self) -> crate::runtime::Value {
+        panic!("Tokenizer Errors cannot be turned into values!")
+    }
+}
 
 impl std::fmt::Display for TokenizerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

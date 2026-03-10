@@ -1,3 +1,4 @@
+use crate::runtime::Value;
 use crate::runtime::{expressions::Expression, Environment, RuntimeError};
 
 use crate::error::Result;
@@ -123,14 +124,20 @@ impl DivideExpression {
 }
 
 impl Expression for DivideExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
+    fn eval(&self, environment: &Environment) -> Result<Value> {
         use super::Value::*;
 
         let lhs = self.lhs.eval(environment)?;
         let rhs = self.rhs.eval(environment)?;
 
         match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Integer(l / r)),
+            (Integer(l), Integer(r)) => {
+                if r == 0 {
+                    Err(Box::new(RuntimeError::DivisionByZero))
+                } else {
+                    Ok(Value::Integer(l / r))
+                }
+            },
             (Float(l), Float(r)) => Ok(Float(l / r)),
 
             (l, r) => Err(RuntimeError::Unknown {

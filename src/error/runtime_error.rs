@@ -1,6 +1,8 @@
+use std::{cell::RefCell, rc::Rc};
+
 use colored::Colorize;
 
-use crate::runtime::Type;
+use crate::runtime::{ModuleAddress, Struct, Type, Value};
 
 #[derive(Debug)]
 pub enum RuntimeError {
@@ -63,17 +65,16 @@ pub enum RuntimeError {
     ModuleNotLoaded {
         module_identifier: String,
     },
+    DivisionByZero,
 
     Unknown {
         message: String,
     },
 }
 
-impl super::Error for RuntimeError {}
-
-impl std::fmt::Display for RuntimeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message = match self {
+impl RuntimeError {
+    pub(crate) fn get_message(&self) -> String {
+        match self {
             RuntimeError::IndexingNotAccepted { ty } => 
                 format!("Indexing not allowed on values of type {ty}!"),
             RuntimeError::MembersNotAccepted { ty } => 
@@ -118,14 +119,54 @@ impl std::fmt::Display for RuntimeError {
                 format!("Module '{module_identifier}' is not loaded!"),
             RuntimeError::Unknown { message } => 
                 format!("{message}"),
+            RuntimeError::DivisionByZero => 
+                format!("Division by zero!"),
+        }
+    }
+}
+
+impl super::Error for RuntimeError {
+    fn to_value(&self) -> Value {
+        let err = |variant: &str| {
+            Value::Struct(Rc::new(RefCell::new(Some(
+                Struct::new(ModuleAddress::new("Errors".into(), variant.into()))
+                    .with_member("message".into(), Value::String(self.get_message() + "Error"), false).unwrap()
+            ))))
         };
 
-        write!(
-            f,
-            "{} {}",
-            "Runtime Error!".on_red(),
-            (&message as &str).red()
-        )
+        match self {
+            RuntimeError::IndexingNotAccepted { ty: _ } => err("IndexingNotAccepted"),
+            RuntimeError::MembersNotAccepted { ty: _ } => err("MembersNotAccepted"),
+            RuntimeError::AddressantsNotAccepted { ty: _ } => err("AddressantsNotAccepted"),
+            RuntimeError::IndexOutOfBounds { array_length: _, index: _ } => err("IndexOutOfBounds"),
+            RuntimeError::NoSuchMember { member_identifier: _ } => err("NoSuchMember"),
+            RuntimeError::UseOfMovedValue => err("UseOfMovedValue"),
+            RuntimeError::UseOfDroppedValue => err("UseOfDroppedValue"),
+            RuntimeError::CannotReference { ty: _ } => err("CannotReference"),
+            RuntimeError::FieldIsPrivate => err("FieldIsPrivate"),
+            RuntimeError::KeyAlreadyPresent { key: _ } => err("KeyAlreadyPresent"),
+            RuntimeError::NoEntrypoint => err("NoEntrypoint"),
+            RuntimeError::TypeMismatch { expected: _, found: _ } => err("TypeMismatch"),
+            RuntimeError::VariableAlreadyPresent { variable_identifier: _ } => err("VariableAlreadyPresent"),
+            RuntimeError::NoSuchVariable { variable_identifier: _ } => err("NoSuchVariable"),
+            RuntimeError::ProcedureNotExported { procedure_identifier: _ } => err("NotExported"),
+            RuntimeError::AssociatedProcedureNotExported { procedure_identifier: _, struct_identifier: _ } => err("NotExported"),
+            RuntimeError::StructNotExported { struct_identifier: _ } => err("NotExported"),
+            RuntimeError::ProcedureNotDefined { procedure_identifier: _ } => err("NotDefined"),
+            RuntimeError::StructNotDefined { struct_identifier: _ } => err("NotDefined"),
+            RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: _, struct_identifier: _ } => err("NotDefined"),
+            RuntimeError::ModuleNotLoaded { module_identifier: _ } => err("ModuleNotLoaded"),
+            RuntimeError::Unknown { message: _ } => err("Unknown"),
+            RuntimeError::DivisionByZero => err("DivisionByZero"),
+        }
+    }
+}
+
+impl std::fmt::Display for RuntimeError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let message = self.get_message();
+
+        write!(f, "{} {}", "Runtime Error:".on_red(), (&message as &str).red())
     }
 }
 

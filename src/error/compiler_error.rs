@@ -32,7 +32,11 @@ pub(crate) enum CompilerError {
     },
 }
 
-impl super::Error for CompilerError {}
+impl super::Error for CompilerError {
+    fn to_value(&self) -> crate::runtime::Value {
+        panic!("Compiler Errors cannot be turned into values!")
+    }
+}
 
 impl std::fmt::Display for CompilerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
