@@ -14,19 +14,6 @@ use crate::{
 
 use crate::error::Result;
 
-#[derive(Debug)]
-pub struct ProcedureCallExpression {
-    //TODO: Remove public visibility
-    pub procedure_id: ModuleAddress,
-    pub arguments: Vec<Box<dyn Expression>>,
-}
-
-impl ErrorContextualizer for ProcedureCallExpression {
-    fn contextualize(&self, error: Box<dyn Error>) -> Box<dyn Error> {
-        ProcedureContextDecorator::new_boxed(error, self.procedure_id.clone())
-    }
-}
-
 impl Expression for ProcedureCallExpression {
     fn eval(&self, environment: &Environment) -> Result<Value> {
         let procedure = environment.get_procedure_by_address(&self.procedure_id)?;

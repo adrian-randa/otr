@@ -3,10 +3,10 @@ use std::{collections::HashMap, rc::Rc};
 use derive_more::{Deref, IntoIterator};
 
 use crate::{
-    compiler::{expression_parser::ExpressionParser, NoExpressionEnvironment},
-    error::{compiler_error::CompilerError, Error},
+    compiler::{NoExpressionEnvironment, expression_parser::ExpressionParser},
+    error::{Error, compiler_error::CompilerError},
     lexer::token::{ParenthesisType, PunctuationToken, Token},
-    runtime::{environment::Environment, Expression, RuntimeError, Value},
+    runtime::{Expression, RuntimeError, Value, environment::Environment, scope::vec_map::VecMap},
 };
 
 use crate::error::Result;
@@ -136,8 +136,10 @@ impl ScopeAddress {
 #[derive(Deref, IntoIterator)]
 pub(crate) struct BakedScopeAddress(Vec<ScopeAddressant>);
 
+pub mod vec_map;
+
 #[derive(Debug, Clone)]
-struct Stack(Vec<HashMap<String, Value>>);
+struct Stack(Vec<VecMap<String, Value>>);
 
 impl Default for Stack {
     fn default() -> Self {
@@ -147,20 +149,30 @@ impl Default for Stack {
 
 impl Stack {
     fn new() -> Self {
-        Self(vec![HashMap::new()])
+        Self(vec![VecMap::new()])
     }
 
-    fn from_members(members: HashMap<String, Value>) -> Self {
-        Self(vec![members])
+    fn from_members(members: impl IntoIterator<Item = (String, Value)>) -> Self {
+        let mut map = VecMap::new();
+
+        for (key, value) in members {
+            map.insert(key, value);
+        }
+
+        Self(vec![map])
     }
 
-    fn insert_members(&mut self, members: HashMap<String, Value>) {
+    fn insert_members(&mut self, members: impl IntoIterator<Item = (String, Value)>) {
         let last = self.0.len() - 1;
-        self.0[last].extend(members.into_iter());
+        let last = &mut  self.0[last];
+        
+        for (key, value) in members {
+            last.insert(key, value);
+        }
     }
 
     fn grow(&mut self) {
-        self.0.push(HashMap::new());
+        self.0.push(VecMap::new());
     }
 
     fn shrink(&mut self) {

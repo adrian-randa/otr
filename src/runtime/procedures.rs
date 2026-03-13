@@ -13,42 +13,9 @@ use crate::{
 
 use crate::error::Result;
 
-pub trait Procedure: std::fmt::Debug {
-    fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value>;
-}
 
-#[derive(Debug)]
-pub enum Instruction {
-    PushVarToScope {
-        identifier: String,
-    },
-    PopVarFromScope {
-        identifier: String,
-    },
-    GrowStack,
-    ShrinkStack,
-    EvaluateExpression {
-        expression: Box<dyn Expression>,
-        target: Option<ScopeAddress>,
-    },
-    JumpConditional {
-        condition_expression: Box<dyn Expression>,
-        jump_target: usize,
-    },
-    Return {
-        expression: Box<dyn Expression>,
-    },
-    Throw {
-        expression: Box<dyn Expression>,
-    }
-}
 
-#[derive(Debug)]
-pub struct CompiledProcedure {
-    arguments_identifiers: Vec<String>,
-    instructions: Vec<Instruction>,
-}
-
+// TODO: Use this code for the 'run_procedure' function
 impl Procedure for CompiledProcedure {
     fn call(&self, mut environment: Environment, arguments: Vec<Value>) -> Result<Value> {
         let members = HashMap::from_iter(
@@ -118,6 +85,8 @@ impl Procedure for CompiledProcedure {
     }
 }
 
+
+// TODO: Move this code into the compiler
 trait ScopeExcapeHandler: std::fmt::Debug {
     fn resolve(&self, instructions: &mut Vec<Instruction>);
 
