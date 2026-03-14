@@ -1,4 +1,8 @@
-use crate::error::Result;
+use std::{cell::RefCell, rc::{Rc, Weak}, vec::IntoIter};
+
+use itertools::Itertools;
+
+use crate::{core::{expression::variable::VariableAddressant, r#struct::Struct, r#type::Type}, error::{Result, context::VariableContextDecorator, runtime_error::RuntimeError}};
 
 #[derive(Debug)]
 pub enum Value {
@@ -49,51 +53,6 @@ impl PartialEq for Value {
         }
     }
 }
-
-impl TryFrom<LiteralToken> for Value {
-    type Error = Box<dyn Error>;
-
-    fn try_from(value: LiteralToken) -> std::result::Result<Self, Self::Error> {
-        match value {
-            LiteralToken::Null => Ok(Self::Null),
-            LiteralToken::Integer(num) => Ok(Self::Integer(num.parse().map_err(|_| {
-                CompilerError::LiteralParseError {
-                    ty: Type::Integer,
-                    literal: num,
-                }
-                .boxed()
-            })?)),
-            LiteralToken::Float(num) => Ok(Self::Float(num.parse().map_err(|_| {
-                CompilerError::LiteralParseError {
-                    ty: Type::Float,
-                    literal: num,
-                }
-                .boxed()
-            })?)),
-            LiteralToken::Boolean(b) => match &b as &str {
-                "true" => Ok(Self::Bool(true)),
-                "false" => Ok(Self::Bool(false)),
-                _ => Err(CompilerError::LiteralParseError {
-                    ty: Type::Bool,
-                    literal: b,
-                }
-                .boxed()),
-            },
-            LiteralToken::Char(c) => Ok(Self::Char(
-                c.chars().next().ok_or(
-                    CompilerError::LiteralParseError {
-                        ty: Type::Char,
-                        literal: c,
-                    }
-                    .boxed(),
-                )?,
-            )),
-            LiteralToken::String(str) => Ok(Self::String(str)),
-            LiteralToken::Type(ty) => Ok(Self::Type(Type::from(ty))),
-        }
-    }
-}
-
 impl Value {
     pub(crate) fn get_type_id(&self) -> Type {
         match self {
@@ -128,7 +87,7 @@ impl Value {
 
     pub(crate) fn get(
         &self,
-        address: IntoIter<ScopeAddressant>,
+        address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
     ) -> Result<Value> {
         self.apply_to_submember(Self::get_value, address, contained_module_id, ())
@@ -152,7 +111,7 @@ impl Value {
 
     pub fn reference(
         &self,
-        address: IntoIter<ScopeAddressant>,
+        address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
     ) -> Result<Value> {
         self.apply_to_submember(Self::reference_value, address, contained_module_id, ())
@@ -179,7 +138,7 @@ impl Value {
 
     pub(crate) fn get_type(
         &self,
-        address: IntoIter<ScopeAddressant>,
+        address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
     ) -> Result<Value> {
         self.apply_to_submember(Self::get_value_type, address, contained_module_id, ())
@@ -191,7 +150,7 @@ impl Value {
 
     pub(crate) fn set(
         &mut self,
-        address: IntoIter<ScopeAddressant>,
+        address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
         value: Value,
     ) -> Result<()> {
@@ -215,14 +174,14 @@ impl Value {
         }
     }
 
-    pub(crate) fn clone_member(&self, address: IntoIter<ScopeAddressant>, contained_module_id: &String) -> Result<Value> {
+    pub(crate) fn clone_member(&self, address: IntoIter<VariableAddressant>, contained_module_id: &String) -> Result<Value> {
         self.apply_to_submember(Self::clone_value, address, contained_module_id, ())
     }
 
     pub(crate) fn apply_to_submember<Args, T>(
         &self,
         function: impl Fn(&Self, Args) -> Result<T>,
-        mut address: IntoIter<ScopeAddressant>,
+        mut address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
         args: Args
     ) -> Result<T> {
@@ -231,7 +190,7 @@ impl Value {
             let result = {
                 match self {
                     Value::Array(arr) => {
-                        if let ScopeAddressant::Index(i) = addressant {
+                        if let VariableAddressant::Index(i) = addressant {
                             let arr_len = arr.len();
                             arr.get(i)
                                 .ok_or(
@@ -250,7 +209,7 @@ impl Value {
                         }
                     }
                     Value::Struct(ref_cell) => {
-                        if let ScopeAddressant::Identifier(ident) = addressant {
+                        if let VariableAddressant::Identifier(ident) = addressant {
                             let reference = ref_cell.borrow();
                             let obj = reference
                                 .as_ref()
@@ -277,7 +236,7 @@ impl Value {
                         }
                     }
                     Value::StructRef(weak) => {
-                        if let ScopeAddressant::Identifier(ident) = addressant {
+                        if let VariableAddressant::Identifier(ident) = addressant {
                             let rc = weak
                                 .upgrade()
                                 .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
@@ -331,7 +290,7 @@ impl Value {
     pub(crate) fn apply_to_submember_mut<Args, T>(
         &mut self,
         function: impl Fn(&mut Self, Args) -> Result<T>,
-        mut address: IntoIter<ScopeAddressant>,
+        mut address: IntoIter<VariableAddressant>,
         contained_module_id: &String,
         args: Args
     ) -> Result<T> {
@@ -340,7 +299,7 @@ impl Value {
             let result = {
                 match self {
                     Value::Array(arr) => {
-                        if let ScopeAddressant::Index(i) = addressant {
+                        if let VariableAddressant::Index(i) = addressant {
                             let arr_len = arr.len();
                             arr.get_mut(i)
                                 .ok_or(
@@ -359,7 +318,7 @@ impl Value {
                         }
                     }
                     Value::Struct(ref_cell) => {
-                        if let ScopeAddressant::Identifier(ident) = addressant {
+                        if let VariableAddressant::Identifier(ident) = addressant {
                             let mut reference = ref_cell.borrow_mut();
                             let obj = reference
                                 .as_mut()
@@ -386,7 +345,7 @@ impl Value {
                         }
                     }
                     Value::StructRef(weak) => {
-                        if let ScopeAddressant::Identifier(ident) = addressant {
+                        if let VariableAddressant::Identifier(ident) = addressant {
                             let rc = weak
                                 .upgrade()
                                 .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;

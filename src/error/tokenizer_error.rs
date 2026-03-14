@@ -1,10 +1,11 @@
 use colored::{Color, Colorize};
+use crate::core::value::Value;
 
 #[derive(Debug)]
 pub enum TokenizerError {}
 
 impl super::Error for TokenizerError {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         panic!("Tokenizer Errors cannot be turned into values!")
     }
 }

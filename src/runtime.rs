@@ -1,35 +1,48 @@
-use std::cell::RefCell;
-use std::fmt::Display;
-use std::rc::Weak;
-use std::vec::IntoIter;
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
-use itertools::Itertools;
-
-use crate::error::compiler_error::CompilerError;
-use crate::error::context::{HintContextDecorator, VariableContextDecorator};
+use crate::core::CompiledObject;
+use crate::core::expression::{Expression, ProcedureCallExpression};
+use crate::core::module::ModuleAddress;
+use crate::core::value::Value;
+use crate::error::context::{HintContextDecorator};
 use crate::error::runtime_error::RuntimeError;
-use crate::error::Error;
-use crate::lexer::token::{
-    LiteralToken, PrimitiveTypeToken,
-};
 use crate::runtime::environment::Environment;
-use crate::runtime::scope::ScopeAddressant;
 
 use crate::error::Result;
+use crate::runtime::expressions::eval_expression;
+use crate::runtime::module::RuntimeModule;
 
 pub mod environment;
 pub mod expressions;
 pub mod module;
 pub mod procedures;
 
-pub trait Expression: std::fmt::Debug {
-    fn eval(&self, environment: &Environment) -> Result<Value>;
+#[derive(Debug)]
+pub struct RuntimeObject<'a> {
+    pub(crate) base_environement: Environment<'a>,
+    pub(crate) entrypoint: Option<ModuleAddress>,
 }
 
+impl From<CompiledObject> for RuntimeObject<'_> {
+    fn from(mut object: CompiledObject) -> Self {
+        let mut runtime_object = Self {
+            base_environement: Environment::default(),
+            entrypoint: object.entrypoint()
+        };
 
-impl RuntimeObject {
-    pub(crate) fn new() -> Self {
+        for (identifier, module) in object {
+            runtime_object.base_environement.load_module(
+                identifier,
+                Rc::new(RuntimeModule::Compiled(module))
+            );
+        }
+
+        runtime_object    
+    }
+}
+
+impl RuntimeObject<'_> {
+    pub(crate) fn _new() -> Self {
         Self {
             base_environement: Environment::new("".into()),
             entrypoint: None,
@@ -44,9 +57,11 @@ impl RuntimeObject {
             }.boxed()
         )?;
 
-        let main_expression = ProcedureCallExpression::new(entrypoint, Vec::new());
+        let main_expression = Expression::ProcedureCall(
+            ProcedureCallExpression::new(entrypoint, Vec::new())
+        );
 
-        main_expression.eval(&self.base_environement)
+        eval_expression(&main_expression, &self.base_environement)
     }
 }
 

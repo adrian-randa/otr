@@ -1,64 +1,29 @@
-use crate::error::Result;
+use std::collections::HashMap;
 
-pub(crate) trait Module {
-    fn insert_procedure(
-        &mut self,
-        identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    );
-    fn get_procedure(
-        &self,
-        identifier: &String,
-        private_access: bool,
-    ) -> Result<&Box<dyn Procedure>>;
-    fn insert_associated_procedure(
-        &mut self,
-        struct_identifier: String,
-        procedure_identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    );
-    fn get_associated_procedure(
-        &self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
-        private_access: bool,
-    ) -> Result<&Box<dyn Procedure>>;
-    fn insert_struct(&mut self, identifier: String, prototype: Struct, exported: bool);
-    fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct>;
-    fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()>;
-    fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()>;
-    fn set_associated_precedure_visibility(
-        &mut self,
-        struct_ident: &String,
-        member_ident: &String,
-        visibility: bool,
-    ) -> Result<()>;
-}
+use crate::{core::{procedure::CompiledProcedure, r#struct::Struct}, error::{Result, compiler_error::CompilerError, runtime_error::RuntimeError}};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct CompiledModule {
     struct_prototypes: HashMap<String, (Struct, bool)>,
-    procedures: HashMap<String, (Box<dyn Procedure>, bool)>,
-    associated_procedures: HashMap<(String, String), (Box<dyn Procedure>, bool)>,
+    procedures: HashMap<String, (Box<CompiledProcedure>, bool)>,
+    associated_procedures: HashMap<(String, String), (Box<CompiledProcedure>, bool)>,
 }
 
-impl Module for CompiledModule {
-    fn insert_procedure(
+impl CompiledModule {
+    pub(crate) fn insert_procedure(
         &mut self,
         identifier: String,
-        procedure: Box<dyn Procedure>,
+        procedure: Box<CompiledProcedure>,
         exported: bool,
     ) {
         self.procedures.insert(identifier, (procedure, exported));
     }
 
-    fn get_procedure(
+    pub(crate) fn get_procedure(
         &self,
         identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>> {
+    ) -> Result<&Box<CompiledProcedure>> {
         match self.procedures.get(identifier) {
             Some((proc, exported)) => {
                 if *exported || private_access {
@@ -77,11 +42,11 @@ impl Module for CompiledModule {
         }
     }
 
-    fn insert_associated_procedure(
+    pub(crate) fn insert_associated_procedure(
         &mut self,
         struct_identifier: String,
         procedure_identifier: String,
-        procedure: Box<dyn Procedure>,
+        procedure: Box<CompiledProcedure>,
         exported: bool,
     ) {
         self.associated_procedures.insert(
@@ -90,12 +55,12 @@ impl Module for CompiledModule {
         );
     }
 
-    fn get_associated_procedure(
+    pub(crate) fn get_associated_procedure(
         &self,
         struct_identifier: &String,
         procedure_identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>> {
+    ) -> Result<&Box<CompiledProcedure>> {
         match self
             .associated_procedures
             .get(&(struct_identifier.clone(), procedure_identifier.clone()))
@@ -121,12 +86,12 @@ impl Module for CompiledModule {
         }
     }
 
-    fn insert_struct(&mut self, identifier: String, prototype: Struct, exported: bool) {
+    pub(crate) fn insert_struct(&mut self, identifier: String, prototype: Struct, exported: bool) {
         self.struct_prototypes
             .insert(identifier, (prototype, exported));
     }
 
-    fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct> {
+    pub(crate) fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct> {
         match self.struct_prototypes.get(identifier) {
             Some((prototype, exported)) => {
                 if *exported || private_access {
@@ -145,7 +110,7 @@ impl Module for CompiledModule {
         }
     }
 
-    fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
+    pub(crate) fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
         if let Some(member) = self.procedures.get_mut(member_ident) {
             member.1 = visibility;
             return Ok(());
@@ -156,7 +121,7 @@ impl Module for CompiledModule {
         .boxed())
     }
 
-    fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
+    pub(crate) fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
         if let Some(member) = self.struct_prototypes.get_mut(member_ident) {
             member.1 = visibility;
             return Ok(());
@@ -167,7 +132,7 @@ impl Module for CompiledModule {
         .boxed())
     }
 
-    fn set_associated_precedure_visibility(
+    pub(crate) fn set_associated_precedure_visibility(
         &mut self,
         struct_ident: &String,
         member_ident: &String,
@@ -204,7 +169,7 @@ impl From<(&str, &str)> for ModuleAddress {
     }
 }
 
-impl Display for ModuleAddress {
+impl std::fmt::Display for ModuleAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}::{}", self.module_id, self.identifier)
     }

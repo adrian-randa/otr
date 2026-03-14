@@ -1,30 +1,32 @@
-use super::scope::{Scope, ScopeAddress};
+use super::scope::{Scope};
 
-use super::Value;
+use crate::core::expression::variable::VariableAddress;
+use crate::core::r#struct::Struct;
+use crate::core::value::Value;
 
-use super::RuntimeError;
+use crate::error::runtime_error::RuntimeError;
 
-use crate::runtime::module::{CompiledModule, Module};
+use crate::runtime::module::{Module, RuntimeModule};
+use crate::runtime::procedures::RuntimeProcedure;
 use crate::runtime::procedures::builtin::{arrays, debug, files, numbers, strings};
-use crate::runtime::procedures::Procedure;
-use crate::runtime::Struct;
 
-use super::ModuleAddress;
+use crate::core::module::ModuleAddress;
 
 use crate::error::Result;
+use crate::runtime::scope::try_bake_variable_address;
 
 use std::rc::Rc;
 
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub struct Environment {
+pub(crate) struct Environment<'a> {
     contained_module_id: String,
-    loaded_modules: HashMap<String, Rc<CompiledModule>>,
+    loaded_modules: HashMap<String, Rc<RuntimeModule<'a>>>,
     scope: Scope,
 }
 
-impl Default for Environment {
+impl Default for Environment<'_> {
     fn default() -> Self {
         Self {
             contained_module_id: Default::default(),
@@ -43,7 +45,8 @@ impl Default for Environment {
     }
 }
 
-impl Environment {
+#[allow(unused)]
+impl Environment<'_> {
     pub fn new(contained_module_id: String) -> Self {
         Self {
             contained_module_id,
@@ -52,13 +55,13 @@ impl Environment {
         }
     }
 
-    pub fn get_loaded_module(&self, module_id: &String) -> Option<&CompiledModule> {
+    pub fn get_loaded_module(&self, module_id: &String) -> Option<&RuntimeModule> {
         self.loaded_modules
             .get(module_id)
             .map(|module| module.as_ref())
     }
 
-    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<&Box<dyn Procedure>> {
+    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<RuntimeProcedure> {
         let module = self.loaded_modules.get(address.get_module_id()).ok_or(
             RuntimeError::ModuleNotLoaded {
                 module_identifier: address.get_module_id().clone(),
@@ -88,7 +91,7 @@ impl Environment {
 
     pub fn open_subenvironment(&self, new_scope: Scope, module_address: &ModuleAddress) -> Self {
         Self {
-            contained_module_id: module_address.module_id.clone(),
+            contained_module_id: module_address.get_module_id().clone(),
             loaded_modules: self.loaded_modules.clone(),
             scope: new_scope,
         }
@@ -98,53 +101,64 @@ impl Environment {
         self.scope.insert_members(members);
     }
 
-    pub fn query_variable(&self, address: ScopeAddress) -> Result<Value> {
-        let address = address.try_bake(self)?;
+    pub fn query_variable(&self, address: VariableAddress) -> Result<Value> {
+        let address = try_bake_variable_address(address, self)?;
 
         self.scope
             .query_variable(address, &self.contained_module_id)
     }
 
-    pub fn set_variable(&mut self, address: ScopeAddress, new_value: Value) -> Result<()> {
-        let address = address.try_bake(self)?;
+    pub fn set_variable(&mut self, address: VariableAddress, new_value: Value) -> Result<()> {
+        let address = try_bake_variable_address(address, self)?;
 
         self.scope
             .set_variable(address, &self.contained_module_id, new_value)
     }
 
-    pub fn reference_variable(&self, address: ScopeAddress) -> Result<Value> {
-        let address = address.try_bake(self)?;
+    pub fn reference_variable(&self, address: VariableAddress) -> Result<Value> {
+        let address = try_bake_variable_address(address, self)?;
 
         self.scope
             .reference_variable(address, &self.contained_module_id)
     }
 
-    pub(crate) fn clone_variable(&self, address: ScopeAddress) -> Result<Value> {
-        let address = address.try_bake(self)?;
+    pub fn clone_variable(&self, address: VariableAddress) -> Result<Value> {
+        let address = try_bake_variable_address(address, self)?;
 
         self.scope
             .clone_variable(address, &self.contained_module_id)
     }
 
-    pub(crate) fn get_variable_type(&self, address: ScopeAddress) -> Result<Value> {
-        let address = address.try_bake(self)?;
+    pub fn get_variable_type(&self, address: VariableAddress) -> Result<Value> {
+        let address = try_bake_variable_address(address, self)?;
 
         self.scope.query_type(address, &self.contained_module_id)
-    }
-
-    pub fn load_module(&mut self, module_identifier: String, module: Rc<CompiledModule>) {
-        self.loaded_modules.insert(module_identifier, module);
     }
 
     pub fn get_contained_module_id(&self) -> &String {
         &self.contained_module_id
     }
 
-    pub(crate) fn _get_scope(&self) -> &Scope {
+    pub fn _get_scope(&self) -> &Scope {
         &self.scope
     }
 
-    pub(crate) fn get_scope_mut(&mut self) -> &mut Scope {
+    pub fn get_scope_mut(&mut self) -> &mut Scope {
         &mut self.scope
+    }
+}
+
+impl<'a> Environment<'a> {
+    pub fn load_module(&mut self, module_identifier: String, module: Rc<RuntimeModule<'a>>) {
+        match module.as_ref() {
+            RuntimeModule::Abstract(_) => {
+                self.loaded_modules.insert(module_identifier, module);
+            },
+            RuntimeModule::AbstractRef(_) => panic!("Can only insert owned runtime modules into environments!"),
+            RuntimeModule::Compiled(_) => {
+                self.loaded_modules.insert(module_identifier, module);
+            },
+            RuntimeModule::CompiledRef(_) => panic!("Can only insert owned runtime modules into environments!"),
+        }
     }
 }

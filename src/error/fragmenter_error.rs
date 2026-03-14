@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use crate::error::Error;
+use crate::{core::value::Value, error::Error};
 
 #[derive(Debug)]
 pub enum FragmentationError {
@@ -15,7 +15,7 @@ pub enum FragmentationError {
 }
 
 impl Error for FragmentationError {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         panic!("Fragmentation Errors cannot be turned into values!")
     }
 }

@@ -3,10 +3,7 @@ use std::{
 };
 
 use crate::{
-    compiler::{file_reader::FileReader, states::CompilerBaseState},
-    error::{compiler_error::CompilerError, context::SourceFileContextDecorator},
-    lexer::token::Token,
-    runtime::{environment::Environment, ModuleAddress, RuntimeObject},
+    compiler::{file_reader::FileReader, states::CompilerBaseState}, core::{CompiledObject, module::ModuleAddress}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::token::Token
 };
 
 use crate::error::Result;
@@ -18,11 +15,11 @@ pub trait CompilerState {
         compiler_environment: &mut CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>>;
 
-    fn finalize(self: Box<Self>) -> Result<Environment>;
+    fn finalize(self: Box<Self>) -> Result<CompiledObject>;
 }
 
 pub trait Decorator {
-    fn apply(self: Box<Self>, runtime_object: &mut RuntimeObject) -> Result<()>;
+    fn apply(self: Box<Self>, object: &mut CompiledObject) -> Result<()>;
 }
 
 pub trait ExpressionParseEnvironment {
@@ -65,19 +62,17 @@ impl Compiler {
         Ok(self)
     }
 
-    pub fn finalize(self) -> Result<RuntimeObject> {
-        let mut runtime_object = RuntimeObject::new();
-
-        runtime_object.base_environement = self.state.finalize()?;
+    pub fn finalize(self) -> Result<CompiledObject> {
+        let mut object = self.state.finalize()?;
 
         for decorator in self.compiler_environment.decorators {
-            decorator.apply(&mut runtime_object)?;
+            decorator.apply(&mut object)?;
         }
 
-        Ok(runtime_object)
+       Ok(object)
     }
 
-    pub fn compile(mut self) -> Result<RuntimeObject> {
+    pub fn compile(mut self) -> Result<CompiledObject> {
         while let Some(token) = self.compiler_environment.file_reader.next() {
             let line = token.line_index;
             let column = token.column_index;
@@ -182,3 +177,4 @@ pub mod expression_parser;
 pub mod file_reader;
 pub mod parenthesis;
 pub mod states;
+pub mod procedure;

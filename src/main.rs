@@ -1,6 +1,6 @@
 use std::env;
 
-use otr::{compiler::{Compiler, file_reader::{FileReader, ImportAddress}}, lexer::Tokenizer};
+use otr::{compiler::{Compiler, file_reader::{FileReader, ImportAddress}}, lexer::Tokenizer, runtime::RuntimeObject};
 
 fn main() {
     let mut file_reader = FileReader::new(Tokenizer::default(), env::current_dir().unwrap());
@@ -21,13 +21,15 @@ fn main() {
 
     let compiler = Compiler::new(file_reader);
 
-    let runtime_object = match compiler.compile() {
+    let compiled_object = match compiler.compile() {
         Ok(obj) => obj,
         Err(error) => {
             println!("{error}");
             return;
         }
     };
+
+    let runtime_object = RuntimeObject::from(compiled_object);
 
     if let Err(error) = runtime_object.execute() {
         println!("{error}");

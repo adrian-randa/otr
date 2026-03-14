@@ -1,25 +1,22 @@
 use crate::{
     compiler::{
-        states::{
+        CompilerEnvironment, CompilerError, CompilerState, states::{
             import::CompilerImportState, module::CompilerModuleState
-        },
-        CompilerEnvironment, CompilerError, CompilerState,
-    },
-    lexer::token::{KeywordToken, Token},
-    runtime::environment::Environment,
+        }
+    }, core::CompiledObject, lexer::token::{KeywordToken, Token}
 };
 
 use crate::error::Result;
 
 #[derive(Clone)]
 pub struct CompilerBaseState {
-    environment: Environment,
+    object: CompiledObject,
 }
 
 impl CompilerBaseState {
     pub fn new() -> Self {
         Self {
-            environment: Environment::default(),
+            object: CompiledObject::new(),
         }
     }
 }
@@ -47,8 +44,8 @@ impl CompilerState for CompilerBaseState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<Environment> {
-        Ok(self.environment)
+    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
+        Ok(self.object)
     }
 }
 

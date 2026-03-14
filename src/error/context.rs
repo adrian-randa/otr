@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use colored::Colorize;
 
-use crate::runtime::ModuleAddress;
+use crate::core::{module::ModuleAddress, value::Value};
 
 use super::Error;
 
@@ -13,7 +13,7 @@ pub(crate) struct ProcedureContextDecorator {
 }
 
 impl Error for ProcedureContextDecorator {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }
@@ -47,7 +47,7 @@ pub(crate) struct AssociatedProcedureContextDecorator {
 }
 
 impl Error for AssociatedProcedureContextDecorator {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }
@@ -89,7 +89,7 @@ pub(crate) struct SourceFileContextDecorator {
 }
 
 impl Error for SourceFileContextDecorator {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }
@@ -119,7 +119,7 @@ pub(crate) struct HintContextDecorator {
 }
 
 impl Error for HintContextDecorator {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }
@@ -150,7 +150,7 @@ pub(crate) struct VariableContextDecorator {
 }
 
 impl Error for VariableContextDecorator {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }

@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::{core::{member::MemberMap, module::ModuleAddress, value::Value}, error::Result};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Struct {
@@ -36,13 +36,9 @@ impl std::fmt::Display for Struct {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} {{{}}}",
+            "{} {}",
             self.get_struct_id().to_string(),
             self.get_members()
-                .members
-                .iter()
-                .map(|(label, value)| { label.to_string() + ": " + &value.get_unchecked().to_string() })
-                .join(", ")
         )
     }
 }

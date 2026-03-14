@@ -1,8 +1,8 @@
 use crate::core::expression::Expression;
 
 
-
-pub(crate) enum ArithmeticExpression {
+#[derive(Debug, Clone)]
+pub enum ArithmeticExpression {
     Add { lhs: Box<Expression>, rhs: Box<Expression> },
     Subtract { lhs: Box<Expression>, rhs: Box<Expression> },
     Multiply { lhs: Box<Expression>, rhs: Box<Expression> },

@@ -1,3 +1,5 @@
+use crate::core::module::ModuleAddress;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Null,
@@ -30,22 +32,5 @@ impl std::fmt::Display for Type {
         };
 
         write!(f, "{}", representation)
-    }
-}
-
-macro_rules! id {
-    ($value:ident: $id0:ident $(, $id:ident)+) => {
-        match $value {
-            PrimitiveTypeToken::$id0 => Self::$id0,
-            $(
-                PrimitiveTypeToken::$id => Self::$id,
-            )+
-        }
-    };
-}
-
-impl From<PrimitiveTypeToken> for Type {
-    fn from(value: PrimitiveTypeToken) -> Self {
-        id!(value: Null, Integer, Float, Bool, Char, String, Array, Moved, Dropped, Type)
     }
 }

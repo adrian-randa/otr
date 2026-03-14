@@ -1,267 +1,153 @@
-use crate::runtime::Value;
-use crate::runtime::{expressions::Expression, Environment, RuntimeError};
-
+use crate::core::expression::Expression;
+use crate::core::expression::arithmetic::ArithmeticExpression;
+use crate::core::value::Value::{self, *};
 use crate::error::Result;
+use crate::error::runtime_error::RuntimeError;
+use crate::runtime::environment::Environment;
 
-#[derive(Debug)]
-pub struct AddExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
+use super::eval_expression;
 
-impl AddExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
+pub(crate) fn eval_arithmetic_expression(expression: &ArithmeticExpression, environment: &Environment) -> Result<Value> {
+    match expression {
+        ArithmeticExpression::Add { lhs, rhs } => eval_add_expression(lhs, rhs, environment),
+        ArithmeticExpression::Subtract { lhs, rhs } => eval_subtract_expression(lhs, rhs, environment),
+        ArithmeticExpression::Multiply { lhs, rhs } => eval_multiply_expression(rhs, lhs, environment),
+        ArithmeticExpression::Divide { lhs, rhs } => eval_divide_expression(lhs, rhs, environment),
+        ArithmeticExpression::Power { base, exponent } => eval_power_expression(base, exponent, environment),
+        ArithmeticExpression::Modulo { lhs, rhs } => eval_modulo_expression(lhs, rhs, environment),
     }
 }
 
-impl Expression for AddExpression {
-    fn eval(&self, environment: &Environment) -> Result<super::Value> {
-        use super::Value::*;
+fn eval_add_expression(lhs: &Expression, rhs: &Expression, environment: &Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => Ok(Integer(l + r)),
+        (Float(l), Float(r)) => Ok(Float(l + r)),
 
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Integer(l + r)),
-            (Float(l), Float(r)) => Ok(Float(l + r)),
+        (String(l), String(r)) => Ok(String(l.to_string() + &r)),
 
-            (String(l), String(r)) => Ok(String(l.to_string() + &r)),
+        (String(l), Integer(r)) => Ok(String(l + &r.to_string())),
+        (String(l), Float(r)) => Ok(String(l + &r.to_string())),
+        (Integer(l), String(r)) => Ok(String(l.to_string() + &r)),
+        (Float(l), String(r)) => Ok(String(l.to_string() + &r)),
 
-            (String(l), Integer(r)) => Ok(String(l + &r.to_string())),
-            (String(l), Float(r)) => Ok(String(l + &r.to_string())),
-            (Integer(l), String(r)) => Ok(String(l.to_string() + &r)),
-            (Float(l), String(r)) => Ok(String(l.to_string() + &r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct SubtractExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
 
-impl SubtractExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
+fn eval_subtract_expression(lhs: &Expression, rhs: &Expression, environment: &Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-impl Expression for SubtractExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => Ok(Integer(l - r)),
+        (Float(l), Float(r)) => Ok(Float(l - r)),
 
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Integer(l - r)),
-            (Float(l), Float(r)) => Ok(Float(l - r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot subtract {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot subtract {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct MultiplyExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
+fn eval_multiply_expression(rhs: &Expression, lhs: &Expression, environment: &Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-impl MultiplyExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => Ok(Integer(l * r)),
+        (Float(l), Float(r)) => Ok(Float(l * r)),
 
-impl Expression for MultiplyExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Integer(l * r)),
-            (Float(l), Float(r)) => Ok(Float(l * r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot multiply {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot multiply {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct DivideExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
 
-impl DivideExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
+fn eval_divide_expression(lhs: &Expression, rhs: &Expression, environment: &Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
+
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => {
+            if r == 0 {
+                Err(Box::new(RuntimeError::DivisionByZero))
+            } else {
+                Ok(Value::Integer(l / r))
+            }
+        },
+        (Float(l), Float(r)) => Ok(Float(l / r)),
+
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!("Cannot divide {} and {}!", l.get_type_id(), r.get_type_id()),
+        }
+        .boxed()),
     }
 }
 
-impl Expression for DivideExpression {
-    fn eval(&self, environment: &Environment) -> Result<Value> {
-        use super::Value::*;
+fn eval_power_expression(base: &Expression, exponent: &Expression, environment: &Environment) -> Result<crate::runtime::Value> {
+    let base = eval_expression(base, environment)?;
+    let exponent = eval_expression(exponent, environment)?;
 
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => {
-                if r == 0 {
-                    Err(Box::new(RuntimeError::DivisionByZero))
-                } else {
-                    Ok(Value::Integer(l / r))
+    match (base, exponent) {
+        (Integer(l), Integer(r)) => Ok(Integer(
+            l.checked_pow(r.try_into().map_err(|_| {
+                RuntimeError::Unknown {
+                    message: "Could not compute power; the exponent was too large!".into(),
                 }
-            },
-            (Float(l), Float(r)) => Ok(Float(l / r)),
+                .boxed()
+            })?)
+            .ok_or(
+                RuntimeError::Unknown {
+                    message: "Overflow occured while computing power!".into(),
+                }
+                .boxed(),
+            )?,
+        )),
+        (Float(l), Float(r)) => Ok(Float(l.powf(r))),
 
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!("Cannot divide {} and {}!", l.get_type_id(), r.get_type_id()),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot compute power of {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct PowerExpression {
-    base: Box<dyn Expression>,
-    exponent: Box<dyn Expression>,
-}
+fn eval_modulo_expression(lhs: &Expression, rhs: &Expression, environment: &Environment) -> Result<crate::runtime::Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-impl PowerExpression {
-    pub fn new(base: Box<dyn Expression>, exponent: Box<dyn Expression>) -> Self {
-        Self { base, exponent }
-    }
-}
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => Ok(Integer(l.rem_euclid(r))),
+        (Float(l), Float(r)) => Ok(Float(l.rem_euclid(r))),
 
-impl Expression for PowerExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let base = self.base.eval(environment)?;
-        let exponent = self.exponent.eval(environment)?;
-
-        match (base, exponent) {
-            (Integer(l), Integer(r)) => Ok(Integer(
-                l.checked_pow(r.try_into().map_err(|_| {
-                    RuntimeError::Unknown {
-                        message: "Could not compute power; the exponent was too large!".into(),
-                    }
-                    .boxed()
-                })?)
-                .ok_or(
-                    RuntimeError::Unknown {
-                        message: "Overflow occured while computing power!".into(),
-                    }
-                    .boxed(),
-                )?,
-            )),
-            (Float(l), Float(r)) => Ok(Float(l.powf(r))),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot compute power of {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot modulate {} by {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ModuloExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
-
-impl ModuloExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
-
-impl Expression for ModuloExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Integer(l.rem_euclid(r))),
-            (Float(l), Float(r)) => Ok(Float(l.rem_euclid(r))),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot modulate {} by {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub struct GreaterThanExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
-
-impl GreaterThanExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
-
-impl Expression for GreaterThanExpression {
-    fn eval(&self, environment: &Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Integer(l), Integer(r)) => Ok(Bool(l > r)),
-            (Float(l), Float(r)) => Ok(Bool(l > r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Ordering is undefined on {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
-        }
+        .boxed()),
     }
 }

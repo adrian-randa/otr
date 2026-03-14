@@ -1,11 +1,6 @@
-use crate::error::Result;
+use crate::core::expression::{Expression, variable::VariableAddress};
 
-pub trait Procedure: std::fmt::Debug {
-    fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value>;
-}
-
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Instruction {
     PushVarToScope {
         identifier: String,
@@ -16,23 +11,36 @@ pub enum Instruction {
     GrowStack,
     ShrinkStack,
     EvaluateExpression {
-        expression: Box<dyn Expression>,
-        target: Option<ScopeAddress>,
+        expression: Expression,
+        target: Option<VariableAddress>,
     },
     JumpConditional {
-        condition_expression: Box<dyn Expression>,
+        condition_expression: Expression,
         jump_target: usize,
     },
     Return {
-        expression: Box<dyn Expression>,
+        expression: Expression,
     },
     Throw {
-        expression: Box<dyn Expression>,
+        expression: Expression,
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CompiledProcedure {
-    arguments_identifiers: Vec<String>,
+    argument_identifiers: Vec<String>,
     instructions: Vec<Instruction>,
+}
+
+impl CompiledProcedure {
+    pub(crate) fn new(argument_identifiers: Vec<String>, instructions: Vec<Instruction>) -> Self {
+        Self { argument_identifiers, instructions }
+    }
+    pub(crate) fn get_argument_identifiers(&self) -> &Vec<String> {
+        &self.argument_identifiers
+    }
+    
+    pub(crate) fn get_instructions(&self) -> &Vec<Instruction> {
+        &self.instructions
+    }
 }

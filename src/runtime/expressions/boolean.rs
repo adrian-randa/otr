@@ -1,102 +1,64 @@
-use crate::runtime::{expressions::Expression, RuntimeError};
+use crate::{core::{expression::{Expression, boolean::BooleanExpression}, value::Value::{self, *}}, error::runtime_error::RuntimeError, runtime::environment::Environment};
 
 use crate::error::Result;
+use crate::runtime::expressions::eval_expression;
 
-#[derive(Debug)]
-pub struct AndExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
-
-impl AndExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
+pub(crate) fn eval_boolean_expression(expression: &BooleanExpression, environment: &Environment) -> Result<Value> {
+    match expression {
+        BooleanExpression::And { lhs, rhs } => eval_and_expression(lhs, rhs, environment),
+        BooleanExpression::Or { lhs, rhs } => eval_or_expression(lhs, rhs, environment),
+        BooleanExpression::Not(expression) => eval_not_expression(expression, environment),
     }
 }
 
-impl Expression for AndExpression {
-    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
+fn eval_and_expression(lhs: &Expression, rhs: &Expression, environment: &crate::runtime::Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
+    match (lhs, rhs) {
+        (Bool(l), Bool(r)) => Ok(Bool(l && r)),
 
-        match (lhs, rhs) {
-            (Bool(l), Bool(r)) => Ok(Bool(l && r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot perform boolean and operation on {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot perform boolean and operation on {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct OrExpression {
-    lhs: Box<dyn Expression>,
-    rhs: Box<dyn Expression>,
-}
+fn eval_or_expression(lhs: &Expression, rhs: &Expression, environment: &crate::runtime::Environment) -> Result<Value> {
+    let lhs = eval_expression(lhs, environment)?;
+    let rhs = eval_expression(rhs, environment)?;
 
-impl OrExpression {
-    pub fn new(lhs: Box<dyn Expression>, rhs: Box<dyn Expression>) -> Self {
-        Self { lhs, rhs }
-    }
-}
+    match (lhs, rhs) {
+        (Bool(l), Bool(r)) => Ok(Bool(l || r)),
 
-impl Expression for OrExpression {
-    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let lhs = self.lhs.eval(environment)?;
-        let rhs = self.rhs.eval(environment)?;
-
-        match (lhs, rhs) {
-            (Bool(l), Bool(r)) => Ok(Bool(l || r)),
-
-            (l, r) => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot perform boolean or operation on {} and {}!",
-                    l.get_type_id(),
-                    r.get_type_id()
-                ),
-            }
-            .boxed()),
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot perform boolean or operation on {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }
 
-#[derive(Debug)]
-pub struct NotExpression {
-    expr: Box<dyn Expression>,
-}
+fn eval_not_expression(expression: &Expression, environment: &crate::runtime::Environment) -> Result<Value> {
+    let value = eval_expression(expression, environment)?;
 
-impl NotExpression {
-    pub fn new(expr: Box<dyn Expression>) -> Self {
-        Self { expr }
-    }
-}
+    match value {
+        Bool(value) => Ok(Bool(!value)),
 
-impl Expression for NotExpression {
-    fn eval(&self, environment: &crate::runtime::Environment) -> Result<crate::runtime::Value> {
-        use super::Value::*;
-
-        let value = self.expr.eval(environment)?;
-
-        match value {
-            Bool(value) => Ok(Bool(!value)),
-
-            value => Err(RuntimeError::Unknown {
-                message: format!(
-                    "Cannot perform boolean nor operation on {}!",
-                    value.get_type_id()
-                ),
-            }
-            .boxed()),
+        value => Err(RuntimeError::Unknown {
+            message: format!(
+                "Cannot perform boolean nor operation on {}!",
+                value.get_type_id()
+            ),
         }
+        .boxed()),
     }
 }

@@ -1,7 +1,10 @@
-use crate::error::Result;
+use std::collections::HashMap;
+use itertools::Itertools;
+
+use crate::{core::value::Value, error::{Result, runtime_error::RuntimeError}};
 
 #[derive(Debug, Clone, PartialEq)]
-struct Member {
+pub(crate) struct Member {
     is_public: bool,
     value: Value,
 }
@@ -54,6 +57,15 @@ impl Member {
 #[derive(Debug, Clone, PartialEq)]
 pub struct MemberMap {
     members: HashMap<String, Member>,
+}
+
+impl std::fmt::Display for MemberMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{{}}}", self.members.iter()
+            .map(|(label, value)| { label.to_string() + ": " + &value.get_unchecked().to_string() })
+            .join(", ")
+        )
+    }
 }
 
 impl MemberMap {
