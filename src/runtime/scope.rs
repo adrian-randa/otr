@@ -1,143 +1,56 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap};
 
 use derive_more::{Deref, IntoIterator};
 
 use crate::{
-    compiler::{expression_parser::ExpressionParser, NoExpressionEnvironment},
-    error::{compiler_error::CompilerError, Error},
-    lexer::token::{ParenthesisType, PunctuationToken, Token},
-    runtime::{environment::Environment, Expression, RuntimeError, Value},
+    core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value}, error::runtime_error::RuntimeError, runtime::{environment::Environment, expressions::eval_expression, scope::vec_map::VecMap}
 };
 
 use crate::error::Result;
 
-#[derive(Debug, Clone)]
-pub enum ScopeAddressant {
-    Identifier(String),
-    Index(usize),
-    DynamicIndex(Rc<dyn Expression>),
-}
 
-impl From<&str> for ScopeAddressant {
-    fn from(value: &str) -> Self {
-        Self::Identifier(value.into())
-    }
-}
 
-impl From<usize> for ScopeAddressant {
-    fn from(value: usize) -> Self {
-        Self::Index(value)
-    }
-}
+pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &Environment) -> Result<BakedVariableAddress> {
+    let mut out = Vec::with_capacity(address.len());
 
-impl<E: Expression + 'static> From<E> for ScopeAddressant {
-    fn from(value: E) -> Self {
-        Self::DynamicIndex(Rc::new(value))
-    }
-}
+    for addressant in address {
+        let addressant = match addressant {
+            VariableAddressant::Identifier(ident) => VariableAddressant::Identifier(ident),
+            VariableAddressant::Index(idx) => VariableAddressant::Index(idx),
+            VariableAddressant::DynamicIndex(expression) => {
+                let value = eval_expression(&expression, environment)?;
+                let idx: usize = match value {
+                    Value::Integer(value) => {
+                        let idx = value.try_into().unwrap();
 
-#[derive(Debug, Clone)]
-pub struct ScopeAddress(Vec<ScopeAddressant>);
-
-impl TryFrom<Vec<ScopeAddressant>> for ScopeAddress {
-    type Error = ();
-
-    fn try_from(value: Vec<ScopeAddressant>) -> std::result::Result<Self, Self::Error> {
-        if value.is_empty() {
-            Err(())
-        } else {
-            Ok(Self(value))
-        }
-    }
-}
-
-impl TryFrom<Vec<Token>> for ScopeAddress {
-    type Error = Box<dyn Error>;
-
-    fn try_from(value: Vec<Token>) -> std::result::Result<Self, Self::Error> {
-        let mut tokens = value.into_iter();
-
-        let mut addressants = Vec::new();
-
-        while let Some(token) = tokens.next() {
-            match token {
-                Token::Identifier(ident) => {
-                    addressants.push(ScopeAddressant::Identifier(ident));
-                }
-                Token::Punctuation(PunctuationToken::Dot) => {}
-                Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
-                    let index_expression = ExpressionParser::take_until_closing(
-                        &mut tokens,
-                        Token::Punctuation(PunctuationToken::SquareBrackets(
-                            ParenthesisType::Closing,
-                        )),
-                    )?;
-
-                    let index_expression =
-                        ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
-
-                    addressants.push(ScopeAddressant::DynamicIndex(index_expression.into()));
-                }
-
-                other => {
-                    return Err(CompilerError::InvalidScopeAddress {
-                        unexpected_token: Some(other),
+                        idx
                     }
-                    .boxed());
-                }
-            }
-        }
-
-        addressants.try_into().map_err(|_| {
-            CompilerError::InvalidScopeAddress {
-                unexpected_token: None,
-            }
-            .boxed()
-        })
-    }
-}
-
-impl ScopeAddress {
-    pub(crate) fn try_bake(self, environment: &Environment) -> Result<BakedScopeAddress> {
-        let mut out = Vec::with_capacity(self.0.len());
-
-        for addressant in self.0 {
-            let addressant = match addressant {
-                ScopeAddressant::Identifier(ident) => ScopeAddressant::Identifier(ident),
-                ScopeAddressant::Index(idx) => ScopeAddressant::Index(idx),
-                ScopeAddressant::DynamicIndex(expression) => {
-                    let value = expression.eval(environment)?;
-                    let idx: usize = match value {
-                        Value::Integer(value) => {
-                            let idx = value.try_into().unwrap();
-
-                            idx
+                    _ => {
+                        return Err(RuntimeError::TypeMismatch {
+                            expected: crate::core::r#type::Type::Integer,
+                            found: value.get_type_id(),
                         }
-                        _ => {
-                            return Err(RuntimeError::TypeMismatch {
-                                expected: super::Type::Integer,
-                                found: value.get_type_id(),
-                            }
-                            .boxed())
-                        }
-                    };
+                        .boxed())
+                    }
+                };
 
-                    ScopeAddressant::Index(idx)
-                }
-            };
+                VariableAddressant::Index(idx)
+            }
+        };
 
-            out.push(addressant);
-        }
-
-        Ok(BakedScopeAddress(out))
+        out.push(addressant);
     }
+
+    Ok(BakedVariableAddress(out.try_into().unwrap()))
 }
 
 #[derive(Deref, IntoIterator)]
-pub(crate) struct BakedScopeAddress(Vec<ScopeAddressant>);
+pub(crate) struct BakedVariableAddress(VariableAddress);
+
+pub mod vec_map;
 
 #[derive(Debug, Clone)]
-struct Stack(Vec<HashMap<String, Value>>);
+struct Stack(Vec<VecMap<String, Value>>);
 
 impl Default for Stack {
     fn default() -> Self {
@@ -147,20 +60,30 @@ impl Default for Stack {
 
 impl Stack {
     fn new() -> Self {
-        Self(vec![HashMap::new()])
+        Self(vec![VecMap::new()])
     }
 
-    fn from_members(members: HashMap<String, Value>) -> Self {
-        Self(vec![members])
+    fn from_members(members: impl IntoIterator<Item = (String, Value)>) -> Self {
+        let mut map = VecMap::new();
+
+        for (key, value) in members {
+            map.insert(key, value);
+        }
+
+        Self(vec![map])
     }
 
-    fn insert_members(&mut self, members: HashMap<String, Value>) {
+    fn insert_members(&mut self, members: impl IntoIterator<Item = (String, Value)>) {
         let last = self.0.len() - 1;
-        self.0[last].extend(members.into_iter());
+        let last = &mut  self.0[last];
+        
+        for (key, value) in members {
+            last.insert(key, value);
+        }
     }
 
     fn grow(&mut self) {
-        self.0.push(HashMap::new());
+        self.0.push(VecMap::new());
     }
 
     fn shrink(&mut self) {
@@ -280,7 +203,7 @@ impl Scope {
 
     pub(crate) fn query_variable(
         &self,
-        address: BakedScopeAddress,
+        address: BakedVariableAddress,
         contained_module_id: &String,
     ) -> Result<Value> {
         let mut address = address.into_iter();
@@ -288,11 +211,11 @@ impl Scope {
         let first_addressant = address.next().unwrap();
 
         let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
+            VariableAddressant::Identifier(ident) => ident,
+            VariableAddressant::Index(_) => {
                 panic!("Unsupported scope address!");
             }
-            ScopeAddressant::DynamicIndex(_) => {
+            VariableAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
@@ -304,7 +227,7 @@ impl Scope {
 
     pub(crate) fn set_variable(
         &mut self,
-        address: BakedScopeAddress,
+        address: BakedVariableAddress,
         contained_module_id: &String,
         value: Value,
     ) -> Result<()> {
@@ -313,11 +236,11 @@ impl Scope {
         let first_addressant = address.next().unwrap();
 
         let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
+            VariableAddressant::Identifier(ident) => ident,
+            VariableAddressant::Index(_) => {
                 panic!("Unsupported scope address!");
             }
-            ScopeAddressant::DynamicIndex(_) => {
+            VariableAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
@@ -329,7 +252,7 @@ impl Scope {
 
     pub(crate) fn reference_variable(
         &self,
-        address: BakedScopeAddress,
+        address: BakedVariableAddress,
         contained_module_id: &String,
     ) -> Result<Value> {
         let mut address = address.into_iter();
@@ -337,11 +260,11 @@ impl Scope {
         let first_addressant = address.next().unwrap();
 
         let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
+            VariableAddressant::Identifier(ident) => ident,
+            VariableAddressant::Index(_) => {
                 panic!("Unsupported scope address!");
             }
-            ScopeAddressant::DynamicIndex(_) => {
+            VariableAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
@@ -353,7 +276,7 @@ impl Scope {
 
     pub(crate) fn clone_variable(
         &self,
-        address: BakedScopeAddress,
+        address: BakedVariableAddress,
         contained_module_id: &String,
     ) -> Result<Value> {
         let mut address = address.into_iter();
@@ -361,11 +284,11 @@ impl Scope {
         let first_addressant = address.next().unwrap();
 
         let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
+            VariableAddressant::Identifier(ident) => ident,
+            VariableAddressant::Index(_) => {
                 panic!("Unsupported scope address!");
             }
-            ScopeAddressant::DynamicIndex(_) => {
+            VariableAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };
@@ -377,7 +300,7 @@ impl Scope {
 
     pub(crate) fn query_type(
         &self,
-        address: BakedScopeAddress,
+        address: BakedVariableAddress,
         contained_module_id: &String,
     ) -> Result<Value> {
         let mut address = address.into_iter();
@@ -385,11 +308,11 @@ impl Scope {
         let first_addressant = address.next().unwrap();
 
         let first_identifier = match first_addressant {
-            ScopeAddressant::Identifier(ident) => ident,
-            ScopeAddressant::Index(_) => {
+            VariableAddressant::Identifier(ident) => ident,
+            VariableAddressant::Index(_) => {
                 panic!("Unsupported scope address!");
             }
-            ScopeAddressant::DynamicIndex(_) => {
+            VariableAddressant::DynamicIndex(_) => {
                 panic!("Found dynamic index as addressant after baking!");
             }
         };

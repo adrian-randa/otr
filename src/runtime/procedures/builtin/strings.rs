@@ -1,26 +1,49 @@
 use num::ToPrimitive;
 
 use crate::runtime::environment::Environment;
-use crate::runtime::module::Module;
-use crate::runtime::Type;
-use crate::runtime::{module::CompiledModule, procedures::Procedure, RuntimeError, Value};
+use crate::core::r#type::Type;
+use crate::runtime::module::{Module, RuntimeModule};
+use crate::runtime::procedures::RuntimeProcedure;
+use crate::runtime::{procedures::Procedure, RuntimeError, Value};
 
 use crate::error::Result;
 
-pub(crate) fn get_module() -> CompiledModule {
-    let mut module = CompiledModule::default();
+pub(crate) fn get_module() -> RuntimeModule<'static> {
+    RuntimeModule::Abstract(Box::new(StringsModule))
+}
 
-    module.insert_procedure("length".into(), Box::new(StringLengthProcdure), true);
-    module.insert_procedure(
-        "toCharArray".into(),
-        Box::new(StringToCharArrayProcedure),
-        true,
-    );
-    module.insert_procedure("split".into(), Box::new(StringSplitProcedure), true);
-    module.insert_procedure("toString".into(), Box::new(ToStringProcedure), true);
-    module.insert_procedure("fromBytes".into(), Box::new(FromBytesProcedure), true);
+#[derive(Debug)]
+struct StringsModule;
 
-    module
+impl Module for StringsModule {
+    fn get_procedure(
+        &self,
+        identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        match identifier as &str {
+            "length" => Ok(RuntimeProcedure::AbstractRef(&StringLengthProcdure)),
+            "split" => Ok(RuntimeProcedure::AbstractRef(&StringSplitProcedure)),
+            "toString" => Ok(RuntimeProcedure::AbstractRef(&ToStringProcedure)),
+            "toCharArray" => Ok(RuntimeProcedure::AbstractRef(&StringToCharArrayProcedure)),
+            "fromBytes" => Ok(RuntimeProcedure::AbstractRef(&FromBytesProcedure)),
+
+            unknown => Err(RuntimeError::ProcedureNotDefined { procedure_identifier: unknown.to_string() }.boxed())
+        }
+    }
+
+    fn get_associated_procedure(
+        &self,
+        _struct_identifier: &String,
+        _procedure_identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        todo!()
+    }
+
+    fn get_struct(&self, _identifier: &String, _private_access: bool) -> Result<crate::core::r#struct::Struct> {
+        todo!()
+    }
 }
 
 #[derive(Debug)]
@@ -43,7 +66,7 @@ impl Procedure for StringLengthProcdure {
             Value::String(str) => Ok(Value::Integer(str.len() as i64)),
 
             other => Err(RuntimeError::TypeMismatch {
-                expected: crate::runtime::Type::String,
+                expected: Type::String,
                 found: other.get_type_id(),
             }
             .boxed()),
@@ -71,7 +94,7 @@ impl Procedure for StringToCharArrayProcedure {
             Value::String(str) => Ok(Value::Array(str.chars().map(|c| Value::Char(c)).collect())),
 
             other => Err(RuntimeError::TypeMismatch {
-                expected: crate::runtime::Type::String,
+                expected: Type::String,
                 found: other.get_type_id(),
             }
             .boxed()),
@@ -98,7 +121,7 @@ impl Procedure for StringSplitProcedure {
             str
         } else {
             return Err(RuntimeError::TypeMismatch {
-                expected: crate::runtime::Type::String,
+                expected: Type::String,
                 found: str.get_type_id(),
             }
             .boxed());
@@ -114,7 +137,7 @@ impl Procedure for StringSplitProcedure {
             pattern
         } else {
             return Err(RuntimeError::TypeMismatch {
-                expected: crate::runtime::Type::String,
+                expected: Type::String,
                 found: pattern.get_type_id(),
             }
             .boxed());

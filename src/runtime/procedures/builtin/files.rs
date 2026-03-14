@@ -3,25 +3,46 @@ use std::{cell::RefCell, fs, rc::Rc};
 use num::ToPrimitive;
 
 use crate::{
-    error::{runtime_error::RuntimeError, Result},
-    runtime::{
-        module::{CompiledModule, Module},
-        procedures::Procedure,
-        ModuleAddress, Struct, Type, Value,
-    },
+    core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value}, error::{Result, runtime_error::RuntimeError}, runtime::{module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}}
 };
 
-pub(crate) fn get_module() -> CompiledModule {
-    let mut module = CompiledModule::default();
+pub(crate) fn get_module() -> RuntimeModule<'static> {
+    RuntimeModule::Abstract(Box::new(FilesModule))
+}
 
-    module.insert_procedure("read".into(), Box::new(FSReadProcedure), true);
-    module.insert_procedure("write".into(), Box::new(FSWriteProcedure), true);
-    module.insert_procedure("exists".into(), Box::new(FSExistsProcedure), true);
-    module.insert_procedure("listDir".into(), Box::new(FSListDirProcedure), true);
-    module.insert_procedure("removeFile".into(), Box::new(FSRemoveFileProcedure), true);
-    module.insert_procedure("removeDir".into(), Box::new(FSRemoveDirProcedure), true);
+#[derive(Debug)]
+struct FilesModule;
 
-    module
+impl Module for FilesModule {
+    fn get_procedure(
+        &self,
+        identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        match identifier as &str {
+            "read" => Ok(RuntimeProcedure::AbstractRef(&FSReadProcedure)),
+            "write" => Ok(RuntimeProcedure::AbstractRef(&FSWriteProcedure)),
+            "exists" => Ok(RuntimeProcedure::AbstractRef(&FSExistsProcedure)),
+            "listDir" => Ok(RuntimeProcedure::AbstractRef(&FSListDirProcedure)),
+            "removeFile" => Ok(RuntimeProcedure::AbstractRef(&FSRemoveFileProcedure)),
+            "removeDir" => Ok(RuntimeProcedure::AbstractRef(&FSRemoveDirProcedure)),
+
+            unknown => Err(RuntimeError::ProcedureNotDefined { procedure_identifier: unknown.to_string() }.boxed())
+        }
+    }
+
+    fn get_associated_procedure(
+        &self,
+        struct_identifier: &String,
+        procedure_identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
+    }
+
+    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<crate::core::r#struct::Struct> {
+        Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
+    }
 }
 
 fn directory(path: String) -> Struct {

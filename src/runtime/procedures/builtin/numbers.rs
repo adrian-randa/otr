@@ -1,14 +1,41 @@
-use crate::runtime::module::Module;
-use crate::runtime::{module::CompiledModule, procedures::Procedure, RuntimeError, Value};
+use crate::runtime::module::{Module, RuntimeModule};
+use crate::runtime::procedures::RuntimeProcedure;
+use crate::runtime::{procedures::Procedure, RuntimeError, Value};
 
 use crate::error::Result;
 
-pub(crate) fn get_module() -> CompiledModule {
-    let mut module = CompiledModule::default();
+pub(crate) fn get_module() -> RuntimeModule<'static> {
+    RuntimeModule::Abstract(Box::new(NumbersModule))
+}
 
-    module.insert_procedure("parse".into(), Box::new(NumberParseProcedure), true);
+#[derive(Debug)]
+struct NumbersModule;
 
-    module
+impl Module for NumbersModule {
+    fn get_procedure(
+        &self,
+        identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        match identifier as &str {
+            "parse" => Ok(RuntimeProcedure::AbstractRef(&NumberParseProcedure)),
+
+            unknown => Err(RuntimeError::ProcedureNotDefined { procedure_identifier: unknown.to_string() }.boxed())
+        }
+    }
+
+    fn get_associated_procedure(
+        &self,
+        struct_identifier: &String,
+        procedure_identifier: &String,
+        _private_access: bool,
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+        Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
+    }
+
+    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<crate::core::r#struct::Struct> {
+        Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
+    }
 }
 
 #[derive(Debug)]
@@ -18,7 +45,7 @@ impl Procedure for NumberParseProcedure {
     fn call(
         &self,
         _environment: crate::runtime::environment::Environment,
-        arguments: Vec<crate::runtime::Value>,
+        arguments: Vec<Value>,
     ) -> Result<crate::runtime::Value> {
         let value = arguments.get(0).ok_or(
             RuntimeError::NoSuchVariable {
@@ -54,7 +81,7 @@ impl Procedure for NumberParseProcedure {
             }
 
             other => Err(RuntimeError::TypeMismatch {
-                expected: crate::runtime::Type::String,
+                expected: crate::core::r#type::Type::String,
                 found: other.get_type_id(),
             }
             .boxed()),

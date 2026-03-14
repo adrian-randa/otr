@@ -1,6 +1,5 @@
 use crate::{
-    compiler::{CompilerError, Decorator},
-    runtime::{ModuleAddress, RuntimeObject},
+    compiler::{CompilerError, Decorator}, core::{CompiledObject, module::ModuleAddress},
 };
 
 use crate::error::Result;
@@ -16,17 +15,17 @@ impl EntrypointDecorator {
 }
 
 impl Decorator for EntrypointDecorator {
-    fn apply(self: Box<Self>, runtime_object: &mut RuntimeObject) -> Result<()> {
-        if runtime_object.entrypoint.is_some() {
+    fn apply(self: Box<Self>, object: &mut CompiledObject) -> Result<()> {
+        if object.get_entrypoint().is_some() {
             Err(CompilerError::Unknown {
                 message: format!(
                     "Duplicate entrypoint! Entrypoint is already set to {:?}!",
-                    runtime_object.entrypoint
+                    object.get_entrypoint().as_ref().unwrap()
                 ),
             }
             .boxed())
         } else {
-            runtime_object.entrypoint = Some(self.procedure_id);
+            object.set_entrypoint(self.procedure_id);
             Ok(())
         }
     }

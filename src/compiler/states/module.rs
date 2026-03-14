@@ -1,15 +1,9 @@
-use std::rc::Rc;
-
 use crate::{
     compiler::{
-        states::{
-            decorator::CompilerDecoratorState, procedure::CompilerProcedureState,
-            r#struct::CompilerStructState, CompilerBaseState,
-        }, CompilerEnvironment, CompilerError, CompilerState,
-    },
-    error::context::HintContextDecorator,
-    lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token},
-    runtime::module::{CompiledModule, Module},
+        CompilerEnvironment, CompilerError, CompilerState, states::{
+            CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState, r#struct::CompilerStructState
+        }
+    }, core::{CompiledObject, module::CompiledModule}, error::context::HintContextDecorator, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -97,8 +91,8 @@ impl CompilerState for CompilerModuleState {
             ModuleSubstate::InScope => match token {
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
                     self.base
-                        .environment
-                        .load_module(self.module_name.unwrap(), Rc::new(self.module));
+                        .object
+                        .insert_module(self.module_name.unwrap(), self.module);
                     Ok(Box::new(self.base))
                 }
 
@@ -232,30 +226,11 @@ impl CompilerState for CompilerModuleState {
                         .boxed()),
                     },
                 }
-                /* match token {
-                    Token::Punctuation(PunctuationToken::Comma) => {
-                        return Ok(self);
-                    }
-
-                    Token::Identifier(ident) => {
-                        self.module.set_member_visibility(&ident, true)?;
-                        return Ok(self);
-                    }
-
-                    Token::Punctuation(PunctuationToken::Semicolon) => {
-                        self.substate = ModuleSubstate::InScope;
-                        return Ok(self);
-                    }
-
-                    other => {
-                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
-                    }
-                } */
             }
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
+    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

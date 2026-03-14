@@ -1,8 +1,7 @@
 use crate::{
     compiler::{
-        file_reader::ImportAddress, states::CompilerBaseState, CompilerError, CompilerState,
-    },
-    lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token},
+        CompilerError, CompilerState, file_reader::ImportAddress, states::CompilerBaseState
+    }, core::CompiledObject, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -83,7 +82,7 @@ impl CompilerState for CompilerImportState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<crate::runtime::environment::Environment> {
+    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

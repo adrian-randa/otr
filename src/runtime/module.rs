@@ -1,102 +1,48 @@
-use std::collections::HashMap;
-
-use crate::{
-    error::compiler_error::CompilerError,
-    runtime::{
-        procedures::Procedure, RuntimeError, Struct,
-    },
-};
-
+use crate::core::module::CompiledModule;
+use crate::core::r#struct::Struct;
+use crate::runtime::procedures::RuntimeProcedure;
 use crate::error::Result;
 
-#[derive(Debug, Default)]
-pub struct CompiledModule {
-    struct_prototypes: HashMap<String, (Struct, bool)>,
-    procedures: HashMap<String, (Box<dyn Procedure>, bool)>,
-    associated_procedures: HashMap<(String, String), (Box<dyn Procedure>, bool)>,
-}
-
-pub(crate) trait Module {
-    fn insert_procedure(
-        &mut self,
-        identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    );
+pub(crate) trait Module: std::fmt::Debug {
     fn get_procedure(
         &self,
         identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>>;
-    fn insert_associated_procedure(
-        &mut self,
-        struct_identifier: String,
-        procedure_identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    );
+    ) -> Result<RuntimeProcedure>;
     fn get_associated_procedure(
         &self,
         struct_identifier: &String,
         procedure_identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>>;
-    fn insert_struct(&mut self, identifier: String, prototype: Struct, exported: bool);
+    ) -> Result<RuntimeProcedure>;
     fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct>;
-    fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()>;
-    fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()>;
-    fn set_associated_precedure_visibility(
-        &mut self,
-        struct_ident: &String,
-        member_ident: &String,
-        visibility: bool,
-    ) -> Result<()>;
 }
 
-impl Module for CompiledModule {
-    fn insert_procedure(
-        &mut self,
-        identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    ) {
-        self.procedures.insert(identifier, (procedure, exported));
-    }
+#[allow(unused)]
+#[derive(Debug)]
+pub(crate) enum RuntimeModule<'a> {
+    Abstract(Box<dyn Module>),
+    AbstractRef(&'a dyn Module),
+    Compiled(CompiledModule),
+    CompiledRef(&'a CompiledModule),
+}
 
+impl<'a> Module for RuntimeModule<'a> {
     fn get_procedure(
         &self,
         identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>> {
-        match self.procedures.get(identifier) {
-            Some((proc, exported)) => {
-                if *exported || private_access {
-                    Ok(proc)
-                } else {
-                    Err(RuntimeError::ProcedureNotExported {
-                        procedure_identifier: identifier.clone(),
-                    }
-                    .boxed())
-                }
-            }
-            None => Err(RuntimeError::ProcedureNotDefined {
-                procedure_identifier: identifier.clone(),
-            }
-            .boxed()),
+    ) -> Result<RuntimeProcedure> {
+        match self {
+            RuntimeModule::Abstract(module) => module.get_procedure(identifier, private_access),
+            RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
+                compiled_module.get_procedure(identifier, private_access)?
+            )),
+            RuntimeModule::AbstractRef(module) => module.get_procedure(identifier, private_access),
+            RuntimeModule::CompiledRef(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
+                compiled_module.get_procedure(identifier, private_access)?
+            )),
         }
-    }
-
-    fn insert_associated_procedure(
-        &mut self,
-        struct_identifier: String,
-        procedure_identifier: String,
-        procedure: Box<dyn Procedure>,
-        exported: bool,
-    ) {
-        self.associated_procedures.insert(
-            (struct_identifier, procedure_identifier),
-            (procedure, exported),
-        );
     }
 
     fn get_associated_procedure(
@@ -104,94 +50,23 @@ impl Module for CompiledModule {
         struct_identifier: &String,
         procedure_identifier: &String,
         private_access: bool,
-    ) -> Result<&Box<dyn Procedure>> {
-        match self
-            .associated_procedures
-            .get(&(struct_identifier.clone(), procedure_identifier.clone()))
-        {
-            Some((proc, exported)) => {
-                if *exported || private_access {
-                    Ok(proc)
-                } else {
-                    let procedure_identifier = procedure_identifier.clone();
-                    let struct_identifier = struct_identifier.clone();
-                    Err(RuntimeError::AssociatedProcedureNotExported {
-                        procedure_identifier,
-                        struct_identifier,
-                    }
-                    .boxed())
-                }
-            }
-            None => Err(RuntimeError::AssociatedProcedureNotDefined {
-                procedure_identifier: procedure_identifier.clone(),
-                struct_identifier: struct_identifier.clone(),
-            }
-            .boxed()),
+    ) -> Result<RuntimeProcedure> {
+        match self {
+            RuntimeModule::Abstract(module) => module.get_associated_procedure(struct_identifier, procedure_identifier, private_access),
+            RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(compiled_module.get_associated_procedure(struct_identifier, procedure_identifier, private_access)?)),
+            RuntimeModule::AbstractRef(module) => module.get_associated_procedure(struct_identifier, procedure_identifier, private_access),
+            RuntimeModule::CompiledRef(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
+                compiled_module.get_associated_procedure(struct_identifier, procedure_identifier, private_access)?
+            )),
         }
-    }
-
-    fn insert_struct(&mut self, identifier: String, prototype: Struct, exported: bool) {
-        self.struct_prototypes
-            .insert(identifier, (prototype, exported));
     }
 
     fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct> {
-        match self.struct_prototypes.get(identifier) {
-            Some((prototype, exported)) => {
-                if *exported || private_access {
-                    Ok(prototype.clone())
-                } else {
-                    Err(RuntimeError::StructNotExported {
-                        struct_identifier: identifier.clone(),
-                    }
-                    .boxed())
-                }
-            }
-            None => Err(RuntimeError::StructNotDefined {
-                struct_identifier: identifier.clone(),
-            }
-            .boxed()),
+        match self {
+            RuntimeModule::Abstract(module) => module.get_struct(identifier, private_access),
+            RuntimeModule::Compiled(compiled_module) => compiled_module.get_struct(identifier, private_access),
+            RuntimeModule::AbstractRef(module) => module.get_struct(identifier, private_access),
+            RuntimeModule::CompiledRef(compiled_module) => compiled_module.get_struct(identifier, private_access),
         }
-    }
-
-    fn set_procedure_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
-        if let Some(member) = self.procedures.get_mut(member_ident) {
-            member.1 = visibility;
-            return Ok(());
-        }
-        Err(CompilerError::NoSuchMember {
-            member_identifier: member_ident.clone(),
-        }
-        .boxed())
-    }
-
-    fn set_struct_visibility(&mut self, member_ident: &String, visibility: bool) -> Result<()> {
-        if let Some(member) = self.struct_prototypes.get_mut(member_ident) {
-            member.1 = visibility;
-            return Ok(());
-        }
-        Err(CompilerError::NoSuchMember {
-            member_identifier: member_ident.clone(),
-        }
-        .boxed())
-    }
-
-    fn set_associated_precedure_visibility(
-        &mut self,
-        struct_ident: &String,
-        member_ident: &String,
-        visibility: bool,
-    ) -> Result<()> {
-        if let Some(member) = self
-            .associated_procedures
-            .get_mut(&(struct_ident.to_owned(), member_ident.to_owned()))
-        {
-            member.1 = visibility;
-            return Ok(());
-        }
-        Err(CompilerError::NoSuchMember {
-            member_identifier: format!("{struct_ident}->{member_ident}"),
-        }
-        .boxed())
     }
 }

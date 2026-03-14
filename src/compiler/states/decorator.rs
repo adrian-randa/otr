@@ -1,9 +1,7 @@
 use crate::{
     compiler::{
-        states::{module::CompilerModuleState, procedure::CompilerProcedureState}, CompilerEnvironment, CompilerError, CompilerState,
-    },
-    lexer::token::{KeywordToken, PunctuationToken, Token},
-    runtime::environment::Environment,
+        CompilerEnvironment, CompilerError, CompilerState, states::{module::CompilerModuleState, procedure::CompilerProcedureState}
+    }, core::CompiledObject, lexer::token::{KeywordToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -85,7 +83,7 @@ impl CompilerState for CompilerDecoratorState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<Environment> {
+    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

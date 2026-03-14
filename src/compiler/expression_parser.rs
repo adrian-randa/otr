@@ -1,26 +1,17 @@
 use crate::{
-    compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack},
-    lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token},
-    runtime::{
-        Expression, ModuleAddress, Type, Value, expressions::{
-            ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, CloneExpression, EqualityExpression, ProcedureCallExpression, ReferenceExpression, StructConstructionExpression, StructMemberExpression, TypeofVariableExpression, VariableExpression, arithmetic::{
-                AddExpression, DivideExpression, GreaterThanExpression, ModuloExpression,
-                MultiplyExpression, PowerExpression, SubtractExpression,
-            }, boolean::{AndExpression, NotExpression, OrExpression}
-        }, scope::ScopeAddressant
-    },
+    compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack}, core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddressant, VariableExpression}}, module::ModuleAddress, r#type::Type, value::Value}, lexer::token::{KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
 
 #[derive(Debug)]
 pub enum ExpressionAtom {
-    Subexpression(Box<dyn Expression>),
+    Subexpression(Expression),
     Operator(OperatorToken),
 }
 
 impl ExpressionAtom {
-    fn unwrap_subexpression(self) -> Box<dyn Expression> {
+    fn unwrap_subexpression(self) -> Expression {
         match self {
             ExpressionAtom::Subexpression(expression) => expression,
             ExpressionAtom::Operator(_) => panic!("Called unwrap on non subexpression!"),
@@ -40,7 +31,7 @@ impl ExpressionParser {
     pub fn parse(
         expression: impl IntoIterator<Item = Token>,
         environment: &dyn ExpressionParseEnvironment,
-    ) -> Result<Box<dyn Expression>> {
+    ) -> Result<Expression> {
         let atoms = Self::atomize(expression, environment)?;
 
         let mut operator_order = Vec::new();
@@ -60,9 +51,9 @@ impl ExpressionParser {
                         if let Some(ExpressionAtom::Subexpression(subexpr)) =
                             atoms[operator_order[i].1 + 1].take()
                         {
-                            let splice = vec![Some(ExpressionAtom::Subexpression(Box::new(
-                                NotExpression::new(subexpr),
-                            )))];
+                            let splice = vec![Some(ExpressionAtom::Subexpression(
+                                Expression::Boolean(BooleanExpression::Not(Box::new(subexpr)))
+                            ))];
 
                             atoms.splice(i..=i + 1, splice);
 
@@ -321,66 +312,67 @@ impl ExpressionParser {
 
     fn resolve_binary_operator(
         operator: &OperatorToken,
-        lhs: Box<dyn Expression>,
-        rhs: Box<dyn Expression>,
-    ) -> Result<Box<dyn Expression>> {
+        lhs: Expression,
+        rhs: Expression,
+    ) -> Result<Expression> {
+        let lhs = Box::new(lhs);
+        let rhs = Box::new(rhs);
+
         match operator {
             OperatorToken::Assignment => Err(CompilerError::InvalidExpression {
                 message: "Assignment operator disallowed in expressions!".into(),
             }
             .boxed()),
             OperatorToken::Plus => {
-                Ok(Box::new(AddExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Add { lhs, rhs }))
             }
             OperatorToken::Minus => {
-                Ok(Box::new(SubtractExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Subtract { lhs, rhs }))
             }
             OperatorToken::Multiply => {
-                Ok(Box::new(MultiplyExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Multiply { lhs, rhs }))
             }
             OperatorToken::Divide => {
-                Ok(Box::new(DivideExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Divide { lhs, rhs }))
             }
             OperatorToken::Modulo => {
-                Ok(Box::new(ModuloExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Modulo { lhs, rhs }))
             }
             OperatorToken::Power => {
-                Ok(Box::new(PowerExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Arithmetic(ArithmeticExpression::Power { base: lhs, exponent: rhs }))
             }
-            OperatorToken::And => Ok(Box::new(AndExpression::new(lhs, rhs)) as Box<dyn Expression>),
-            OperatorToken::Or => Ok(Box::new(OrExpression::new(lhs, rhs)) as Box<dyn Expression>),
+            OperatorToken::And => Ok(Expression::Boolean(BooleanExpression::And { lhs, rhs })),
+            OperatorToken::Or => Ok(Expression::Boolean(BooleanExpression::Or { lhs, rhs })),
             OperatorToken::Equality => {
-                Ok(Box::new(EqualityExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Comparison(ComparisonExpression::Equals { lhs, rhs }))
             }
-            OperatorToken::Inequality => Ok(Box::new(NotExpression::new(Box::new(
-                EqualityExpression::new(lhs, rhs),
-            ))) as Box<dyn Expression>),
+            OperatorToken::Inequality => Ok(
+                Expression::Boolean(BooleanExpression::Not(
+                    Box::new(Expression::Comparison(ComparisonExpression::Equals { lhs, rhs }))
+                ))
+            ),
             OperatorToken::Not => Err(CompilerError::InvalidExpression {
                 message: "'Not' operator is not a binary operator!".into(),
             }
             .boxed()),
             OperatorToken::Greater => {
-                Ok(Box::new(GreaterThanExpression::new(lhs, rhs)) as Box<dyn Expression>)
+                Ok(Expression::Comparison(ComparisonExpression::GreaterThan { lhs, rhs }))
             }
             OperatorToken::Less => {
-                Ok(Box::new(GreaterThanExpression::new(rhs, lhs)) as Box<dyn Expression>)
+                Ok(Expression::Comparison(ComparisonExpression::GreaterThan { lhs: rhs, rhs: lhs }))
             }
-            OperatorToken::GreaterEquals => Ok(Box::new(NotExpression::new(Box::new(
-                GreaterThanExpression::new(rhs, lhs),
-            ))) as Box<dyn Expression>),
-            OperatorToken::LessEquals => Ok(Box::new(NotExpression::new(Box::new(
-                GreaterThanExpression::new(lhs, rhs),
-            ))) as Box<dyn Expression>),
+            OperatorToken::GreaterEquals => Ok(
+                Expression::Boolean(BooleanExpression::Not(
+                    Box::new(Expression::Comparison(ComparisonExpression::GreaterThan { lhs: rhs, rhs: lhs }))
+                ))
+            ),
+            OperatorToken::LessEquals => Ok(
+                Expression::Boolean(BooleanExpression::Not(
+                    Box::new(Expression::Comparison(ComparisonExpression::GreaterThan { lhs, rhs }))
+                ))
+            ),
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum ScopeAccessMode {
-    Move,
-    Ref,
-    Clone,
-    Typeof,
 }
 
 enum ExpressionAtomParserState {
@@ -389,25 +381,25 @@ enum ExpressionAtomParserState {
         ident: String,
     },
     ScopeAddress {
-        address: Vec<ScopeAddressant>,
-        access: ScopeAccessMode,
+        address: Vec<VariableAddressant>,
+        access: VariableAccessMode,
     },
     ScopeAddressMember {
-        address: Vec<ScopeAddressant>,
-        access: ScopeAccessMode,
+        address: Vec<VariableAddressant>,
+        access: VariableAccessMode,
     },
     Subexpression {
-        subexpression: Box<dyn Expression>,
+        subexpression: Expression,
     },
     ModuleMember {
         module_ident: String,
         member_ident: Option<String>,
     },
     StructMember {
-        subexpression: Box<dyn Expression>,
+        subexpression: Expression,
     },
     AssociatedProcedureCall {
-        subexpression: Box<dyn Expression>,
+        subexpression: Expression,
         ident: Option<String>,
     },
 }
@@ -437,15 +429,15 @@ impl ExpressionAtomParser {
                 Base => match token {
                     Token::Keyword(KeywordToken::Catch) => {
                         self.state = Subexpression {
-                            subexpression: Box::new(CatchExpression::new(
-                                ExpressionParser::parse(&mut tokens, environment)?
+                            subexpression: Expression::Catch(CatchExpression::new(
+                                Box::new(ExpressionParser::parse(&mut tokens, environment)?)
                             ))
                         };
                     }
 
                     Token::Literal(literal) => {
                         self.state = Subexpression {
-                            subexpression: Box::new(Value::try_from(literal)?),
+                            subexpression: Expression::Value(try_parse_literal(literal)?),
                         }
                     }
                     Token::Identifier(ident) => {
@@ -453,19 +445,19 @@ impl ExpressionAtomParser {
                     }
                     Token::Keyword(KeywordToken::Ref) => {
                         self.state = ScopeAddressMember {
-                            access: ScopeAccessMode::Ref,
+                            access: VariableAccessMode::Ref,
                             address: Vec::new(),
                         };
                     }
                     Token::Keyword(KeywordToken::Clone) => {
                         self.state = ScopeAddressMember {
-                            access: ScopeAccessMode::Clone,
+                            access: VariableAccessMode::Clone,
                             address: Vec::new(),
                         };
                     }
                     Token::Keyword(KeywordToken::Typeof) => {
                         self.state = ScopeAddressMember {
-                            access: ScopeAccessMode::Typeof,
+                            access: VariableAccessMode::TypeOf,
                             address: Vec::new(),
                         };
                     }
@@ -495,7 +487,7 @@ impl ExpressionAtomParser {
                             items.push(ExpressionParser::parse(raw_item, environment)?);
                         }
                         self.state = Subexpression {
-                            subexpression: Box::new(ArrayConstructionExpression { items }),
+                            subexpression: Expression::ArrayConstruction(ArrayConstructionExpression::new(items)),
                         }
                     }
                     other => {
@@ -509,8 +501,8 @@ impl ExpressionAtomParser {
                 SingleIdent { ident } => match token {
                     Token::Punctuation(PunctuationToken::Dot) => {
                         self.state = ScopeAddressMember {
-                            address: vec![ScopeAddressant::Identifier(ident)],
-                            access: ScopeAccessMode::Move,
+                            address: vec![VariableAddressant::Identifier(ident)],
+                            access: VariableAccessMode::Move,
                         };
                     }
                     Token::Punctuation(PunctuationToken::SquareBrackets(
@@ -526,10 +518,10 @@ impl ExpressionAtomParser {
 
                         self.state = ScopeAddress {
                             address: vec![
-                                ScopeAddressant::Identifier(ident),
-                                ScopeAddressant::DynamicIndex(index_expression.into()),
+                                VariableAddressant::Identifier(ident),
+                                VariableAddressant::DynamicIndex(index_expression.into()),
                             ],
-                            access: ScopeAccessMode::Move,
+                            access: VariableAccessMode::Move,
                         };
                     }
                     Token::Punctuation(PunctuationToken::DoubleColon) => {
@@ -540,11 +532,12 @@ impl ExpressionAtomParser {
                     }
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
                         self.state = AssociatedProcedureCall {
-                            subexpression: Box::new(VariableExpression {
-                                variable_address: vec![ScopeAddressant::Identifier(ident)]
+                            subexpression: Expression::Variable(VariableExpression::new(
+                                vec![VariableAddressant::Identifier(ident)]
                                     .try_into()
                                     .unwrap(),
-                            }),
+                                VariableAccessMode::Move
+                            )),
                             ident: None,
                         }
                     }
@@ -565,10 +558,10 @@ impl ExpressionAtomParser {
                         }
 
                         self.state = Subexpression {
-                            subexpression: Box::new(ProcedureCallExpression {
-                                procedure_id: module_address,
+                            subexpression: Expression::ProcedureCall(ProcedureCallExpression::new(
+                                module_address,
                                 arguments,
-                            }),
+                            )),
                         };
                     }
 
@@ -614,10 +607,10 @@ impl ExpressionAtomParser {
                         }
 
                         self.state = Subexpression {
-                            subexpression: Box::new(StructConstructionExpression {
-                                struct_id: module_address,
+                            subexpression: Expression::StructConstruction(StructConstructionExpression::new(
+                                module_address,
                                 field_overrides,
-                            }),
+                            )),
                         };
                     }
 
@@ -649,30 +642,15 @@ impl ExpressionAtomParser {
                         )?;
                         let index_expression = ExpressionParser::parse(inner, environment)?;
 
-                        address.push(ScopeAddressant::DynamicIndex(index_expression.into()));
+                        address.push(VariableAddressant::DynamicIndex(index_expression.into()));
 
                         self.state = ScopeAddress { address, access };
                     }
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
-                        let variable_address = address.try_into().unwrap();
-                        let subexpression = match access {
-                            ScopeAccessMode::Move => {
-                                Box::new(VariableExpression { variable_address })
-                                    as Box<dyn Expression>
-                            }
-                            ScopeAccessMode::Ref => {
-                                Box::new(ReferenceExpression { variable_address })
-                                    as Box<dyn Expression>
-                            }
-                            ScopeAccessMode::Clone => {
-                                Box::new(CloneExpression { variable_address })
-                                    as Box<dyn Expression>
-                            }
-                            ScopeAccessMode::Typeof => {
-                                Box::new(TypeofVariableExpression { variable_address })
-                                    as Box<dyn Expression>
-                            }
-                        };
+                        let subexpression = Expression::Variable(VariableExpression::new(
+                            address.try_into().unwrap(),
+                            access
+                        ));
 
                         self.state = AssociatedProcedureCall {
                             subexpression,
@@ -692,7 +670,7 @@ impl ExpressionAtomParser {
                     access,
                 } => match token {
                     Token::Identifier(ident) => {
-                        address.push(ScopeAddressant::Identifier(ident));
+                        address.push(VariableAddressant::Identifier(ident));
                         self.state = ScopeAddress { address, access };
                     }
 
@@ -720,10 +698,10 @@ impl ExpressionAtomParser {
                         let index_expression = ExpressionParser::parse(inner, environment)?;
 
                         self.state = Subexpression {
-                            subexpression: Box::new(ArrayIndexExpression {
-                                subexpression,
-                                index_expression,
-                            }),
+                            subexpression: Expression::ArrayIndex(ArrayIndexExpression::new(
+                                Box::new(subexpression),
+                                Box::new(index_expression),
+                            )),
                         };
                     }
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
@@ -764,13 +742,13 @@ impl ExpressionAtomParser {
                                 }
 
                                 self.state = Subexpression {
-                                    subexpression: Box::new(ProcedureCallExpression {
-                                        procedure_id: ModuleAddress::new(
+                                    subexpression: Expression::ProcedureCall(ProcedureCallExpression::new(
+                                        ModuleAddress::new(
                                             module_ident,
                                             member_ident,
                                         ),
                                         arguments,
-                                    }),
+                                    )),
                                 };
                             }
                             Token::Punctuation(PunctuationToken::CurlyBraces(
@@ -819,10 +797,10 @@ impl ExpressionAtomParser {
                                 }
 
                                 self.state = Subexpression {
-                                    subexpression: Box::new(StructConstructionExpression {
-                                        struct_id: ModuleAddress::new(module_ident, member_ident),
+                                    subexpression: Expression::StructConstruction(StructConstructionExpression::new(
+                                        ModuleAddress::new(module_ident, member_ident),
                                         field_overrides,
-                                    }),
+                                    )),
                                 };
                             }
 
@@ -852,10 +830,10 @@ impl ExpressionAtomParser {
                 StructMember { subexpression } => match token {
                     Token::Identifier(member_ident) => {
                         self.state = Subexpression {
-                            subexpression: Box::new(StructMemberExpression {
-                                subexpression,
+                            subexpression: Expression::StructMember(StructMemberExpression::new(
+                                Box::new(subexpression),
                                 member_ident,
-                            }),
+                            )),
                         }
                     }
 
@@ -889,11 +867,11 @@ impl ExpressionAtomParser {
                                 }
 
                                 self.state = Subexpression {
-                                    subexpression: Box::new(AssociatedProcedureCallExpression {
-                                        callee_expression: subexpression,
-                                        procedure_ident: ident,
+                                    subexpression: Expression::AssociatedProcedureCall(AssociatedProcedureCallExpression::new(
+                                        Box::new(subexpression),
+                                        ident,
                                         arguments,
-                                    }),
+                                    )),
                                 };
                             }
 
@@ -933,27 +911,16 @@ impl ExpressionAtomParser {
             }
             .boxed()),
             ExpressionAtomParserState::SingleIdent { ident } => Ok(ExpressionAtom::Subexpression(
-                Box::new(VariableExpression {
-                    variable_address: vec![ScopeAddressant::Identifier(ident)].try_into().unwrap(),
-                }),
+                Expression::Variable(VariableExpression::new(
+                    vec![VariableAddressant::Identifier(ident)].try_into().unwrap(),
+                    VariableAccessMode::Move
+                )),
             )),
             ExpressionAtomParserState::ScopeAddress { address, access } => {
                 Ok(ExpressionAtom::Subexpression({
-                    let variable_address = address.try_into().unwrap();
-                    match access {
-                        ScopeAccessMode::Move => {
-                            Box::new(VariableExpression { variable_address }) as Box<dyn Expression>
-                        }
-                        ScopeAccessMode::Ref => Box::new(ReferenceExpression { variable_address })
-                            as Box<dyn Expression>,
-                        ScopeAccessMode::Clone => {
-                            Box::new(CloneExpression { variable_address }) as Box<dyn Expression>
-                        }
-                        ScopeAccessMode::Typeof => {
-                            Box::new(TypeofVariableExpression { variable_address })
-                                as Box<dyn Expression>
-                        }
-                    }
+                    Expression::Variable(VariableExpression::new(
+                        address.try_into().unwrap(), access
+                    ))
                 }))
             }
             ExpressionAtomParserState::ScopeAddressMember {
@@ -971,7 +938,7 @@ impl ExpressionAtomParser {
                 member_ident,
             } => {
                 if let Some(member_ident) = member_ident {
-                    Ok(ExpressionAtom::Subexpression(Box::new(Value::Type(
+                    Ok(ExpressionAtom::Subexpression(Expression::Value(Value::Type(
                         Type::Struct {
                             struct_id: ModuleAddress::new(module_ident, member_ident),
                         },
@@ -999,4 +966,59 @@ impl ExpressionAtomParser {
             .boxed()),
         }
     }
+}
+
+fn try_parse_literal(literal: crate::lexer::token::LiteralToken) -> Result<Value> {
+    match literal {
+        LiteralToken::Null => Ok(Value::Null),
+        LiteralToken::Integer(num) => Ok(Value::Integer(num.parse().map_err(|_| {
+            CompilerError::LiteralParseError {
+                ty: Type::Integer,
+                literal: num,
+            }
+            .boxed()
+        })?)),
+        LiteralToken::Float(num) => Ok(Value::Float(num.parse().map_err(|_| {
+            CompilerError::LiteralParseError {
+                ty: Type::Float,
+                literal: num,
+            }
+            .boxed()
+        })?)),
+        LiteralToken::Boolean(b) => match &b as &str {
+            "true" => Ok(Value::Bool(true)),
+            "false" => Ok(Value::Bool(false)),
+            _ => Err(CompilerError::LiteralParseError {
+                ty: Type::Bool,
+                literal: b,
+            }
+            .boxed()),
+        },
+        LiteralToken::Char(c) => Ok(Value::Char(
+            c.chars().next().ok_or(
+                CompilerError::LiteralParseError {
+                    ty: Type::Char,
+                    literal: c,
+                }
+                .boxed(),
+            )?,
+        )),
+        LiteralToken::String(str) => Ok(Value::String(str)),
+        LiteralToken::Type(ty) => Ok(Value::Type(parse_type(ty))),
+    }
+}
+
+fn parse_type(ty: PrimitiveTypeToken) -> Type {
+    macro_rules! id {
+        ($value:ident: $id0:ident $(, $id:ident)+) => {
+            match $value {
+                PrimitiveTypeToken::$id0 => Type::$id0,
+                $(
+                    PrimitiveTypeToken::$id => Type::$id,
+                )+
+            }
+        };
+    }
+    
+    id!(ty: Null, Integer, Float, Bool, Char, String, Array, Moved, Dropped, Type)   
 }

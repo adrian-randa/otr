@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use crate::{lexer::token::Token, runtime::Type};
+use crate::{core::{r#type::Type, value::Value}, lexer::token::Token};
 
 #[derive(Debug)]
 pub(crate) enum CompilerError {
@@ -33,7 +33,7 @@ pub(crate) enum CompilerError {
 }
 
 impl super::Error for CompilerError {
-    fn to_value(&self) -> crate::runtime::Value {
+    fn to_value(&self) -> Value {
         panic!("Compiler Errors cannot be turned into values!")
     }
 }

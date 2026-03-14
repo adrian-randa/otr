@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use colored::Colorize;
 
-use crate::runtime::{ModuleAddress, Struct, Type, Value};
+use crate::core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value};
 
 #[derive(Debug)]
 pub enum RuntimeError {
