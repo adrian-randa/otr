@@ -3,17 +3,33 @@ use std::{cell::RefCell, fs, rc::Rc};
 use num::ToPrimitive;
 
 use crate::{
-    core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value}, error::{Result, runtime_error::RuntimeError}, runtime::{module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}}
+    core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value}, error::{Result, runtime_error::RuntimeError}, runtime::{environment::features::FeatureBuilder, module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}}
 };
 
-pub(crate) fn get_module() -> RuntimeModule<'static> {
-    RuntimeModule::Abstract(Box::new(FilesModule))
+pub(crate) struct FilesFeatureBuilder {
+    //TODO: Add support for feature arguments
+}
+
+impl FilesFeatureBuilder {
+    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+        Box::new(Self { })
+    }
+}
+
+impl FeatureBuilder for FilesFeatureBuilder {
+    fn add_arg(&mut self, _arg_ident: &dyn AsRef<str>, _arg_value: &dyn AsRef<str>) -> Result<()> {
+        Err(RuntimeError::Unknown { message: "Feature arguments not supported!".into() }.boxed())
+    }
+
+    fn build(&mut self) -> Result<RuntimeModule<'static>> {
+        Ok(RuntimeModule::Abstract(Box::new(FilesFeature)))
+    }
 }
 
 #[derive(Debug)]
-struct FilesModule;
+struct FilesFeature;
 
-impl Module for FilesModule {
+impl Module for FilesFeature {
     fn get_procedure(
         &self,
         identifier: &String,

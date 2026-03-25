@@ -1,17 +1,34 @@
+use crate::runtime::environment::features::FeatureBuilder;
 use crate::runtime::module::{Module, RuntimeModule};
 use crate::runtime::procedures::RuntimeProcedure;
 use crate::runtime::{environment::Environment, procedures::Procedure, RuntimeError, Value};
 
 use crate::error::Result;
 
-pub(crate) fn get_module() -> RuntimeModule<'static> {
-    RuntimeModule::Abstract(Box::new(FilesModule))
+pub(crate) struct ArraysFeatureBuilder {
+    //TODO: Add support for feature arguments
+}
+
+impl ArraysFeatureBuilder {
+    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+        Box::new(Self { })
+    }
+}
+
+impl FeatureBuilder for ArraysFeatureBuilder {
+    fn add_arg(&mut self, _arg_ident: &dyn AsRef<str>, _arg_value: &dyn AsRef<str>) -> Result<()> {
+        Err(RuntimeError::Unknown { message: "Feature arguments not supported!".into() }.boxed())
+    }
+
+    fn build(&mut self) -> Result<RuntimeModule<'static>> {
+        Ok(RuntimeModule::Abstract(Box::new(ArraysFeature)))
+    }
 }
 
 #[derive(Debug)]
-struct FilesModule;
+struct ArraysFeature;
 
-impl Module for FilesModule {
+impl Module for ArraysFeature {
     fn get_procedure(
         &self,
         identifier: &String,

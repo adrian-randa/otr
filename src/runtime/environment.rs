@@ -8,7 +8,6 @@ use crate::error::runtime_error::RuntimeError;
 
 use crate::runtime::module::{Module, RuntimeModule};
 use crate::runtime::procedures::RuntimeProcedure;
-use crate::runtime::procedures::builtin::{arrays, debug, files, numbers, strings};
 
 use crate::core::module::ModuleAddress;
 
@@ -30,16 +29,7 @@ impl Default for Environment<'_> {
     fn default() -> Self {
         Self {
             contained_module_id: Default::default(),
-            loaded_modules: HashMap::from_iter(
-                vec![
-                    ("Arrays".into(), Rc::new(arrays::get_module())),
-                    ("Strings".into(), Rc::new(strings::get_module())),
-                    ("Numbers".into(), Rc::new(numbers::get_module())),
-                    ("Debug".into(), Rc::new(debug::get_module())),
-                    ("Files".into(), Rc::new(files::get_module())),
-                ]
-                .into_iter(),
-            ),
+            loaded_modules: Default::default(),
             scope: Default::default(),
         }
     }
@@ -162,3 +152,6 @@ impl<'a> Environment<'a> {
         }
     }
 }
+
+pub mod environment_builder;
+pub(crate) mod features;

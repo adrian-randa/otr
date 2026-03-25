@@ -29,6 +29,10 @@ fn main() {
         }
     };
 
+    println!("{:#?}", compiled_object);
+            
+            
+
     let runtime_object = RuntimeObject::from(compiled_object);
 
     if let Err(error) = runtime_object.execute() {

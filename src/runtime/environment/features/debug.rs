@@ -1,18 +1,36 @@
 use crate::runtime::environment::Environment;
+use crate::runtime::environment::features::FeatureBuilder;
 use crate::runtime::module::{Module, RuntimeModule};
 use crate::runtime::procedures::RuntimeProcedure;
 use crate::runtime::{procedures::Procedure, RuntimeError, Value};
 
 use crate::error::Result;
 
-pub(crate) fn get_module() -> RuntimeModule<'static> {
-    RuntimeModule::Abstract(Box::new(DebugModule))
+pub(crate) struct DebugFeatureBuilder {
+    //TODO: Add support for feature arguments
 }
 
-#[derive(Debug)]
-struct DebugModule;
+impl DebugFeatureBuilder {
+    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+        Box::new(Self { })
+    }
+}
 
-impl Module for DebugModule {
+impl FeatureBuilder for DebugFeatureBuilder {
+    fn add_arg(&mut self, _arg_ident: &dyn AsRef<str>, _arg_value: &dyn AsRef<str>) -> Result<()> {
+        Err(RuntimeError::Unknown { message: "Feature arguments not supported!".into() }.boxed())
+    }
+
+    fn build(&mut self) -> Result<RuntimeModule<'static>> {
+        Ok(RuntimeModule::Abstract(Box::new(DebugFeature)))
+    }
+}
+
+
+#[derive(Debug)]
+struct DebugFeature;
+
+impl Module for DebugFeature {
     fn get_procedure(
         &self,
         identifier: &String,
