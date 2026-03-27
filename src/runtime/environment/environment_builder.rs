@@ -14,10 +14,10 @@ use crate::error::Result;
 
 pub(crate) trait EnvironmentBuilderState { }
 
-pub(crate) struct EnvironmentBuilderBaseState;
+pub struct EnvironmentBuilderBaseState;
 impl EnvironmentBuilderState for EnvironmentBuilderBaseState { }
 
-pub(crate) struct EnvironmentBuilderFeatureState;
+pub struct EnvironmentBuilderFeatureState;
 impl EnvironmentBuilderState for EnvironmentBuilderFeatureState { }
 
 #[allow(private_bounds)]
@@ -29,7 +29,7 @@ pub struct EnvironmentBuilder<State: EnvironmentBuilderState> {
 }
 
 #[allow(private_bounds, private_interfaces)]
-impl<State: EnvironmentBuilderState> EnvironmentBuilder<State> {
+impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
     #[allow(private_bounds)]
     pub fn new() -> EnvironmentBuilder<EnvironmentBuilderBaseState> {
         EnvironmentBuilder {

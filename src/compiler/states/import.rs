@@ -1,6 +1,6 @@
 use crate::{
     compiler::{
-        CompilerError, CompilerState, file_reader::ImportAddress, states::CompilerBaseState
+        CompilerError, CompilerState, source_file_reader::ImportAddress, states::CompilerBaseState
     }, core::CompiledObject, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
 };
 

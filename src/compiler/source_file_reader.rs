@@ -47,7 +47,7 @@ impl Iterator for SourceFile {
     }
 }
 
-pub struct FileReader {
+pub struct SourceFileReader {
     root_file_path: PathBuf,
     source_stack: Vec<SourceFile>,
     read_modules: HashSet<ImportAddress>,
@@ -55,7 +55,7 @@ pub struct FileReader {
     tokenizer: Tokenizer,
 }
 
-impl FileReader {
+impl SourceFileReader {
     pub fn new(tokenizer: Tokenizer, root_file_path: PathBuf) -> Self {
         Self {
             root_file_path,
@@ -129,7 +129,7 @@ impl FileReader {
     }
 }
 
-impl Iterator for FileReader {
+impl Iterator for SourceFileReader {
     type Item = ContextualizedToken;
 
     fn next(&mut self) -> Option<Self::Item> {

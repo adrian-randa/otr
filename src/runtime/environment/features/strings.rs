@@ -34,10 +34,10 @@ struct StringsFeature;
 
 impl Module for StringsFeature {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         match identifier as &str {
             "length" => Ok(RuntimeProcedure::AbstractRef(&StringLengthProcdure)),
             "split" => Ok(RuntimeProcedure::AbstractRef(&StringSplitProcedure)),
@@ -50,11 +50,11 @@ impl Module for StringsFeature {
     }
 
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         _struct_identifier: &String,
         _procedure_identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         todo!()
     }
 

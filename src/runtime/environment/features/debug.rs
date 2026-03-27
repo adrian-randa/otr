@@ -32,10 +32,10 @@ struct DebugFeature;
 
 impl Module for DebugFeature {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         match identifier as &str {
             "print" => Ok(RuntimeProcedure::AbstractRef(&DebugPrintProcedure)),
             "println" => Ok(RuntimeProcedure::AbstractRef(&DebugPrintlnProcedure)),
@@ -45,11 +45,11 @@ impl Module for DebugFeature {
     }
 
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         struct_identifier: &String,
         procedure_identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 

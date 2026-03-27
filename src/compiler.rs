@@ -1,9 +1,9 @@
 use std::{
-    collections::HashMap,
+    collections::HashMap, path::PathBuf,
 };
 
 use crate::{
-    compiler::{file_reader::FileReader, states::CompilerBaseState}, core::{CompiledObject, module::ModuleAddress}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::token::Token
+    compiler::{source_file_reader::{ImportAddress, SourceFileReader}, states::CompilerBaseState}, core::{CompiledObject, module::ModuleAddress}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{Tokenizer, token::Token}
 };
 
 use crate::error::Result;
@@ -50,11 +50,18 @@ pub struct Compiler {
 }
 
 impl Compiler {
-    pub fn new(file_reader: FileReader) -> Self {
-        Self {
+    pub fn new(tokenizer: Tokenizer, root_file_path: PathBuf, root_module_ident: String) -> Result<Self> {
+        let mut file_reader = SourceFileReader::new(tokenizer, root_file_path);
+
+        file_reader.push_dependency(ImportAddress {
+            module_id: root_module_ident,
+            path: None
+        })?;
+
+        Ok(Self {
             state: Box::new(CompilerBaseState::new()),
             compiler_environment: CompilerEnvironment::new(file_reader),
-        }
+        })
     }
 
     pub fn read(mut self, token: Token) -> Result<Self> {
@@ -104,11 +111,11 @@ pub struct CompilerEnvironment {
     procedure_ident_map: HashMap<String, ModuleAddress>,
     struct_ident_map: HashMap<String, ModuleAddress>,
 
-    file_reader: FileReader,
+    file_reader: SourceFileReader,
 }
 
 impl CompilerEnvironment {
-    pub(crate) fn new(file_reader: FileReader) -> Self {
+    pub(crate) fn new(file_reader: SourceFileReader) -> Self {
         Self {
             decorators: Vec::new(),
             procedure_ident_map: Default::default(),
@@ -121,11 +128,11 @@ impl CompilerEnvironment {
         self.decorators.push(decorator);
     }
 
-    pub fn get_file_reader(&self) -> &FileReader {
+    pub fn get_file_reader(&self) -> &SourceFileReader {
         &self.file_reader
     }
 
-    pub fn get_file_reader_mut(&mut self) -> &mut FileReader {
+    pub fn get_file_reader_mut(&mut self) -> &mut SourceFileReader {
         &mut self.file_reader
     }
 
@@ -174,7 +181,7 @@ impl ExpressionParseEnvironment for CompilerEnvironment {
 
 pub mod decorators;
 pub mod expression_parser;
-pub mod file_reader;
+pub mod source_file_reader;
 pub mod parenthesis;
 pub mod states;
 pub mod procedure;

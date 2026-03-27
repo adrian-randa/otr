@@ -31,10 +31,10 @@ struct FilesFeature;
 
 impl Module for FilesFeature {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         match identifier as &str {
             "read" => Ok(RuntimeProcedure::AbstractRef(&FSReadProcedure)),
             "write" => Ok(RuntimeProcedure::AbstractRef(&FSWriteProcedure)),
@@ -48,11 +48,11 @@ impl Module for FilesFeature {
     }
 
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         struct_identifier: &String,
         procedure_identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 

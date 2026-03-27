@@ -19,7 +19,7 @@ use std::rc::Rc;
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Environment<'a> {
+pub struct Environment<'a> {
     contained_module_id: String,
     loaded_modules: HashMap<String, Rc<RuntimeModule<'a>>>,
     scope: Scope,
@@ -45,13 +45,13 @@ impl Environment<'_> {
         }
     }
 
-    pub fn get_loaded_module(&self, module_id: &String) -> Option<&RuntimeModule> {
+    pub(crate) fn get_loaded_module(&'_ self, module_id: &String) -> Option<&'_ RuntimeModule<'_>> {
         self.loaded_modules
             .get(module_id)
             .map(|module| module.as_ref())
     }
 
-    pub fn get_procedure_by_address(&self, address: &ModuleAddress) -> Result<RuntimeProcedure> {
+    pub(crate) fn get_procedure_by_address(&'_ self, address: &ModuleAddress) -> Result<RuntimeProcedure<'_>> {
         let module = self.loaded_modules.get(address.get_module_id()).ok_or(
             RuntimeError::ModuleNotLoaded {
                 module_identifier: address.get_module_id().clone(),
@@ -138,6 +138,7 @@ impl Environment<'_> {
     }
 }
 
+#[allow(private_interfaces)]
 impl<'a> Environment<'a> {
     pub fn load_module(&mut self, module_identifier: String, module: Rc<RuntimeModule<'a>>) {
         match module.as_ref() {

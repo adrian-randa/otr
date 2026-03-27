@@ -5,16 +5,16 @@ use crate::error::Result;
 
 pub(crate) trait Module: std::fmt::Debug {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         private_access: bool,
-    ) -> Result<RuntimeProcedure>;
+    ) -> Result<RuntimeProcedure<'_>>;
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         struct_identifier: &String,
         procedure_identifier: &String,
         private_access: bool,
-    ) -> Result<RuntimeProcedure>;
+    ) -> Result<RuntimeProcedure<'_>>;
     fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct>;
 }
 
@@ -29,10 +29,10 @@ pub(crate) enum RuntimeModule<'a> {
 
 impl<'a> Module for RuntimeModule<'a> {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         private_access: bool,
-    ) -> Result<RuntimeProcedure> {
+    ) -> Result<RuntimeProcedure<'_>> {
         match self {
             RuntimeModule::Abstract(module) => module.get_procedure(identifier, private_access),
             RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
@@ -46,11 +46,11 @@ impl<'a> Module for RuntimeModule<'a> {
     }
 
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         struct_identifier: &String,
         procedure_identifier: &String,
         private_access: bool,
-    ) -> Result<RuntimeProcedure> {
+    ) -> Result<RuntimeProcedure<'_>> {
         match self {
             RuntimeModule::Abstract(module) => module.get_associated_procedure(struct_identifier, procedure_identifier, private_access),
             RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(compiled_module.get_associated_procedure(struct_identifier, procedure_identifier, private_access)?)),

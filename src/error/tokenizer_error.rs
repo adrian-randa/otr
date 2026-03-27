@@ -1,6 +1,7 @@
 use colored::{Color, Colorize};
 use crate::core::value::Value;
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum TokenizerError {}
 

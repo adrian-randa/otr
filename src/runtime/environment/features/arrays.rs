@@ -30,10 +30,10 @@ struct ArraysFeature;
 
 impl Module for ArraysFeature {
     fn get_procedure(
-        &self,
+        &'_ self,
         identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         match identifier as &str {
             "new" => Ok(RuntimeProcedure::AbstractRef(&NewArrayProcedure)),
             "size" => Ok(RuntimeProcedure::AbstractRef(&ArraySizeProcedure)),
@@ -43,11 +43,11 @@ impl Module for ArraysFeature {
     }
 
     fn get_associated_procedure(
-        &self,
+        &'_ self,
         struct_identifier: &String,
         procedure_identifier: &String,
         _private_access: bool,
-    ) -> Result<crate::runtime::procedures::RuntimeProcedure> {
+    ) -> Result<crate::runtime::procedures::RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 
