@@ -1,9 +1,6 @@
 use crate::{
     compiler::{
-        CompilerEnvironment, CompilerError, CompilerState, decorators::EntrypointDecorator, procedure::CompiledProcedureBuilder, states::{
-            decorator::RawDecorator,
-            module::CompilerModuleState,
-        }
+        CompilerEnvironment, CompilerError, CompilerState, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState,
     }, core::{CompiledObject, module::ModuleAddress}, lexer::token::{ParenthesisType, PunctuationToken, Token}
 };
 
@@ -33,7 +30,6 @@ enum ProcedureIdentifier {
 
 pub struct CompilerProcedureState {
     module: CompilerModuleState,
-    decorators: Vec<RawDecorator>,
     procedure_identifier: Option<ProcedureIdentifier>,
     procedure: CompiledProcedureBuilder,
 
@@ -41,10 +37,9 @@ pub struct CompilerProcedureState {
 }
 
 impl CompilerProcedureState {
-    pub fn new(module: CompilerModuleState, decorators: Vec<RawDecorator>) -> Self {
+    pub fn new(module: CompilerModuleState) -> Self {
         Self {
             module,
-            decorators,
             procedure_identifier: None,
             procedure: CompiledProcedureBuilder::new(),
 
@@ -241,45 +236,6 @@ impl CompilerState for CompilerProcedureState {
                                     Box::new(procedure),
                                     false,
                                 );
-                            }
-                        }
-
-                        for decorator in self.decorators {
-                            match decorator.get_ident() as &str {
-                                "entrypoint" => {
-                                    let name = if let ProcedureIdentifier::Procedure { ref ident } =
-                                        name
-                                    {
-                                        ident
-                                    } else {
-                                        return Err(CompilerError::InvalidDefinition {
-                                            message: "Associated procedures cannot be used as an entrypoint!".into()
-                                        }.boxed());
-                                    };
-
-                                    compiler_environment.push_decorator(Box::new(
-                                        EntrypointDecorator::new(ModuleAddress::new(
-                                            self.module
-                                                .get_name()
-                                                .ok_or(
-                                                    CompilerError::InvalidDefinition {
-                                                        message: "Contained module has no name!"
-                                                            .into(),
-                                                    }
-                                                    .boxed(),
-                                                )?
-                                                .to_owned(),
-                                            name.clone(),
-                                        )),
-                                    ));
-                                }
-
-                                other => {
-                                    return Err(CompilerError::InvalidDefinition {
-                                        message: format!("Unsupported decorator '{}'!", other),
-                                    }
-                                    .boxed())
-                                }
                             }
                         }
 

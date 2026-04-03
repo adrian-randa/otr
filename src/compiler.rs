@@ -54,12 +54,12 @@ impl Compiler {
         let mut file_reader = SourceFileReader::new(tokenizer, root_file_path);
 
         file_reader.push_dependency(ImportAddress {
-            module_id: root_module_ident,
+            module_id: root_module_ident.clone(),
             path: None
         })?;
 
         Ok(Self {
-            state: Box::new(CompilerBaseState::new()),
+            state: Box::new(CompilerBaseState::new(root_module_ident)),
             compiler_environment: CompilerEnvironment::new(file_reader),
         })
     }
@@ -70,13 +70,7 @@ impl Compiler {
     }
 
     pub fn finalize(self) -> Result<CompiledObject> {
-        let mut object = self.state.finalize()?;
-
-        for decorator in self.compiler_environment.decorators {
-            decorator.apply(&mut object)?;
-        }
-
-       Ok(object)
+        self.state.finalize()
     }
 
     pub fn compile(mut self) -> Result<CompiledObject> {
@@ -179,7 +173,6 @@ impl ExpressionParseEnvironment for CompilerEnvironment {
     }
 }
 
-pub mod decorators;
 pub mod expression_parser;
 pub mod source_file_reader;
 pub mod parenthesis;

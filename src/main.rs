@@ -4,11 +4,15 @@ use otr::{compiler::{Compiler, source_file_reader::{ImportAddress, SourceFileRea
 use otr::error::Result;
 
 fn main() {
-    //run();
-    match get_project_config() {
+    let config = get_project_config().unwrap();
+
+    let root_module = config.get_root_module();
+
+    run(env::current_dir().unwrap(), root_module.into()).unwrap();
+    /* match get_project_config() {
         Ok(conf) => println!("{:#?}", conf),
         Err(err) => println!("{err}"),
-    }
+    } */
 }
 
 fn get_project_config() -> Result<ProjectConfiguration> {

@@ -13,7 +13,7 @@ pub mod expression;
 #[derive(Debug, Clone)]
 pub struct CompiledObject {
     modules: HashMap<String, CompiledModule>,
-    entrypoint: Option<ModuleAddress>,
+    root: Option<String>,
 }
 
 impl IntoIterator for CompiledObject {
@@ -27,23 +27,23 @@ impl IntoIterator for CompiledObject {
 }
 
 impl CompiledObject {
-    pub(crate) fn new() -> Self {
-        Self { modules: HashMap::new(), entrypoint: None }
+    pub(crate) fn new(root: String) -> Self {
+        Self { modules: HashMap::new(), root: Some(root) }
     }
 
     pub(crate) fn insert_module(&mut self, identifier: String, module: CompiledModule) {
         self.modules.insert(identifier, module);
     }
 
-    pub(crate) fn get_entrypoint(&self) -> &Option<ModuleAddress> {
-        &self.entrypoint
+    pub(crate) fn get_root(&self) -> &Option<String> {
+        &self.root
     }
 
-    pub(crate) fn entrypoint(&mut self) -> Option<ModuleAddress> {
-        self.entrypoint.take()
+    pub(crate) fn root(&mut self) -> Option<String> {
+        self.root.take()
     }
 
-    pub(crate) fn set_entrypoint(&mut self, entrypoint: ModuleAddress) {
-        self.entrypoint = Some(entrypoint);
+    pub(crate) fn set_root(&mut self, root: String) {
+        self.root = Some(root);
     }
 }

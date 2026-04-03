@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
         CompilerEnvironment, CompilerError, CompilerState, states::{
-            CompilerBaseState, decorator::CompilerDecoratorState, procedure::CompilerProcedureState, r#struct::CompilerStructState
+            CompilerBaseState, procedure::CompilerProcedureState, r#struct::CompilerStructState
         }
     }, core::{CompiledObject, module::CompiledModule}, error::context::HintContextDecorator, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
 };
@@ -97,15 +97,11 @@ impl CompilerState for CompilerModuleState {
                 }
 
                 Token::Keyword(KeywordToken::Proc) => {
-                    return Ok(Box::new(CompilerProcedureState::new(*self, Vec::new())));
+                    return Ok(Box::new(CompilerProcedureState::new(*self)));
                 }
 
                 Token::Keyword(KeywordToken::Struct) => {
                     return Ok(Box::new(CompilerStructState::new(*self)));
-                }
-
-                Token::Punctuation(PunctuationToken::At) => {
-                    return Ok(Box::new(CompilerDecoratorState::new(*self)));
                 }
 
                 Token::Keyword(KeywordToken::Export) => {

@@ -14,9 +14,9 @@ pub struct CompilerBaseState {
 }
 
 impl CompilerBaseState {
-    pub fn new() -> Self {
+    pub fn new(root: String) -> Self {
         Self {
-            object: CompiledObject::new(),
+            object: CompiledObject::new(root),
         }
     }
 }
@@ -49,7 +49,6 @@ impl CompilerState for CompilerBaseState {
     }
 }
 
-pub mod decorator;
 pub mod import;
 pub mod module;
 pub mod procedure;

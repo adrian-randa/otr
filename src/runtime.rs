@@ -27,7 +27,7 @@ impl From<CompiledObject> for RuntimeObject<'_> {
     fn from(mut object: CompiledObject) -> Self {
         let mut runtime_object = Self {
             base_environement: Environment::default(),
-            entrypoint: object.entrypoint()
+            entrypoint: object.root().map(|root| (&root as &str, "main").into())
         };
 
         for (identifier, module) in object {
