@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
         CompilerEnvironment, CompilerError, CompilerState, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState,
-    }, core::{CompiledObject, module::ModuleAddress}, lexer::token::{ParenthesisType, PunctuationToken, Token}
+    }, core::{CompiledObject, module::{CompiledModule, ModuleAddress}}, lexer::token::{ParenthesisType, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -249,7 +249,7 @@ impl CompilerState for CompilerProcedureState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
+    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

@@ -6,6 +6,8 @@ use std::{
     str::FromStr,
 };
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     compiler::CompilerError,
     lexer::{
@@ -17,7 +19,7 @@ use crate::{
 
 use crate::error::Result;
 
-#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+#[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct ImportAddress {
     pub module_id: String,
     pub path: Option<String>,

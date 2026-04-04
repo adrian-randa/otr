@@ -1,10 +1,11 @@
 use std::{cell::RefCell, rc::{Rc, Weak}, vec::IntoIter};
 
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
 use crate::{core::{expression::variable::VariableAddressant, r#struct::Struct, r#type::Type}, error::{Result, context::VariableContextDecorator, runtime_error::RuntimeError}};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub enum Value {
     Null,
     Integer(i64),

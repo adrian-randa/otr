@@ -1,9 +1,9 @@
 use std::{
-    collections::HashMap, path::PathBuf,
+    collections::{HashMap, HashSet}, path::PathBuf,
 };
 
 use crate::{
-    compiler::{source_file_reader::{ImportAddress, SourceFileReader}, states::CompilerBaseState}, core::{CompiledObject, module::ModuleAddress}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{Tokenizer, token::Token}
+    compiler::{source_file_reader::{ImportAddress, SourceFileReader}, states::CompilerBaseState}, core::{CompiledObject, module::{CompiledModule, ModuleAddress}}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{Tokenizer, token::{ContextualizedToken, Token}}
 };
 
 use crate::error::Result;
@@ -15,7 +15,7 @@ pub trait CompilerState {
         compiler_environment: &mut CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>>;
 
-    fn finalize(self: Box<Self>) -> Result<CompiledObject>;
+    fn finalize(self: Box<Self>) -> Result<CompiledModule>;
 }
 
 pub trait Decorator {
@@ -46,53 +46,27 @@ impl ExpressionParseEnvironment for NoExpressionEnvironment {
 
 pub struct Compiler {
     state: Box<dyn CompilerState>,
-    compiler_environment: CompilerEnvironment,
 }
 
 impl Compiler {
-    pub fn new(tokenizer: Tokenizer, root_file_path: PathBuf, root_module_ident: String) -> Result<Self> {
-        let mut file_reader = SourceFileReader::new(tokenizer, root_file_path);
-
-        file_reader.push_dependency(ImportAddress {
-            module_id: root_module_ident.clone(),
-            path: None
-        })?;
-
-        Ok(Self {
-            state: Box::new(CompilerBaseState::new(root_module_ident)),
-            compiler_environment: CompilerEnvironment::new(file_reader),
-        })
+    pub fn new() -> Self {
+        Self {
+            state: Box::new(CompilerBaseState::new()),
+        }
     }
 
-    pub fn read(mut self, token: Token) -> Result<Self> {
-        self.state = self.state.read(token, &mut self.compiler_environment)?;
+    pub fn read(mut self, token: Token, environment: &mut CompilerEnvironment) -> Result<Self> {
+        self.state = self.state.read(token, environment)?;
         Ok(self)
     }
 
-    pub fn finalize(self) -> Result<CompiledObject> {
+    pub fn finalize(self) -> Result<CompiledModule> {
         self.state.finalize()
     }
 
-    pub fn compile(mut self) -> Result<CompiledObject> {
-        while let Some(token) = self.compiler_environment.file_reader.next() {
-            let line = token.line_index;
-            let column = token.column_index;
-            let token = token.token;
-            let path = self
-                .compiler_environment
-                .file_reader
-                .get_current_file()?
-                .to_path_buf();
-            self = match self.read(token) {
-                Ok(s) => Ok(s),
-                Err(error) => Err(SourceFileContextDecorator {
-                    error,
-                    path,
-                    line,
-                    column,
-                }
-                .boxed()),
-            }?;
+    pub fn compile(mut self, tokens: impl Iterator<Item = Token>, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
+        for token in tokens {
+            self = self.read(token, environment)?;
         }
 
         self.finalize()
@@ -100,34 +74,22 @@ impl Compiler {
 }
 
 pub struct CompilerEnvironment {
-    decorators: Vec<Box<dyn Decorator>>,
-
     procedure_ident_map: HashMap<String, ModuleAddress>,
     struct_ident_map: HashMap<String, ModuleAddress>,
 
-    file_reader: SourceFileReader,
+    file_read_queue: Vec<ImportAddress>,
+    read_modules: HashSet<ImportAddress>,
 }
 
 impl CompilerEnvironment {
-    pub(crate) fn new(file_reader: SourceFileReader) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
-            decorators: Vec::new(),
             procedure_ident_map: Default::default(),
             struct_ident_map: Default::default(),
-            file_reader,
+            
+            file_read_queue: Default::default(),
+            read_modules: Default::default(),
         }
-    }
-
-    pub fn push_decorator(&mut self, decorator: Box<dyn Decorator>) {
-        self.decorators.push(decorator);
-    }
-
-    pub fn get_file_reader(&self) -> &SourceFileReader {
-        &self.file_reader
-    }
-
-    pub fn get_file_reader_mut(&mut self) -> &mut SourceFileReader {
-        &mut self.file_reader
     }
 
     pub fn register_procedure_ident(&mut self, address: ModuleAddress) {
@@ -140,6 +102,21 @@ impl CompilerEnvironment {
         let key = address.get_identifier().to_owned();
 
         self.struct_ident_map.insert(key, address);
+    }
+
+    pub fn has_read_module(&self, address: &ImportAddress) -> bool {
+        self.read_modules.contains(address)
+    }
+
+    pub fn push_file_to_queue(&mut self, address: ImportAddress) {
+        if !self.has_read_module(&address) {
+            self.file_read_queue.push(address.clone());
+            self.read_modules.insert(address);
+        }
+    }
+
+    pub fn get_next_file(&mut self) -> Option<ImportAddress> {
+        self.file_read_queue.pop()
     }
 }
 

@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 use itertools::Itertools;
+use serde::{Deserialize, Serialize};
 
 use crate::{core::value::Value, error::{Result, runtime_error::RuntimeError}};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Member {
     is_public: bool,
     value: Value,
@@ -54,7 +55,7 @@ impl Member {
 }
 
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MemberMap {
     members: HashMap<String, Member>,
 }

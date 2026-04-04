@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::core::expression::{Expression, variable::VariableAddress};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Instruction {
     PushVarToScope {
         identifier: String,
@@ -26,7 +28,7 @@ pub enum Instruction {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledProcedure {
     argument_identifiers: Vec<String>,
     instructions: Vec<Instruction>,

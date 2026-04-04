@@ -1,14 +1,14 @@
 use crate::{
     compiler::{
-        CompilerError, CompilerState, source_file_reader::ImportAddress, states::CompilerBaseState
-    }, core::CompiledObject, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
+        CompilerError, CompilerState, source_file_reader::ImportAddress, states::{CompilerBaseState, module::CompilerModuleState}
+    }, core::{module::CompiledModule}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
 
 pub struct CompilerImportState {
-    base_state: CompilerBaseState,
-    module_id: Option<ImportAddress>,
+    module_state: CompilerModuleState,
+    module_address: Option<ImportAddress>,
 }
 
 impl CompilerState for CompilerImportState {
@@ -17,10 +17,10 @@ impl CompilerState for CompilerImportState {
         token: crate::lexer::token::Token,
         compiler_environment: &mut crate::compiler::CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>> {
-        if self.module_id.is_none() {
+        if self.module_address.is_none() {
             match token {
                 Token::Identifier(ident) => {
-                    self.module_id = Some(ImportAddress {
+                    self.module_address = Some(ImportAddress {
                         module_id: ident,
                         path: None,
                     });
@@ -38,14 +38,14 @@ impl CompilerState for CompilerImportState {
         } else {
             match token {
                 Token::Punctuation(PunctuationToken::Semicolon) => {
-                    compiler_environment
-                        .get_file_reader_mut()
-                        .push_dependency(self.module_id.unwrap())?;
-                    return Ok(Box::new(self.base_state));
+                    let address = self.module_address.unwrap();
+                    compiler_environment.push_file_to_queue(address.clone());
+                    self.module_state.get_module_mut().push_dependency(address);
+                    return Ok(Box::new(self.module_state));
                 }
 
                 Token::Keyword(KeywordToken::From) => {
-                    let module_id = self.module_id.as_mut().unwrap();
+                    let module_id = self.module_address.as_mut().unwrap();
 
                     if module_id.path.is_some() {
                         return Err(CompilerError::InvalidDefinition {
@@ -60,7 +60,7 @@ impl CompilerState for CompilerImportState {
                 }
 
                 Token::Literal(LiteralToken::String(path)) => {
-                    let module_id = self.module_id.as_mut().unwrap();
+                    let module_id = self.module_address.as_mut().unwrap();
                     if module_id.path.is_some() {
                         module_id.path = Some(path);
                         return Ok(self);
@@ -82,7 +82,7 @@ impl CompilerState for CompilerImportState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
+    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }
@@ -91,10 +91,10 @@ impl CompilerState for CompilerImportState {
 }
 
 impl CompilerImportState {
-    pub fn new(base_state: CompilerBaseState) -> Self {
+    pub fn new(module_state: CompilerModuleState) -> Self {
         Self {
-            base_state,
-            module_id: None,
+            module_state: module_state,
+            module_address: None,
         }
     }
 }

@@ -1,9 +1,13 @@
 use std::collections::HashMap;
 
-use crate::{core::{procedure::CompiledProcedure, r#struct::Struct}, error::{Result, compiler_error::CompilerError, runtime_error::RuntimeError}};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone)]
+use crate::{compiler::source_file_reader::ImportAddress, core::{procedure::CompiledProcedure, r#struct::Struct}, error::{Result, compiler_error::CompilerError, runtime_error::RuntimeError}};
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CompiledModule {
+    dependencies: Vec<ImportAddress>,
+
     struct_prototypes: HashMap<String, (Struct, bool)>,
     procedures: HashMap<String, (Box<CompiledProcedure>, bool)>,
     associated_procedures: HashMap<(String, String), (Box<CompiledProcedure>, bool)>,
@@ -53,6 +57,14 @@ impl CompiledModule {
             (struct_identifier, procedure_identifier),
             (procedure, exported),
         );
+    }
+
+    pub(crate) fn push_dependency(&mut self, dependency: ImportAddress) {
+        self.dependencies.push(dependency);
+    }
+
+    pub(crate) fn get_dependencies(&self) -> &[ImportAddress] {
+        &self.dependencies
     }
 
     pub(crate) fn get_associated_procedure(
@@ -154,7 +166,7 @@ impl CompiledModule {
 
 
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ModuleAddress {
     module_id: String,
     identifier: String,

@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
         CompilerEnvironment, CompilerError, CompilerState, states::{
-            CompilerBaseState, procedure::CompilerProcedureState, r#struct::CompilerStructState
+            CompilerBaseState, import::CompilerImportState, procedure::CompilerProcedureState, r#struct::CompilerStructState
         }
     }, core::{CompiledObject, module::CompiledModule}, error::context::HintContextDecorator, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
 };
@@ -62,6 +62,10 @@ impl CompilerState for CompilerModuleState {
     ) -> Result<Box<dyn CompilerState>> {
         match self.substate {
             ModuleSubstate::PreScope => {
+                if let Token::Keyword(KeywordToken::Import)  = token {
+                    return Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>);
+                }
+
                 if self.module_name.is_none() {
                     if let Token::Identifier(ident) = token {
                         self.module_name = Some(ident);
@@ -90,9 +94,7 @@ impl CompilerState for CompilerModuleState {
             }
             ModuleSubstate::InScope => match token {
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
-                    self.base
-                        .object
-                        .insert_module(self.module_name.unwrap(), self.module);
+                    self.base.module = Some(self.module);
                     Ok(Box::new(self.base))
                 }
 
@@ -226,7 +228,7 @@ impl CompilerState for CompilerModuleState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
+    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

@@ -3,20 +3,20 @@ use crate::{
         CompilerEnvironment, CompilerError, CompilerState, states::{
             import::CompilerImportState, module::CompilerModuleState
         }
-    }, core::CompiledObject, lexer::token::{KeywordToken, Token}
+    }, core::{CompiledObject, module::CompiledModule}, lexer::token::{KeywordToken, Token}
 };
 
 use crate::error::Result;
 
 #[derive(Clone)]
 pub struct CompilerBaseState {
-    object: CompiledObject,
+    module: Option<CompiledModule>,
 }
 
 impl CompilerBaseState {
-    pub fn new(root: String) -> Self {
+    pub fn new() -> Self {
         Self {
-            object: CompiledObject::new(root),
+            module: None,
         }
     }
 }
@@ -32,10 +32,6 @@ impl CompilerState for CompilerBaseState {
                 Ok(Box::new(CompilerModuleState::new(*self)) as Box<dyn CompilerState>)
             }
 
-            Token::Keyword(KeywordToken::Import) => {
-                Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>)
-            }
-
             other => Err(CompilerError::UnexpectedToken {
                 expected: None,
                 found: other,
@@ -44,8 +40,8 @@ impl CompilerState for CompilerBaseState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledObject> {
-        Ok(self.object)
+    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
+        self.module.ok_or(CompilerError::Unknown { message: "No module declared in this file".into() }.boxed())
     }
 }
 

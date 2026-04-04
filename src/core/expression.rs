@@ -1,7 +1,9 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{core::{expression::{arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::VariableExpression}, module::ModuleAddress, value::Value}, error::{Error, ErrorContextualizer, context::ProcedureContextDecorator}};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Expression {
     Value(Value),
     Variable(VariableExpression),
@@ -17,7 +19,7 @@ pub enum Expression {
     Catch(CatchExpression)
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcedureCallExpression {
     procedure_id: ModuleAddress,
     arguments: Vec<Expression>,
@@ -46,7 +48,7 @@ impl ProcedureCallExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssociatedProcedureCallExpression {
     callee_expression: Box<Expression>,
     procedure_ident: String,
@@ -71,7 +73,7 @@ impl AssociatedProcedureCallExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructMemberExpression {
     subexpression: Box<Expression>,
     member_ident: String,
@@ -91,7 +93,7 @@ impl StructMemberExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArrayIndexExpression {
     subexpression: Box<Expression>,
     index_expression: Box<Expression>,
@@ -111,7 +113,7 @@ impl ArrayIndexExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StructConstructionExpression {
     struct_id: ModuleAddress,
     field_overrides: Vec<(String, Expression)>,
@@ -132,7 +134,7 @@ impl StructConstructionExpression {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ArrayConstructionExpression {
     items: Vec<Expression>,
 }
@@ -147,7 +149,7 @@ impl ArrayConstructionExpression {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CatchExpression {
     subexpression: Box<Expression>,
 }

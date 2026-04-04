@@ -1,6 +1,8 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{core::{member::MemberMap, module::ModuleAddress, value::Value}, error::Result};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Struct {
     struct_id: ModuleAddress,
     members: MemberMap,

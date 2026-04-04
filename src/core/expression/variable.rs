@@ -1,9 +1,10 @@
 use derive_more::{Deref, IntoIterator};
+use serde::{Deserialize, Serialize};
 
 use crate::{compiler::{NoExpressionEnvironment, expression_parser::ExpressionParser}, core::expression::Expression, error::{Error, compiler_error::CompilerError}, lexer::token::{ParenthesisType, PunctuationToken, Token}};
 
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VariableExpression {
     address: VariableAddress,
     access_mode: VariableAccessMode,
@@ -23,7 +24,7 @@ impl VariableExpression {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) enum VariableAccessMode {
     Move,
     Clone,
@@ -31,7 +32,7 @@ pub(crate) enum VariableAccessMode {
     TypeOf,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VariableAddressant {
     Identifier(String),
     Index(usize),
@@ -50,7 +51,7 @@ impl From<usize> for VariableAddressant {
     }
 }
 
-#[derive(Debug, Clone, Deref, IntoIterator)]
+#[derive(Debug, Clone, Deref, IntoIterator, Serialize, Deserialize)]
 pub struct VariableAddress(Vec<VariableAddressant>);
 
 impl TryFrom<Vec<VariableAddressant>> for VariableAddress {

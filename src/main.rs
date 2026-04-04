@@ -8,7 +8,7 @@ fn main() {
 
     let root_module = config.get_root_module();
 
-    run(env::current_dir().unwrap(), root_module.into()).unwrap();
+    //run(env::current_dir().unwrap(), root_module.into()).unwrap();
     /* match get_project_config() {
         Ok(conf) => println!("{:#?}", conf),
         Err(err) => println!("{err}"),
@@ -43,18 +43,4 @@ fn build_environment_with_features(features: Features) -> Result<Environment<'st
         }
 
     Ok(environment.build())
-}
-
-fn run(root_file_path: PathBuf, root_module: String) -> Result<()> {
-    let compiler = Compiler::new(
-        Tokenizer::default(),
-        root_file_path,
-        root_module
-    )?;
-
-    let compiled_object = compiler.compile()?;
-    
-    let runtime_object = RuntimeObject::from(compiled_object);
-
-    runtime_object.execute().map(|_| ())
 }
