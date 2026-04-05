@@ -1,15 +1,13 @@
 use crate::{
     compiler::{
-        CompilerEnvironment, CompilerError, CompilerState, states::{
-            import::CompilerImportState, module::CompilerModuleState
-        }
-    }, core::{CompiledObject, module::CompiledModule}, lexer::token::{KeywordToken, Token}
+        CompilerEnvironment, CompilerError, CompilerState, states::module::CompilerModuleState
+    }, core::{module::CompiledModule}, lexer::token::{KeywordToken, Token}
 };
 
 use crate::error::Result;
 
 #[derive(Clone)]
-pub struct CompilerBaseState {
+pub(crate) struct CompilerBaseState {
     module: Option<CompiledModule>,
 }
 

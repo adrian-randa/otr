@@ -149,8 +149,8 @@ impl CompilerState for CompilerModuleState {
                     },
                     ModuleExportSubstate::SingleIdent(ident) => match token {
                         Token::Punctuation(PunctuationToken::Comma) => {
-                            if let Err(_) = self.module.set_procedure_visibility(&ident, true) {
-                                self.module.set_struct_visibility(&ident, true)?;
+                            if set_procedure_visibility(&mut self.module, &ident, true).is_err() {
+                                set_struct_visibility(&mut self.module, &ident, true)?;
                             }
                             self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
                             Ok(self)
@@ -164,8 +164,8 @@ impl CompilerState for CompilerModuleState {
                         }
 
                         Token::Punctuation(PunctuationToken::Semicolon) => {
-                            if let Err(_) = self.module.set_procedure_visibility(&ident, true) {
-                                self.module.set_struct_visibility(&ident, true)?;
+                            if set_procedure_visibility(&mut self.module, &ident, true).is_err() {
+                                set_struct_visibility(&mut self.module, &ident, true)?;
                             }
                             self.substate = ModuleSubstate::InScope;
                             Ok(self)
@@ -198,7 +198,8 @@ impl CompilerState for CompilerModuleState {
                         member_ident,
                     } => match token {
                         Token::Punctuation(PunctuationToken::Comma) => {
-                            self.module.set_associated_precedure_visibility(
+                            set_associated_precedure_visibility(
+                                &mut self.module,
                                 &struct_ident,
                                 &member_ident,
                                 true,
@@ -208,7 +209,8 @@ impl CompilerState for CompilerModuleState {
                         }
 
                         Token::Punctuation(PunctuationToken::Semicolon) => {
-                            self.module.set_associated_precedure_visibility(
+                            set_associated_precedure_visibility(
+                                &mut self.module,
                                 &struct_ident,
                                 &member_ident,
                                 true,
@@ -235,3 +237,42 @@ impl CompilerState for CompilerModuleState {
         .boxed())
     }
 }
+
+fn set_procedure_visibility(module: &mut CompiledModule, member_ident: &str, visibility: bool) -> Result<()> {
+    if let Some(member) = module.get_procedure_mut(member_ident) {
+        member.1 = visibility;
+        return Ok(());
+    }
+    Err(CompilerError::NoSuchMember {
+        member_identifier: member_ident.to_string(),
+    }
+    .boxed())
+}
+
+fn set_struct_visibility(module: &mut CompiledModule, member_ident: &str, visibility: bool) -> Result<()> {
+    if let Some(member) = module.get_struct_mut(member_ident) {
+        member.1 = visibility;
+        return Ok(());
+    }
+    Err(CompilerError::NoSuchMember {
+        member_identifier: member_ident.to_string(),
+    }
+    .boxed())
+}
+
+fn set_associated_precedure_visibility(
+    module: &mut CompiledModule,
+    struct_ident: &str,
+    procedure_ident: &str,
+    visibility: bool,
+) -> Result<()> {
+    if let Some(member) = module.get_associated_procedure_mut(struct_ident, procedure_ident) {
+        member.1 = visibility;
+        Ok(())
+    } else {
+        Err(CompilerError::NoSuchMember {
+            member_identifier: format!("{struct_ident}->{procedure_ident}")
+        }.boxed())
+    }
+}
+

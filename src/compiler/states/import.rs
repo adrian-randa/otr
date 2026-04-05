@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
-        CompilerError, CompilerState, source_file_reader::ImportAddress, states::{CompilerBaseState, module::CompilerModuleState}
-    }, core::{module::CompiledModule}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
+        CompilerError, CompilerState, states::{CompilerBaseState, module::CompilerModuleState}
+    }, core::module::{CompiledModule, ImportAddress}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;

@@ -80,32 +80,30 @@ impl AssociatedProcedureContextDecorator {
 }
 
 #[derive(Debug)]
-pub(crate) struct SourceFileContextDecorator {
+pub(crate) struct LineIndexContextDecorator {
     pub(crate) error: Box<dyn Error>,
 
-    pub(crate) path: PathBuf,
     pub(crate) line: usize,
-    pub(crate) column: usize,
 }
 
-impl Error for SourceFileContextDecorator {
+impl Error for LineIndexContextDecorator {
     fn to_value(&self) -> Value {
         self.error.to_value()
     }
 }
 
-impl std::fmt::Display for SourceFileContextDecorator {
+impl std::fmt::Display for LineIndexContextDecorator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let message = format!(
-            "Occurred in file {:?} on line {}:{}.",
-            self.path, self.line, self.column
+            "Occurred on line {}.",
+            self.line
         );
 
         write!(f, "{}\n{}", self.error, (&message as &str).bright_black())
     }
 }
 
-impl SourceFileContextDecorator {
+impl LineIndexContextDecorator {
     pub(crate) fn boxed(self) -> Box<dyn Error> {
         Box::new(self)
     }

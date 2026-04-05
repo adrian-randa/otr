@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, variable::{VariableAccessMode, VariableAddressant, VariableExpression}}, r#type::Type, value::Value}, error::{ErrorContextualizer, Result, context::AssociatedProcedureContextDecorator, runtime_error::RuntimeError}, runtime::{environment::Environment, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope}};
+use crate::{core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, variable::{VariableAccessMode, VariableAddressant, VariableExpression}}, r#type::Type, value::Value}, error::{ErrorContextualizer, Result, context::AssociatedProcedureContextDecorator, runtime_error::RuntimeError}, runtime::{environment::Environment, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value}};
 
 
 pub(crate) fn eval_expression(expression: &Expression, environment: &Environment) -> Result<Value> {
@@ -46,7 +46,8 @@ fn eval_struct_construction_expression(expression: &StructConstructionExpression
 
     for (field, expr) in expression.get_field_overrides() {
         let value = eval_expression(expr, environment)?;
-        instance.get_members_mut().set_unchecked(field, value)?;
+        instance.get_members_mut().set(field, value)
+            .ok_or(RuntimeError::NoSuchMember { member_identifier: field.clone() }.boxed())?;
     }
 
     Ok(Value::Struct(Rc::new(RefCell::new(Some(instance)))))
@@ -75,7 +76,9 @@ fn eval_variable_expression(expression: &VariableExpression, environment: &Envir
 
 
 fn eval_struct_member_expression(expression: &StructMemberExpression, environment: &Environment) -> Result<Value> {
-    eval_expression(expression.get_subexpression(), environment)?.get(
+    let st = eval_expression(expression.get_subexpression(), environment)?;
+    value::get(
+        &st,
         vec![VariableAddressant::Identifier(expression.get_member_ident().clone())].into_iter(),
         environment.get_contained_module_id(),
     )
@@ -94,7 +97,9 @@ fn eval_array_index_expression(expression: &ArrayIndexExpression, environment: &
         .boxed());
     };
 
-    eval_expression(expression.get_subexpression(), environment)?.get(
+    let array = eval_expression(expression.get_subexpression(), environment)?;
+    value::get(
+        &array,
         vec![VariableAddressant::Index(index.try_into().unwrap())].into_iter(),
         environment.get_contained_module_id(),
     )

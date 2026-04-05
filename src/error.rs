@@ -10,10 +10,8 @@ pub trait ErrorContextualizer {
     fn contextualize(&self, error: Box<dyn Error>) -> Box<dyn Error>;
 }
 
-pub(crate) mod compiler_error;
 pub(crate) mod context;
 pub(crate) mod fragmenter_error;
 pub(crate) mod runtime_error;
 pub(crate) mod tokenizer_error;
-pub(crate) mod value_error;
 pub mod system_error;

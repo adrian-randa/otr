@@ -3,7 +3,7 @@ use std::{collections::HashMap};
 use derive_more::{Deref, IntoIterator};
 
 use crate::{
-    core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value}, error::runtime_error::RuntimeError, runtime::{environment::Environment, expressions::eval_expression, scope::vec_map::VecMap}
+    core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value}, error::runtime_error::RuntimeError, runtime::{environment::Environment, expressions::eval_expression, scope::vec_map::VecMap, value}
 };
 
 use crate::error::Result;
@@ -220,9 +220,10 @@ impl Scope {
             }
         };
 
-        self.stack
-            .get(&first_identifier)?
-            .get(address, contained_module_id)
+        let value = self.stack
+            .get(&first_identifier)?;
+        
+        value::get(value, address, contained_module_id)
     }
 
     pub(crate) fn set_variable(
@@ -245,9 +246,10 @@ impl Scope {
             }
         };
 
-        self.stack
-            .get_mut(&first_identifier)?
-            .set(address, contained_module_id, value)
+        let value_ref = self.stack
+            .get_mut(&first_identifier)?;
+        
+        value::set(value_ref, address, contained_module_id, value)
     }
 
     pub(crate) fn reference_variable(
@@ -269,9 +271,10 @@ impl Scope {
             }
         };
 
-        self.stack
-            .get(&first_identifier)?
-            .reference(address, contained_module_id)
+        let value =self.stack
+            .get(&first_identifier)?;
+        
+        value::reference(value, address, contained_module_id)
     }
 
     pub(crate) fn clone_variable(
@@ -293,9 +296,10 @@ impl Scope {
             }
         };
 
-        self.stack
-            .get(&first_identifier)?
-            .clone_member(address, contained_module_id)
+        let value = self.stack
+            .get(&first_identifier)?;
+        
+        value::clone_member(value, address, contained_module_id)
     }
 
     pub(crate) fn query_type(
@@ -317,8 +321,9 @@ impl Scope {
             }
         };
 
-        self.stack
-            .get(&first_identifier)?
-            .get_type(address, contained_module_id)
+        let value = self.stack
+            .get(&first_identifier)?;
+        
+        value::get_type(value, address, contained_module_id)
     }
 }

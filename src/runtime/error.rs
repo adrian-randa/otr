@@ -1,6 +1,4 @@
-use crate::{error::Error};
-use crate::core::value::Value;
-
+use crate::{core::value::Value, error::Error};
 
 #[derive(Debug)]
 pub(crate) struct ValueError {
@@ -15,7 +13,7 @@ impl std::fmt::Display for ValueError {
 
 impl Error for ValueError {
     fn to_value(&self) -> Value {
-        self.value.get_value(()).unwrap()
+        self.value.clone()
     }
 }
 

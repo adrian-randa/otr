@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    core::{procedure::{CompiledProcedure, Instruction}, value::Value}, error::{runtime_error::RuntimeError, value_error::ValueError}, runtime::{environment::Environment, expressions::eval_expression},
+    core::{procedure::{CompiledProcedure, Instruction}, value::Value}, error::runtime_error::RuntimeError, runtime::{environment::Environment, error::ValueError, expressions::eval_expression},
 };
 
 use crate::error::Result;

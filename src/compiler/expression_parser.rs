@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{CompilerError, ExpressionParseEnvironment, parenthesis::ParenthesisStack}, core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddressant, VariableExpression}}, module::ModuleAddress, r#type::Type, value::Value}, lexer::token::{KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token}
+    compiler::{CompilerError, ExpressionParseEnvironment, NoExpressionEnvironment, parenthesis::ParenthesisStack}, core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression}}, module::ModuleAddress, r#type::Type, value::Value}, lexer::token::{KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -968,7 +968,7 @@ impl ExpressionAtomParser {
     }
 }
 
-fn try_parse_literal(literal: crate::lexer::token::LiteralToken) -> Result<Value> {
+pub(crate) fn try_parse_literal(literal: crate::lexer::token::LiteralToken) -> Result<Value> {
     match literal {
         LiteralToken::Null => Ok(Value::Null),
         LiteralToken::Integer(num) => Ok(Value::Integer(num.parse().map_err(|_| {
@@ -1008,7 +1008,7 @@ fn try_parse_literal(literal: crate::lexer::token::LiteralToken) -> Result<Value
     }
 }
 
-fn parse_type(ty: PrimitiveTypeToken) -> Type {
+pub(crate) fn parse_type(ty: PrimitiveTypeToken) -> Type {
     macro_rules! id {
         ($value:ident: $id0:ident $(, $id:ident)+) => {
             match $value {
@@ -1021,4 +1021,46 @@ fn parse_type(ty: PrimitiveTypeToken) -> Type {
     }
     
     id!(ty: Null, Integer, Float, Bool, Char, String, Array, Moved, Dropped, Type)   
+}
+
+pub(crate) fn parse_variable_address(address: Vec<Token>) -> Result<VariableAddress> {
+    let mut tokens = address.into_iter();
+
+    let mut addressants = Vec::new();
+
+    while let Some(token) = tokens.next() {
+        match token {
+            Token::Identifier(ident) => {
+                addressants.push(VariableAddressant::Identifier(ident));
+            }
+            Token::Punctuation(PunctuationToken::Dot) => {}
+            Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
+                let index_expression = ExpressionParser::take_until_closing(
+                    &mut tokens,
+                    Token::Punctuation(PunctuationToken::SquareBrackets(
+                        ParenthesisType::Closing,
+                    )),
+                )?;
+
+                let index_expression =
+                    ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
+
+                addressants.push(VariableAddressant::DynamicIndex(index_expression.into()));
+            }
+
+            other => {
+                return Err(CompilerError::InvalidScopeAddress {
+                    unexpected_token: Some(other),
+                }
+                .boxed());
+            }
+        }
+    }
+
+    addressants.try_into().map_err(|_| {
+        CompilerError::InvalidScopeAddress {
+            unexpected_token: None,
+        }
+        .boxed()
+    })
 }

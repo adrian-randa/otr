@@ -3,7 +3,7 @@ use std::{
 };
 
 use crate::{
-    compiler::{source_file_reader::{ImportAddress, SourceFileReader}, states::CompilerBaseState}, core::{CompiledObject, module::{CompiledModule, ModuleAddress}}, error::{compiler_error::CompilerError, context::SourceFileContextDecorator}, lexer::{Tokenizer, token::{ContextualizedToken, Token}}
+    compiler::{error::CompilerError, states::CompilerBaseState}, core::{CompiledObject, module::{CompiledModule, ImportAddress, ModuleAddress}}, error::context::LineIndexContextDecorator, lexer::{Tokenizer, token::{ContextualizedToken, Token}}
 };
 
 use crate::error::Result;
@@ -64,9 +64,14 @@ impl Compiler {
         self.state.finalize()
     }
 
-    pub fn compile(mut self, tokens: impl Iterator<Item = Token>, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
+    pub fn compile(mut self, tokens: impl Iterator<Item = ContextualizedToken>, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
         for token in tokens {
-            self = self.read(token, environment)?;
+            let line = token.line_index;
+            let token = token.token;
+
+            self = self.read(token, environment).map_err(|error| {
+                LineIndexContextDecorator { error, line }.boxed()
+            })?;
         }
 
         self.finalize()
@@ -82,7 +87,7 @@ pub struct CompilerEnvironment {
 }
 
 impl CompilerEnvironment {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             procedure_ident_map: Default::default(),
             struct_ident_map: Default::default(),
@@ -151,7 +156,7 @@ impl ExpressionParseEnvironment for CompilerEnvironment {
 }
 
 pub mod expression_parser;
-pub mod source_file_reader;
 pub mod parenthesis;
 pub mod states;
 pub mod procedure;
+pub mod error;

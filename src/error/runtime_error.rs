@@ -130,7 +130,7 @@ impl super::Error for RuntimeError {
         let err = |variant: &str| {
             Value::Struct(Rc::new(RefCell::new(Some(
                 Struct::new(ModuleAddress::new("Errors".into(), variant.to_string() + "Error"))
-                    .with_member("message".into(), Value::String(self.get_message()), false).unwrap()
+                    .with_member("message".into(), Value::String(self.get_message()), false)
             ))))
         };
 

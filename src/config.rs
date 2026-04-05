@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fs, path::PathBuf};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -107,4 +107,18 @@ impl ProjectConfiguration {
     pub fn get_features(&self) -> &Features {
         &self.features
     }
+}
+
+fn get_project_config(root_file_path: PathBuf) -> crate::error::Result<ProjectConfiguration> {
+    const CONFIG_PATH: &'static str = "otr_config.toml";
+
+    let config_string = fs::read_to_string(root_file_path.join(CONFIG_PATH)).map_err(|err| SystemError::new(
+        format!("Could not read project configuration file: {}", err)
+    ).boxed())?;
+
+    let config = toml::from_str(&config_string).map_err(|err| SystemError::new(
+        format!("Could not parse project configuration file: {}", err)
+    ).boxed())?;
+
+    Ok(config)
 }

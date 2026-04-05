@@ -1,6 +1,7 @@
 use std::any::Any;
 
-use crate::compiler::expression_parser::ExpressionParser;
+use crate::compiler::error::CompilerError;
+use crate::compiler::expression_parser::{ExpressionParser, parse_variable_address};
 use crate::core::expression::AssociatedProcedureCallExpression;
 use crate::core::expression::boolean::BooleanExpression;
 use crate::core::expression::comparison::ComparisonExpression;
@@ -8,7 +9,6 @@ use crate::core::expression::variable::{VariableAccessMode, VariableAddress, Var
 use crate::core::procedure::CompiledProcedure;
 use crate::core::r#type::Type;
 use crate::error::Result;
-use crate::error::compiler_error::CompilerError;
 use crate::lexer::token::{OperatorToken, ParenthesisType};
 use crate::{compiler::ExpressionParseEnvironment, core::{expression::Expression, procedure::Instruction, value::Value}, lexer::token::{KeywordToken, PunctuationToken, Token}};
 
@@ -495,7 +495,7 @@ impl CompiledProcedureBuilder {
                 address,
                 expression,
             } => {
-                let target = Some(VariableAddress::try_from(address.to_owned())?);
+                let target = Some(parse_variable_address(address.to_owned())?);
 
                 let expression =
                     ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?;

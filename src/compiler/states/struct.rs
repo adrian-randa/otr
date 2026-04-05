@@ -79,7 +79,7 @@ impl CompilerState for CompilerStructState {
                     let members = prototype.get_members_mut();
 
                     for field in self.fields {
-                        members.insert(field.0, Value::Null, field.1)?;
+                        members.insert(field.0, Value::Null, field.1);
                     }
 
                     self.module.get_module_mut().insert_struct(
@@ -117,7 +117,7 @@ impl CompilerState for CompilerStructState {
                     let members = prototype.get_members_mut();
 
                     for field in self.fields {
-                        members.insert(field.0, Value::Null, field.1)?;
+                        members.insert(field.0, Value::Null, field.1);
                     }
 
                     self.module.get_module_mut().insert_struct(

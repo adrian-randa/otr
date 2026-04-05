@@ -16,6 +16,8 @@ pub mod environment;
 pub mod expressions;
 pub mod module;
 pub mod procedures;
+pub mod value;
+pub mod error;
 
 #[derive(Debug)]
 pub struct RuntimeObject<'a> {

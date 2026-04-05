@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{core::{member::MemberMap, module::ModuleAddress, value::Value}, error::Result};
+use crate::{core::{member::MemberMap, module::ModuleAddress, value::Value}};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Struct {
@@ -28,9 +28,9 @@ impl Struct {
         &mut self.members
     }
 
-    pub(crate) fn with_member(mut self, ident: String, value: Value, is_public: bool) -> Result<Self> {
-        self.get_members_mut().insert(ident, value, is_public)?;
-        Ok(self)
+    pub(crate) fn with_member(mut self, ident: String, value: Value, is_public: bool) -> Self {
+        self.get_members_mut().insert(ident, value, is_public);
+        self
     }
 }
 

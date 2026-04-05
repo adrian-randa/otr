@@ -1,32 +1,18 @@
 use std::{env, fs, path::PathBuf};
 
-use otr::{compiler::{Compiler, source_file_reader::{ImportAddress, SourceFileReader}}, config::{self, Features, ProjectConfiguration}, error::system_error::SystemError, lexer::Tokenizer, runtime::{RuntimeObject, environment::{Environment, environment_builder::EnvironmentBuilder}}};
+use otr::{compiler::Compiler, config::{self, Features, ProjectConfiguration}, error::system_error::SystemError, lexer::Tokenizer, runtime::{RuntimeObject, environment::{Environment, environment_builder::EnvironmentBuilder}}};
 use otr::error::Result;
 
 fn main() {
-    let config = get_project_config().unwrap();
+    //let config = get_project_config().unwrap();
 
-    let root_module = config.get_root_module();
+    //let root_module = config.get_root_module();
 
     //run(env::current_dir().unwrap(), root_module.into()).unwrap();
     /* match get_project_config() {
         Ok(conf) => println!("{:#?}", conf),
         Err(err) => println!("{err}"),
     } */
-}
-
-fn get_project_config() -> Result<ProjectConfiguration> {
-    const CONFIG_PATH: &'static str = "otr_config.toml";
-
-    let config_string = fs::read_to_string(env::current_dir().unwrap().join(CONFIG_PATH)).map_err(|err| SystemError::new(
-        format!("Could not read project configuration file: {}", err)
-    ).boxed())?;
-
-    let config = toml::from_str(&config_string).map_err(|err| SystemError::new(
-        format!("Could not parse project configuration file: {}", err)
-    ).boxed())?;
-
-    Ok(config)
 }
 
 fn build_environment_with_features(features: Features) -> Result<Environment<'static>> {

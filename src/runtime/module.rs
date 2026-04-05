@@ -1,5 +1,6 @@
 use crate::core::module::CompiledModule;
 use crate::core::r#struct::Struct;
+use crate::error::runtime_error::RuntimeError;
 use crate::runtime::procedures::RuntimeProcedure;
 use crate::error::Result;
 
@@ -35,13 +36,31 @@ impl<'a> Module for RuntimeModule<'a> {
     ) -> Result<RuntimeProcedure<'_>> {
         match self {
             RuntimeModule::Abstract(module) => module.get_procedure(identifier, private_access),
-            RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
-                compiled_module.get_procedure(identifier, private_access)?
-            )),
+            RuntimeModule::Compiled(compiled_module) => {
+                let (procedure, public) = compiled_module.get_procedure(identifier)
+                    .ok_or(RuntimeError::NoSuchMember { member_identifier: identifier.to_string() }.boxed())?;
+
+                if !public && private_access {
+                    Err(RuntimeError::FieldIsPrivate.boxed())
+                } else {
+                    Ok(RuntimeProcedure::CompiledRef(
+                        procedure
+                    ))
+                }
+            },
             RuntimeModule::AbstractRef(module) => module.get_procedure(identifier, private_access),
-            RuntimeModule::CompiledRef(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
-                compiled_module.get_procedure(identifier, private_access)?
-            )),
+            RuntimeModule::CompiledRef(compiled_module) => {
+                let (procedure, public) = compiled_module.get_procedure(identifier)
+                    .ok_or(RuntimeError::ProcedureNotDefined { procedure_identifier: identifier.to_string() }.boxed())?;
+                
+                if !public && private_access {
+                    Err(RuntimeError::ProcedureNotExported { procedure_identifier: identifier.clone() }.boxed())
+                } else {
+                    Ok(RuntimeProcedure::CompiledRef(
+                        procedure
+                    ))
+                }
+            },
         }
     }
 
@@ -53,20 +72,66 @@ impl<'a> Module for RuntimeModule<'a> {
     ) -> Result<RuntimeProcedure<'_>> {
         match self {
             RuntimeModule::Abstract(module) => module.get_associated_procedure(struct_identifier, procedure_identifier, private_access),
-            RuntimeModule::Compiled(compiled_module) => Ok(RuntimeProcedure::CompiledRef(compiled_module.get_associated_procedure(struct_identifier, procedure_identifier, private_access)?)),
+            RuntimeModule::Compiled(compiled_module) => {
+                let (procedure, public) = compiled_module.get_associated_procedure(struct_identifier, procedure_identifier)
+                    .ok_or(RuntimeError::AssociatedProcedureNotDefined {
+                        procedure_identifier: procedure_identifier.to_string(),
+                        struct_identifier: struct_identifier.to_string()
+                    }.boxed())?;
+                
+                if !public && private_access {
+                    Err(RuntimeError::AssociatedProcedureNotExported {
+                        procedure_identifier: procedure_identifier.to_string(),
+                        struct_identifier: struct_identifier.to_string()
+                    }.boxed())
+                } else {
+                    Ok(RuntimeProcedure::CompiledRef(procedure))
+                }
+            },
             RuntimeModule::AbstractRef(module) => module.get_associated_procedure(struct_identifier, procedure_identifier, private_access),
-            RuntimeModule::CompiledRef(compiled_module) => Ok(RuntimeProcedure::CompiledRef(
-                compiled_module.get_associated_procedure(struct_identifier, procedure_identifier, private_access)?
-            )),
+            RuntimeModule::CompiledRef(compiled_module) => {
+                let (procedure, public) = compiled_module.get_associated_procedure(struct_identifier, procedure_identifier)
+                    .ok_or(RuntimeError::AssociatedProcedureNotDefined {
+                        procedure_identifier: procedure_identifier.to_string(),
+                        struct_identifier: struct_identifier.to_string()
+                    }.boxed())?;
+
+                if !public && private_access {
+                    Err(RuntimeError::AssociatedProcedureNotExported {
+                        procedure_identifier: procedure_identifier.to_string(),
+                        struct_identifier: struct_identifier.to_string()
+                    }.boxed())
+                } else {
+                    Ok(RuntimeProcedure::CompiledRef(procedure))
+                }
+            },
         }
     }
 
     fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct> {
         match self {
             RuntimeModule::Abstract(module) => module.get_struct(identifier, private_access),
-            RuntimeModule::Compiled(compiled_module) => compiled_module.get_struct(identifier, private_access),
+            RuntimeModule::Compiled(compiled_module) => {
+                let (st, public) = compiled_module.get_struct(identifier)
+                    .ok_or(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())?;
+
+                if !public && private_access {
+                    Err(RuntimeError::StructNotExported { struct_identifier: identifier.to_string() }.boxed())
+                } else {
+                    Ok(st.clone())
+                }
+            },
             RuntimeModule::AbstractRef(module) => module.get_struct(identifier, private_access),
-            RuntimeModule::CompiledRef(compiled_module) => compiled_module.get_struct(identifier, private_access),
+            RuntimeModule::CompiledRef(compiled_module) => {
+                let (st, public) = compiled_module.get_struct(identifier)
+                    .ok_or(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())?;
+
+                if !public && private_access {
+                    Err(RuntimeError::StructNotExported { struct_identifier: identifier.to_string() }.boxed())
+                } else {
+                    Ok(st.clone())
+                }
+            },
         }
     }
 }
