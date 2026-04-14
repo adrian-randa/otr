@@ -1,0 +1,76 @@
+use colored::{Color, Colorize};
+
+use otr_core::{value::Value, error::Error};
+
+#[allow(unused)]
+#[derive(Debug)]
+pub enum TokenizerError {}
+
+impl Error for TokenizerError {
+    fn to_value(&self) -> Value {
+        panic!("Tokenizer Errors cannot be turned into values!")
+    }
+}
+
+impl std::fmt::Display for TokenizerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            &"Error while tokenizing source file!".color(Color::Red)
+        )
+    }
+}
+
+impl TokenizerError {
+    pub(crate) fn _boxed(self) -> Box<dyn Error> {
+        Box::new(self)
+    }
+}
+
+#[derive(Debug)]
+pub enum FragmentationError {
+    InvalidControlCharacter {
+        line_index: usize,
+        column_index: usize,
+    },
+    LinebreakInStringLiteral {
+        line_index: usize,
+        column_index: usize,
+    },
+}
+
+impl Error for FragmentationError {
+    fn to_value(&self) -> Value {
+        panic!("Fragmentation Errors cannot be turned into values!")
+    }
+}
+
+impl std::fmt::Display for FragmentationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FragmentationError::InvalidControlCharacter {
+                line_index,
+                column_index,
+            } => write!(
+                f,
+                "{} Invalid control character at line {line_index} column {column_index}!",
+                "Fragmentation Error!".on_red()
+            ),
+            FragmentationError::LinebreakInStringLiteral {
+                line_index,
+                column_index,
+            } => write!(
+                f,
+                "{} Newline in string literal at line {line_index} column {column_index}!",
+                "Fragmentation Error!".on_red()
+            ),
+        }
+    }
+}
+
+impl FragmentationError {
+    pub fn boxed(self) -> Box<dyn Error> {
+        Box::new(self)
+    }
+}

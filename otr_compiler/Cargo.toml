@@ -1,0 +1,10 @@
+[package]
+name = "otr_compiler"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+otr_core = { workspace = true }
+
+colored = { workspace = true }
+derive_more = { workspace = true }
