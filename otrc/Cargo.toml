@@ -1,0 +1,10 @@
+[package]
+name = "otrc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+otr_core = { workspace = true }
+otr_compiler = { workspace = true }
+
+serde_cbor = { workspace = true }
