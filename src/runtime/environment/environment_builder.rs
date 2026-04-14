@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::error::runtime_error::RuntimeError;
+use crate::runtime::error::RuntimeError;
 use crate::runtime::environment::Environment;
 use crate::runtime::environment::features::arrays::ArraysFeatureBuilder;
 use crate::runtime::environment::features::debug::DebugFeatureBuilder;

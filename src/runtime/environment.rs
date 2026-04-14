@@ -4,10 +4,9 @@ use crate::core::expression::variable::VariableAddress;
 use crate::core::r#struct::Struct;
 use crate::core::value::Value;
 
-use crate::error::runtime_error::RuntimeError;
-
 use crate::runtime::module::{Module, RuntimeModule};
 use crate::runtime::procedures::RuntimeProcedure;
+use crate::runtime::error::RuntimeError;
 
 use crate::core::module::ModuleAddress;
 

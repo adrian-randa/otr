@@ -1,7 +1,7 @@
 use crate::core::expression::comparison::ComparisonExpression;
 use crate::error::Result;
 use crate::core::{value::Value::{self, *}, expression::Expression};
-use crate::error::runtime_error::RuntimeError;
+use crate::runtime::error::RuntimeError;
 use crate::runtime::environment::Environment;
 use crate::runtime::expressions::eval_expression;
 

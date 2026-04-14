@@ -2,11 +2,7 @@ use std::{
     collections::{HashMap, HashSet}, path::PathBuf,
 };
 
-use crate::{
-    compiler::{error::CompilerError, states::CompilerBaseState}, core::{CompiledObject, module::{CompiledModule, ImportAddress, ModuleAddress}}, error::context::LineIndexContextDecorator, lexer::{Tokenizer, token::{ContextualizedToken, Token}}
-};
-
-use crate::error::Result;
+use crate::{compiler::{error::CompilerError, lexer::token::{ContextualizedToken, Token}, states::CompilerBaseState}, core::{CompiledObject, module::{CompiledModule, ImportAddress, ModuleAddress}}, error::{Result, context::LineIndexContextDecorator}};
 
 pub trait CompilerState {
     fn read(
@@ -160,3 +156,4 @@ pub mod parenthesis;
 pub mod states;
 pub mod procedure;
 pub mod error;
+pub mod lexer;

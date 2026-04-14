@@ -1,5 +1,5 @@
 use crate::{
-    compiler::error::CompilerError, error::Result, lexer::token::{ParenthesisType, PunctuationToken, Token}
+    compiler::error::CompilerError, error::Result, compiler::lexer::token::{ParenthesisType, PunctuationToken, Token}
 };
 
 pub(crate) struct ParenthesisStack {

@@ -2,7 +2,7 @@ use std::str::{Chars, FromStr};
 
 use derive_more::IntoIterator;
 
-use crate::error::{fragmenter_error::FragmentationError, Error};
+use crate::{error::Error, compiler::lexer::error::FragmentationError};
 
 struct CharCoordinateIterator<'a> {
     iter: Chars<'a>,

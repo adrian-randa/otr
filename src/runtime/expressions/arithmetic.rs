@@ -2,8 +2,7 @@ use crate::core::expression::Expression;
 use crate::core::expression::arithmetic::ArithmeticExpression;
 use crate::core::value::Value::{self, *};
 use crate::error::Result;
-use crate::error::runtime_error::RuntimeError;
-use crate::runtime::environment::Environment;
+use crate::runtime::{error::RuntimeError, environment::Environment};
 
 use super::eval_expression;
 

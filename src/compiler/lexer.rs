@@ -1,9 +1,9 @@
 use crate::error::Result;
 
-use crate::lexer::fragmenter::{Fragment, FragmentStream};
-use crate::lexer::token::{ContextualizedToken, ContextualizedTokenStream};
+use crate::compiler::lexer::fragmenter::{Fragment, FragmentStream};
+use crate::compiler::lexer::token::{ContextualizedToken, ContextualizedTokenStream};
 use crate::{
-    lexer::{
+    compiler::lexer::{
         rules::{
             BooleanLiteralRule, CharLiteralRule, IdentifierRule, KeywordRule, NumberLiteralRule,
             PatternRule, StringLiteralRule,
@@ -15,6 +15,7 @@ use crate::{
 pub mod fragmenter;
 pub mod rules;
 pub mod token;
+pub mod error;
 
 trait TokenizerRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String);

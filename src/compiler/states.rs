@@ -1,7 +1,8 @@
 use crate::{
     compiler::{
+        lexer::token::{KeywordToken, Token},
         CompilerEnvironment, CompilerError, CompilerState, states::module::CompilerModuleState
-    }, core::{module::CompiledModule}, lexer::token::{KeywordToken, Token}
+    }, core::{module::CompiledModule}
 };
 
 use crate::error::Result;

@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{CompilerError, CompilerState, states::module::CompilerModuleState}, core::{CompiledObject, module::{CompiledModule, ModuleAddress}, r#struct::Struct, value::Value}, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
+    compiler::{CompilerError, CompilerState, states::module::CompilerModuleState}, core::{CompiledObject, module::{CompiledModule, ModuleAddress}, r#struct::Struct, value::Value}, compiler::lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -22,7 +22,7 @@ pub struct CompilerStructState {
 impl CompilerState for CompilerStructState {
     fn read(
         mut self: Box<Self>,
-        token: crate::lexer::token::Token,
+        token: crate::compiler::lexer::token::Token,
         compiler_environment: &mut crate::compiler::CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>> {
         match self.substate {

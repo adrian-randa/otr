@@ -3,7 +3,7 @@ use std::{collections::HashMap};
 use derive_more::{Deref, IntoIterator};
 
 use crate::{
-    core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value}, error::runtime_error::RuntimeError, runtime::{environment::Environment, expressions::eval_expression, scope::vec_map::VecMap, value}
+    core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value}, runtime::{error::RuntimeError, environment::Environment, expressions::eval_expression, scope::vec_map::VecMap, value}
 };
 
 use crate::error::Result;

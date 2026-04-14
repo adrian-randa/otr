@@ -1,5 +1,5 @@
 use crate::{
-    compiler::{CompilerError, ExpressionParseEnvironment, NoExpressionEnvironment, parenthesis::ParenthesisStack}, core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression}}, module::ModuleAddress, r#type::Type, value::Value}, lexer::token::{KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token}
+    compiler::{CompilerError, ExpressionParseEnvironment, NoExpressionEnvironment, parenthesis::ParenthesisStack}, core::{expression::{ArrayConstructionExpression, ArrayIndexExpression, AssociatedProcedureCallExpression, CatchExpression, Expression, ProcedureCallExpression, StructConstructionExpression, StructMemberExpression, arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression}}, module::ModuleAddress, r#type::Type, value::Value}, compiler::lexer::token::{KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -968,7 +968,7 @@ impl ExpressionAtomParser {
     }
 }
 
-pub(crate) fn try_parse_literal(literal: crate::lexer::token::LiteralToken) -> Result<Value> {
+pub(crate) fn try_parse_literal(literal: crate::compiler::lexer::token::LiteralToken) -> Result<Value> {
     match literal {
         LiteralToken::Null => Ok(Value::Null),
         LiteralToken::Integer(num) => Ok(Value::Integer(num.parse().map_err(|_| {

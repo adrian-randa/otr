@@ -1,4 +1,4 @@
-use crate::{core::{expression::{Expression, boolean::BooleanExpression}, value::Value::{self, *}}, error::runtime_error::RuntimeError, runtime::environment::Environment};
+use crate::{core::{expression::{Expression, boolean::BooleanExpression}, value::Value::{self, *}}, runtime::{error::RuntimeError, environment::Environment}};
 
 use crate::error::Result;
 use crate::runtime::expressions::eval_expression;

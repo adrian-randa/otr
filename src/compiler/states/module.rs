@@ -3,7 +3,7 @@ use crate::{
         CompilerEnvironment, CompilerError, CompilerState, states::{
             CompilerBaseState, import::CompilerImportState, procedure::CompilerProcedureState, r#struct::CompilerStructState
         }
-    }, core::{CompiledObject, module::CompiledModule}, error::context::HintContextDecorator, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
+    }, core::{CompiledObject, module::CompiledModule}, error::context::HintContextDecorator, compiler::lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}
 };
 
 use crate::error::Result;

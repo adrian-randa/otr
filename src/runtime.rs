@@ -1,23 +1,24 @@
+use std::marker::PhantomData;
 use std::rc::Rc;
 
 use crate::core::CompiledObject;
 use crate::core::expression::{Expression, ProcedureCallExpression};
-use crate::core::module::ModuleAddress;
+use crate::core::module::{CompiledModule, ModuleAddress};
 use crate::core::value::Value;
 use crate::error::context::{HintContextDecorator};
-use crate::error::runtime_error::RuntimeError;
 use crate::runtime::environment::Environment;
 
 use crate::error::Result;
+use crate::runtime::error::RuntimeError;
 use crate::runtime::expressions::eval_expression;
 use crate::runtime::module::RuntimeModule;
 
-pub mod environment;
-pub mod expressions;
-pub mod module;
-pub mod procedures;
-pub mod value;
-pub mod error;
+mod environment;
+mod expressions;
+mod module;
+mod procedures;
+mod value;
+mod error;
 
 #[derive(Debug)]
 pub struct RuntimeObject<'a> {
@@ -43,11 +44,46 @@ impl From<CompiledObject> for RuntimeObject<'_> {
     }
 }
 
+struct RuntimeObjectBuilderNoRoot;
+struct RuntimeObjectBuilderWithRoot;
+struct RuntimeObjectBuilder<T> {
+    runtime_object: RuntimeObject<'static>,
+    phantom_data: PhantomData<T>,
+}
+
+impl RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
+    pub fn with_root(mut self, root_module: CompiledModule, module_ident: String) -> RuntimeObjectBuilder<RuntimeObjectBuilderWithRoot> {
+        self.runtime_object.base_environement.load_module(module_ident, Rc::new(RuntimeModule::Compiled(root_module)));
+        RuntimeObjectBuilder {
+            runtime_object: self.runtime_object,
+            phantom_data: PhantomData
+        }
+    }
+}
+
+impl RuntimeObjectBuilder<RuntimeObjectBuilderWithRoot> {
+    pub fn with_module(mut self, module: CompiledModule, module_ident: String) -> Self {
+        self.runtime_object.base_environement.load_module(module_ident, Rc::new(RuntimeModule::Compiled(module)));
+        self
+    }
+
+    pub fn build(self) -> RuntimeObject<'static> {
+        self.runtime_object
+    }
+}
+
 impl RuntimeObject<'_> {
-    pub(crate) fn _new() -> Self {
+    fn new() -> Self {
         Self {
             base_environement: Environment::new("".into()),
             entrypoint: None,
+        }
+    }
+
+    pub fn builder() -> RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
+        RuntimeObjectBuilder {
+            runtime_object: RuntimeObject::new(),
+            phantom_data: PhantomData,
         }
     }
 
@@ -67,4 +103,4 @@ impl RuntimeObject<'_> {
     }
 }
 
-pub mod scope;
+mod scope;

@@ -1,4 +1,4 @@
-use crate::lexer::{token::Token, TokenizerRule};
+use crate::compiler::lexer::{token::Token, TokenizerRule};
 
 pub(crate) struct KeywordRule {
     keyword: String,

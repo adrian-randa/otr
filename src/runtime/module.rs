@@ -1,7 +1,6 @@
 use crate::core::module::CompiledModule;
 use crate::core::r#struct::Struct;
-use crate::error::runtime_error::RuntimeError;
-use crate::runtime::procedures::RuntimeProcedure;
+use crate::runtime::{error::RuntimeError, procedures::RuntimeProcedure};
 use crate::error::Result;
 
 pub(crate) trait Module: std::fmt::Debug {

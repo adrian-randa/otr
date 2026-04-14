@@ -1,6 +1,6 @@
 use colored::Colorize;
 
-use crate::{core::{r#type::Type, value::Value}, error::Error, lexer::token::Token};
+use crate::{core::{r#type::Type, value::Value}, error::Error, compiler::lexer::token::Token};
 
 #[derive(Debug)]
 pub(crate) enum CompilerError {

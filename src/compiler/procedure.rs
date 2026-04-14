@@ -1,16 +1,17 @@
 use std::any::Any;
 
+use crate::compiler::ExpressionParseEnvironment;
 use crate::compiler::error::CompilerError;
 use crate::compiler::expression_parser::{ExpressionParser, parse_variable_address};
-use crate::core::expression::AssociatedProcedureCallExpression;
+use crate::core::expression::{AssociatedProcedureCallExpression, Expression};
 use crate::core::expression::boolean::BooleanExpression;
 use crate::core::expression::comparison::ComparisonExpression;
-use crate::core::expression::variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression};
-use crate::core::procedure::CompiledProcedure;
+use crate::core::expression::variable::{VariableAccessMode, VariableAddressant, VariableExpression};
+use crate::core::procedure::{CompiledProcedure, Instruction};
 use crate::core::r#type::Type;
+use crate::core::value::Value;
 use crate::error::Result;
-use crate::lexer::token::{OperatorToken, ParenthesisType};
-use crate::{compiler::ExpressionParseEnvironment, core::{expression::Expression, procedure::Instruction, value::Value}, lexer::token::{KeywordToken, PunctuationToken, Token}};
+use crate::compiler::lexer::token::{Token, OperatorToken, ParenthesisType, PunctuationToken, KeywordToken};
 
 trait ScopeExcapeHandler: std::fmt::Debug {
     fn resolve(&self, instructions: &mut Vec<Instruction>);

@@ -11,7 +11,4 @@ pub trait ErrorContextualizer {
 }
 
 pub(crate) mod context;
-pub(crate) mod fragmenter_error;
-pub(crate) mod runtime_error;
-pub(crate) mod tokenizer_error;
 pub mod system_error;

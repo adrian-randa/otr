@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
         CompilerEnvironment, CompilerError, CompilerState, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState,
-    }, core::{CompiledObject, module::{CompiledModule, ModuleAddress}}, lexer::token::{ParenthesisType, PunctuationToken, Token}
+    }, core::{CompiledObject, module::{CompiledModule, ModuleAddress}}, compiler::lexer::token::{ParenthesisType, PunctuationToken, Token}
 };
 
 use crate::error::Result;

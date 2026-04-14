@@ -3,7 +3,7 @@ use std::{cell::RefCell, fs, rc::Rc};
 use num::ToPrimitive;
 
 use crate::{
-    core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value}, error::{Result, runtime_error::RuntimeError}, runtime::{environment::features::FeatureBuilder, module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}}
+    core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value}, error::Result, runtime::{error::RuntimeError, environment::features::FeatureBuilder, module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}}
 };
 
 pub(crate) struct FilesFeatureBuilder {

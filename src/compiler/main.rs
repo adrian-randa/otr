@@ -1,6 +1,6 @@
 use std::{fs, path::{Path, PathBuf}, str::FromStr};
 
-use otr::{compiler::{Compiler, CompilerEnvironment}, core::module::{CompiledModule, ImportAddress}, error::system_error::SystemError, lexer::{Tokenizer, fragmenter::FragmentStream}};
+use otr::{compiler::{Compiler, CompilerEnvironment}, core::module::{CompiledModule, ImportAddress}, error::system_error::SystemError, compiler::lexer::{Tokenizer, fragmenter::FragmentStream}};
 use otr::error::Result;
 
 fn main() {

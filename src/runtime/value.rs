@@ -6,7 +6,7 @@ use crate::core::member::MemberMap;
 use crate::core::{expression::variable::VariableAddressant, value::Value};
 use crate::error::Result;
 use crate::error::context::VariableContextDecorator;
-use crate::error::runtime_error::RuntimeError;
+use crate::runtime::error::RuntimeError;
 
 fn try_get_value<'a>(member_map: &'a MemberMap, member_ident: &'a str) -> Result<&'a Value> {
     member_map

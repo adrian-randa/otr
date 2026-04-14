@@ -1,7 +1,7 @@
 use crate::{
     compiler::{
         CompilerError, CompilerState, states::{CompilerBaseState, module::CompilerModuleState}
-    }, core::module::{CompiledModule, ImportAddress}, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
+    }, core::module::{CompiledModule, ImportAddress}, compiler::lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}
 };
 
 use crate::error::Result;
@@ -14,7 +14,7 @@ pub struct CompilerImportState {
 impl CompilerState for CompilerImportState {
     fn read(
         mut self: Box<Self>,
-        token: crate::lexer::token::Token,
+        token: Token,
         compiler_environment: &mut crate::compiler::CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>> {
         if self.module_address.is_none() {
