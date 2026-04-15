@@ -152,8 +152,11 @@ impl ExpressionParseEnvironment for CompilerEnvironment {
 }
 
 pub mod expression_parser;
-pub mod parenthesis;
-pub mod states;
-pub mod procedure;
-pub mod error;
+pub(crate) mod parenthesis;
+pub(crate) mod states;
+pub(crate) mod procedure;
+pub(crate) mod error;
 pub mod lexer;
+
+pub use expression_parser::ExpressionParser;
+pub use lexer::{Tokenizer, token::{self, *}, fragmenter::{self, *}};

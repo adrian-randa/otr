@@ -1,0 +1,16 @@
+[package]
+name = "otrrun"
+version = "0.1.0"
+license.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otr_core = { workspace = true }
+otr_runtime = { workspace = true }
+otr_config = { workspace = true }
+
+serde = { workspace = true }
+serde_cbor = { workspace = true }
+clap = { workspace = true }

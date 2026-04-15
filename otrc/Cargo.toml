@@ -8,3 +8,4 @@ otr_core = { workspace = true }
 otr_compiler = { workspace = true }
 
 serde_cbor = { workspace = true }
+clap = { workspace = true }

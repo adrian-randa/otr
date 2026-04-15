@@ -21,6 +21,39 @@ impl Display for ImportAddress {
     }
 }
 
+impl ImportAddress {
+    pub fn to_flat_string(self) -> String {
+        fn nibble_to_hex(nibble: u8) -> char {
+            if nibble <= 9 {
+                return ('0' as u8 + nibble) as char
+            } else {
+                return ('a' as u8 - 10 + nibble) as char
+            }
+        }
+
+        fn byte_to_hex(byte: u8) -> [char; 2] {
+            [
+                nibble_to_hex(byte >> 4),
+                nibble_to_hex(byte & 0b00001111)
+            ]
+        }
+
+        let path_hex: String = self.path
+            .map(|path| {
+                path.as_bytes()
+                    .iter()
+                    .fold(Vec::new(), |mut acc, byte| {
+                        acc.extend_from_slice(&byte_to_hex(*byte));
+                        acc
+                    })
+                    .iter().collect()
+            })
+            .unwrap_or("".into());
+
+        self.module_id + &path_hex
+    }
+}
+
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CompiledModule {
     dependencies: Vec<ImportAddress>,

@@ -24,7 +24,7 @@ use otr_core::{
 };
 
 #[derive(Debug)]
-pub enum ExpressionAtom {
+pub(crate) enum ExpressionAtom {
     Subexpression(Expression),
     Operator(OperatorToken),
 }
@@ -39,7 +39,7 @@ impl ExpressionAtom {
 }
 
 #[derive(Debug)]
-pub enum RawExpressionAtom {
+pub(crate) enum RawExpressionAtom {
     Subexpression(Vec<Token>),
     Operator(OperatorToken),
 }

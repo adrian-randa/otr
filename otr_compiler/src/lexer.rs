@@ -9,12 +9,12 @@ use crate::lexer::{
     token::{ContextualizedToken, ContextualizedTokenStream, Token},
 };
 
-pub mod error;
+pub(crate) mod error;
 pub mod fragmenter;
 pub mod rules;
 pub mod token;
 
-trait TokenizerRule {
+pub trait TokenizerRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String);
 }
 
@@ -27,7 +27,7 @@ impl Tokenizer {
         Self { rules: vec![] }
     }
 
-    fn with_rule(mut self, rule: impl TokenizerRule + 'static) -> Self {
+    pub fn with_rule(mut self, rule: impl TokenizerRule + 'static) -> Self {
         self.rules.push(Box::new(rule));
         self
     }

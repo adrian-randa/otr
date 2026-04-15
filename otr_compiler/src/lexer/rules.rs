@@ -1,6 +1,6 @@
 use crate::lexer::{token::Token, TokenizerRule};
 
-pub(crate) struct KeywordRule {
+pub struct KeywordRule {
     keyword: String,
     emits: Token,
 }
@@ -50,7 +50,7 @@ impl TokenizerRule for PatternRule {
     }
 }
 
-pub(crate) struct StringLiteralRule;
+pub struct StringLiteralRule;
 
 impl TokenizerRule for StringLiteralRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String) {
@@ -68,7 +68,7 @@ impl TokenizerRule for StringLiteralRule {
     }
 }
 
-pub(crate) struct CharLiteralRule;
+pub struct CharLiteralRule;
 
 impl TokenizerRule for CharLiteralRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String) {
@@ -86,7 +86,7 @@ impl TokenizerRule for CharLiteralRule {
     }
 }
 
-pub(crate) struct NumberLiteralRule;
+pub struct NumberLiteralRule;
 
 impl TokenizerRule for NumberLiteralRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String) {
@@ -109,7 +109,7 @@ impl TokenizerRule for NumberLiteralRule {
     }
 }
 
-pub(crate) struct BooleanLiteralRule;
+pub struct BooleanLiteralRule;
 
 impl TokenizerRule for BooleanLiteralRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String) {
@@ -124,7 +124,7 @@ impl TokenizerRule for BooleanLiteralRule {
     }
 }
 
-pub(crate) struct IdentifierRule;
+pub struct IdentifierRule;
 
 impl TokenizerRule for IdentifierRule {
     fn try_apply(&self, fragment: String) -> (Option<Token>, String) {

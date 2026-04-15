@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "otr_*", "otrc" ]
+members = [ "otr_*", "otrc" , "otrrun"]
 
 [workspace.package]
 license = "MIT"
@@ -18,6 +18,9 @@ num = { version = "0.4.3", features = ["num-bigint"] }
 serde = { version = "1.0.228", features = ["derive", "rc"] }
 serde_cbor = "0.11.2"
 toml = "1.0.7"
+clap = { version = "4.5.60", features = ["derive"] }
+
+
 
 # Workspace members
 otr_compiler = { path = "otr_compiler", version = "0.1.0"}

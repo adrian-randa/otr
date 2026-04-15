@@ -13,7 +13,7 @@ use crate::error::RuntimeError;
 use crate::expressions::eval_expression;
 use crate::module::RuntimeModule;
 
-mod environment;
+pub mod environment;
 mod expressions;
 mod module;
 mod procedures;
@@ -44,16 +44,18 @@ impl From<CompiledObject> for RuntimeObject<'_> {
     }
 }
 
-struct RuntimeObjectBuilderNoRoot;
-struct RuntimeObjectBuilderWithRoot;
-struct RuntimeObjectBuilder<T> {
+pub struct RuntimeObjectBuilderNoRoot;
+pub struct RuntimeObjectBuilderWithRoot;
+pub struct RuntimeObjectBuilder<T> {
     runtime_object: RuntimeObject<'static>,
     phantom_data: PhantomData<T>,
 }
 
 impl RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
     pub fn with_root(mut self, root_module: CompiledModule, module_ident: String) -> RuntimeObjectBuilder<RuntimeObjectBuilderWithRoot> {
-        self.runtime_object.base_environement.load_module(module_ident, Rc::new(RuntimeModule::Compiled(root_module)));
+        self.runtime_object.base_environement.load_module(module_ident.clone(), Rc::new(RuntimeModule::Compiled(root_module)));
+        self.runtime_object.entrypoint = Some(ModuleAddress::new(module_ident, "main".into()));
+
         RuntimeObjectBuilder {
             runtime_object: self.runtime_object,
             phantom_data: PhantomData
@@ -80,9 +82,12 @@ impl RuntimeObject<'_> {
         }
     }
 
-    pub fn builder() -> RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
+    pub fn builder(base_environment: Environment<'static>) -> RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
+        let mut runtime_object = RuntimeObject::new();
+        runtime_object.base_environement = base_environment;
+        
         RuntimeObjectBuilder {
-            runtime_object: RuntimeObject::new(),
+            runtime_object: runtime_object,
             phantom_data: PhantomData,
         }
     }
@@ -104,3 +109,5 @@ impl RuntimeObject<'_> {
 }
 
 mod scope;
+
+pub use crate::environment::environment_builder::{self, *};

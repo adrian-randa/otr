@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use otr_core::error::{Error, system_error::SystemError};
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(try_from = "&str")]
 pub struct Version {
     major: usize,
@@ -15,6 +15,12 @@ pub struct Version {
 impl Version {
     pub fn new(major: usize, minor: usize, patch: usize) -> Self {
         Self { major, minor, patch }
+    }
+}
+
+impl std::fmt::Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)
     }
 }
 
@@ -107,12 +113,15 @@ impl ProjectConfiguration {
     pub fn get_features(&self) -> &Features {
         &self.features
     }
+
+    pub fn features(self) -> Features {
+        self.features
+    }
 }
 
-fn get_project_config(root_file_path: PathBuf) -> otr_core::error::Result<ProjectConfiguration> {
-    const CONFIG_PATH: &'static str = "otr_config.toml";
-
-    let config_string = fs::read_to_string(root_file_path.join(CONFIG_PATH)).map_err(|err| SystemError::new(
+pub fn get_project_config(config_path: PathBuf) -> otr_core::error::Result<ProjectConfiguration> {
+    
+    let config_string = fs::read_to_string(config_path).map_err(|err| SystemError::new(
         format!("Could not read project configuration file: {}", err)
     ).boxed())?;
 

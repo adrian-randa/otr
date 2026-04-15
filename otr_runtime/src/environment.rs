@@ -154,4 +154,4 @@ impl<'a> Environment<'a> {
 }
 
 pub mod environment_builder;
-pub(crate) mod features;
+mod features;

@@ -63,7 +63,7 @@ impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
             environment.load_module(module_identifier, Rc::new(module));
         }
 
-        todo!()
+        environment
     }
 }
 
