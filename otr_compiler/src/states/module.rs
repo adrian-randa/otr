@@ -57,10 +57,6 @@ impl CompilerState for CompilerModuleState {
     ) -> Result<Box<dyn CompilerState>> {
         match self.substate {
             ModuleSubstate::PreScope => {
-                if let Token::Keyword(KeywordToken::Import)  = token {
-                    return Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>);
-                }
-
                 if self.module_name.is_none() {
                     if let Token::Identifier(ident) = token {
                         self.module_name = Some(ident);
@@ -91,6 +87,10 @@ impl CompilerState for CompilerModuleState {
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
                     self.base.module = Some(self.module);
                     Ok(Box::new(self.base))
+                }
+
+                Token::Keyword(KeywordToken::Import) => {
+                    return Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>);
                 }
 
                 Token::Keyword(KeywordToken::Proc) => {
