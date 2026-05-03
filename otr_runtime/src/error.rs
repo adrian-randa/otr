@@ -55,6 +55,7 @@ pub enum RuntimeError {
         ty: Type,
     },
     FieldIsPrivate,
+    #[allow(unused)]
     KeyAlreadyPresent {
         key: String,
     },

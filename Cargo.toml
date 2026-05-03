@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "otr_*", "otrc" , "otrrun"]
+members = ["collar", "otr_*", "otrc", "otrrun"]
 
 [workspace.package]
 license = "MIT"

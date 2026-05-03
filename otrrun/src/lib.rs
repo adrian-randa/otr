@@ -1,4 +1,4 @@
-use std::{collections::HashSet, env, fs, hash::Hash, path::{Path, PathBuf}};
+use std::{collections::HashSet, env, fs, path::{Path, PathBuf}};
 
 use otr_config::Features;
 use otr_core::{Result, SystemError, module::{CompiledModule, ImportAddress}};

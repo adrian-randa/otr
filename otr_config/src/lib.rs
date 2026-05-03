@@ -4,12 +4,28 @@ use serde::{Deserialize, Serialize};
 
 use otr_core::error::{Error, system_error::SystemError};
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, PartialOrd)]
 #[serde(try_from = "&str")]
 pub struct Version {
-    major: usize,
-    minor: usize,
-    patch: usize,
+    pub major: usize,
+    pub minor: usize,
+    pub patch: usize,
+}
+
+impl Ord for Version {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match self.major.cmp(&other.major) {
+            std::cmp::Ordering::Equal => {
+                match self.minor.cmp(&other.minor) {
+                    std::cmp::Ordering::Equal => {
+                        self.patch.cmp(&other.patch)
+                    },
+                    other => other
+                }
+            },
+            other => other
+        }
+    }
 }
 
 impl Version {
@@ -52,8 +68,8 @@ impl Serialize for Version {
 }
 
 pub struct Feature {
-    feature_ident: String,
-    config: Vec<(String, String)>
+    pub feature_ident: String,
+    pub config: Vec<(String, String)>
 }
 
 impl Feature {
@@ -67,7 +83,7 @@ impl Feature {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Features(HashMap<String, FeatureConfig>);
+pub struct Features(pub HashMap<String, FeatureConfig>);
 
 impl IntoIterator for Features {
     type Item = Feature;
@@ -85,16 +101,46 @@ impl IntoIterator for Features {
 
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct FeatureConfig(HashMap<String, String>);
+pub struct FeatureConfig(pub HashMap<String, String>);
 
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, PartialOrd)]
+#[serde(try_from = "&str")]
+pub enum ProjectType {
+    Executable,
+    Library,
+}
+
+impl TryFrom<&str> for ProjectType {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        match value {
+            "executable" => Ok(Self::Executable),
+            "library" => Ok(Self::Library),
+            _ => Err(SystemError::new(format!("'{value}' is not a valid project type!")).boxed())
+        }
+    }
+}
+
+impl Serialize for ProjectType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer {
+        match self {
+            ProjectType::Executable => "executable",
+            ProjectType::Library => "library",
+        }.serialize(serializer)
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ProjectConfiguration {
-    name: String,
-    otr_version: Version,
-    root_module: String,
+    pub project: ProjectType,
+    pub name: String,
+    pub otr_version: Version,
+    pub root_module: String,
 
-    features: Features,
+    pub features: Features,
 }
 
 impl ProjectConfiguration {

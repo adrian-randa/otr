@@ -1,5 +1,5 @@
 use crate::{
-    CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}, states::{CompilerBaseState, module::CompilerModuleState}
+    CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}, states::{module::CompilerModuleState}
 };
 
 use otr_core::{module::{CompiledModule, ImportAddress}, error::Result};

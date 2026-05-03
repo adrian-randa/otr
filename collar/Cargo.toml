@@ -1,0 +1,19 @@
+[package]
+name = "collar"
+version = "0.1.0"
+license.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+otr_config = { workspace = true }
+otr_core = { workspace = true }
+
+clap = { workspace = true }
+colored = {workspace = true }
+serde = {workspace = true }
+toml = {workspace = true }
+current_platform = "0.2.0"
+reqwest = { version = "0.13.3", features = ["blocking"] }
+serde_json = "1.0.149"

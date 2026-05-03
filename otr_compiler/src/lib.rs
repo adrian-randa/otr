@@ -1,8 +1,6 @@
-use std::{
-    collections::{HashMap, HashSet}, path::PathBuf,
-};
+use std::collections::{HashMap, HashSet};
 
-use crate::{error::{CompilerError}, lexer::token::{ContextualizedToken, Token}, states::CompilerBaseState};
+use crate::{error::{CompilerError, context::LineIndexContextDecorator}, states::CompilerBaseState};
 
 use otr_core::{module::{CompiledModule, ImportAddress, ModuleAddress}, error::Result};
 
@@ -64,9 +62,9 @@ impl Compiler {
             let token = token.token;
 
             self = self.read(token, environment)
-                /* .map_err(|error| {
+                .map_err(|error| {
                     LineIndexContextDecorator { error, line }.boxed()
-                }) */
+                })
                 ?;
         }
 

@@ -24,7 +24,7 @@ use otr_core::{
 };
 
 #[derive(Debug)]
-pub(crate) enum ExpressionAtom {
+pub enum ExpressionAtom {
     Subexpression(Expression),
     Operator(OperatorToken),
 }
@@ -53,13 +53,7 @@ impl ExpressionParser {
     ) -> Result<Expression> {
         let atoms = Self::atomize(expression, environment)?;
 
-        let mut operator_order = Vec::new();
-        for i in 0..atoms.len() {
-            if let ExpressionAtom::Operator(operator) = &atoms[i] {
-                operator_order.push((Self::get_precedence(operator), i));
-            }
-        }
-        operator_order.sort_by_key(|(precedence, _i)| usize::MAX - *precedence);
+        let mut operator_order = Self::get_operator_order(&atoms);
 
         let mut atoms = atoms.into_iter().map(|atom| Some(atom)).collect::<Vec<_>>();
 
@@ -127,6 +121,18 @@ impl ExpressionParser {
         Ok(atoms[0].take().unwrap().unwrap_subexpression())
     }
 
+    fn get_operator_order(atoms: &[ExpressionAtom]) -> Vec<(usize, usize)> {
+        let mut operator_order = Vec::new();
+        for i in 0..atoms.len() {
+            if let ExpressionAtom::Operator(operator) = &atoms[i] {
+                operator_order.push((Self::get_precedence(operator), i));
+            }
+        }
+        operator_order.sort_by_key(|(precedence, _i)| usize::MAX - *precedence);
+
+        operator_order
+    }
+
     pub fn atomize(
         expression: impl IntoIterator<Item = Token>,
         environment: &dyn ExpressionParseEnvironment,
@@ -187,40 +193,15 @@ impl ExpressionParser {
         let mut iter = tokens.into_iter();
 
         let mut slices = Vec::new();
-
         let mut current = Vec::new();
 
-        let mut stack = Vec::new();
+        let mut parenthesis_stack = ParenthesisStack::new();
 
         while let Some(next) = iter.next() {
-            if let Token::Punctuation(punct) = next.clone() {
-                use PunctuationToken::*;
-
-                match &punct {
-                    Parenthesis(p) | SquareBrackets(p) | CurlyBraces(p) => match p {
-                        ParenthesisType::Opening => stack.push(punct),
-                        ParenthesisType::Closing => {
-                            let top = stack
-                                .pop()
-                                .ok_or(CompilerError::InvalidParenthesisStructure.boxed())?;
-
-                            match (&top, &punct) {
-                                (Parenthesis(_), Parenthesis(_))
-                                | (SquareBrackets(_), SquareBrackets(_))
-                                | (CurlyBraces(_), CurlyBraces(_)) => {}
-                                _ => {
-                                    return Err(CompilerError::InvalidParenthesisStructure.boxed());
-                                }
-                            }
-                        }
-                    },
-
-                    _ => {}
-                };
-            }
+            parenthesis_stack.read(next.clone())?;
 
             if let Token::Punctuation(PunctuationToken::Comma) = next {
-                if stack.is_empty() {
+                if parenthesis_stack.is_empty() {
                     slices.push(current);
                     current = Vec::new();
                     continue;
@@ -243,40 +224,12 @@ impl ExpressionParser {
         let mut atoms = Vec::new();
         let mut current_subexpression = Vec::new();
 
-        let mut stack = Vec::new();
+        let mut parenthesis_stack = ParenthesisStack::new();
 
         while let Some(next) = tokens.next() {
             match next.clone() {
-                Token::Punctuation(punct) => {
-                    use PunctuationToken::*;
-
-                    match &punct {
-                        Parenthesis(p) | SquareBrackets(p) | CurlyBraces(p) => match p {
-                            ParenthesisType::Opening => stack.push(punct),
-                            ParenthesisType::Closing => {
-                                let top = stack
-                                    .pop()
-                                    .ok_or(CompilerError::InvalidParenthesisStructure.boxed())?;
-
-                                match (&top, &punct) {
-                                    (Parenthesis(_), Parenthesis(_))
-                                    | (SquareBrackets(_), SquareBrackets(_))
-                                    | (CurlyBraces(_), CurlyBraces(_)) => {}
-                                    _ => {
-                                        return Err(
-                                            CompilerError::InvalidParenthesisStructure.boxed()
-                                        );
-                                    }
-                                }
-                            }
-                        },
-
-                        _ => {}
-                    };
-                }
-
                 Token::Operator(operator) => {
-                    if stack.is_empty() {
+                    if parenthesis_stack.is_empty() {
                         if !current_subexpression.is_empty() {
                             atoms.push(RawExpressionAtom::Subexpression(current_subexpression));
                         }
@@ -286,7 +239,9 @@ impl ExpressionParser {
                     }
                 }
 
-                _ => {}
+                other => {
+                    parenthesis_stack.read(other)?;
+                }
             }
             current_subexpression.push(next);
         }
@@ -608,8 +563,7 @@ impl ExpressionAtomParser {
                         for field_override in raw_field_overrides {
                             let mut tokens = field_override.into_iter();
 
-                            let field_name = tokens.next();
-                            let field_name = match field_name {
+                            let field_name = match tokens.next() {
                                 Some(Token::Identifier(ident)) => ident,
                                 other => {
                                     return Err(CompilerError::UnexpectedToken {
@@ -1002,9 +956,7 @@ impl ExpressionAtomParser {
     }
 }
 
-pub(crate) fn try_parse_literal(
-    literal: LiteralToken,
-) -> Result<Value> {
+pub(crate) fn try_parse_literal(literal: LiteralToken) -> Result<Value> {
     match literal {
         LiteralToken::Null => Ok(Value::Null),
         LiteralToken::Integer(num) => Ok(Value::Integer(num.parse().map_err(|_| {

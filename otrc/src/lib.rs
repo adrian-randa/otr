@@ -1,6 +1,6 @@
-use std::{fs, path::{Path, PathBuf}, str::FromStr};
+use std::{fs, path::{Path, PathBuf}};
 
-use otr_compiler::{Compiler, CompilerEnvironment, lexer::{Tokenizer, fragmenter::FragmentStream}};
+use otr_compiler::{Compiler, CompilerEnvironment, Fragmenter, lexer::Tokenizer};
 use otr_core::{SystemError, error::Result, module::{CompiledModule, ImportAddress}};
 
 
@@ -24,7 +24,7 @@ pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name
 }
 
 pub fn compile_single_file(source: String, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
-    let fragments = FragmentStream::from_str(&source)?;
+    let fragments = Fragmenter::fragment(&source)?;
     let tokens = Tokenizer::default().tokenize(fragments)?;
 
     let compiler = Compiler::new();

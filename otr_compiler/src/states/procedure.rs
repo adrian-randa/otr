@@ -2,7 +2,7 @@ use crate::{
     CompilerEnvironment, CompilerError, CompilerState, lexer::token::{ParenthesisType, PunctuationToken, Token}, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState
 };
 
-use otr_core::{CompiledObject, module::{CompiledModule, ModuleAddress}, error::Result};
+use otr_core::{module::{CompiledModule, ModuleAddress}, error::Result};
 
 #[derive(Debug, PartialEq, Eq)]
 enum ProcedureSubstate {

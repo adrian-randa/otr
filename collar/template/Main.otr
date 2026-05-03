@@ -1,0 +1,10 @@
+
+module Main {
+
+    # The entrypoint of the project
+    proc main() {
+        Debug::println("Hello world!");
+    }
+
+    export main;
+}

@@ -1,6 +1,6 @@
 use std::{env, path::PathBuf};
 
-use clap::{self, Arg, Command, Parser, builder::ValueParser};
+use clap::Parser;
 use otr_core::SystemError;
 
 fn main() {

@@ -38,22 +38,17 @@ impl Tokenizer {
         for mut frag in fragments {
             'scan: while !frag.fragment.is_empty() {
                 for rule in self.rules.iter() {
-                    let frag_len = frag.fragment.len();
                     let (token, remainder) = rule.try_apply(frag.fragment);
-                    let rem_len = remainder.len();
                     let line = frag.line_index;
-                    let column = frag.column_index;
                     frag = Fragment {
                         fragment: remainder,
                         line_index: frag.line_index,
-                        column_index: frag.column_index + frag_len - rem_len,
                     };
 
                     if let Some(token) = token {
                         stream.push(ContextualizedToken {
                             token,
                             line_index: line,
-                            column_index: column,
                         });
                         continue 'scan;
                     }

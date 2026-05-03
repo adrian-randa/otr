@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
-use otr_core::{error::{ErrorContextualizer, Result}, expression::{variable::{VariableAccessMode, VariableAddressant, VariableExpression}, *}, r#type::Type, value::Value};
-use crate::{error::{RuntimeError, context::AssociatedProcedureContextDecorator}, environment::Environment, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
+use otr_core::{error::Result, expression::{variable::{VariableAccessMode, VariableAddressant, VariableExpression}, *}, r#type::Type, value::Value};
+use crate::{environment::Environment, error::{RuntimeError, context::{AssociatedProcedureContextDecorator, ProcedureContextDecorator}}, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
 
 
 pub(crate) fn eval_expression(expression: &Expression, environment: &Environment) -> Result<Value> {
@@ -38,7 +38,10 @@ fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Envir
 
     Ok(procedure
         .call(environment, arguments)
-        //.map_err(|error| expression.contextualize(error))
+        .map_err(|error| ProcedureContextDecorator {
+            error,
+            procedure_id: expression.get_procedure_id().clone()
+        }.boxed())
         ?
     )
 }

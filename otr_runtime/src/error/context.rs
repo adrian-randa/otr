@@ -1,5 +1,3 @@
-use std::path::PathBuf;
-
 use colored::Colorize;
 
 use crate::ModuleAddress;
@@ -9,8 +7,8 @@ use super::Error;
 
 #[derive(Debug)]
 pub(crate) struct ProcedureContextDecorator {
-    error: Box<dyn Error>,
-    procedure_id: ModuleAddress,
+    pub(crate) error: Box<dyn Error>,
+    pub(crate) procedure_id: ModuleAddress,
 }
 
 impl Error for ProcedureContextDecorator {
@@ -32,11 +30,8 @@ impl std::fmt::Display for ProcedureContextDecorator {
 }
 
 impl ProcedureContextDecorator {
-    pub(crate) fn new_boxed(error: Box<dyn Error>, procedure_id: ModuleAddress) -> Box<dyn Error> {
-        Box::new(Self {
-            error,
-            procedure_id,
-        })
+    pub(crate) fn boxed(self) -> Box<dyn Error> {
+        Box::new(self)
     }
 }
 
@@ -77,36 +72,6 @@ impl AssociatedProcedureContextDecorator {
             struct_id,
             procedure_identifier,
         })
-    }
-}
-
-#[derive(Debug)]
-pub(crate) struct LineIndexContextDecorator {
-    pub(crate) error: Box<dyn Error>,
-
-    pub(crate) line: usize,
-}
-
-impl Error for LineIndexContextDecorator {
-    fn to_value(&self) -> Value {
-        self.error.to_value()
-    }
-}
-
-impl std::fmt::Display for LineIndexContextDecorator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let message = format!(
-            "Occurred on line {}.",
-            self.line
-        );
-
-        write!(f, "{}\n{}", self.error, (&message as &str).bright_black())
-    }
-}
-
-impl LineIndexContextDecorator {
-    pub(crate) fn boxed(self) -> Box<dyn Error> {
-        Box::new(self)
     }
 }
 

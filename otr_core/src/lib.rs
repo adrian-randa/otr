@@ -1,6 +1,6 @@
 use std::collections::{HashMap, hash_map};
 
-use module::{CompiledModule, ModuleAddress};
+use module::{CompiledModule};
 
 pub mod value;
 pub mod member;

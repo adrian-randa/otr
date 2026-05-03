@@ -1,11 +1,11 @@
-use std::str::{Chars, FromStr};
+use std::str::Chars;
 
 use derive_more::IntoIterator;
 
 use crate::lexer::error::FragmentationError;
-use otr_core::error::Error;
+use otr_core::error::Result;
 
-
+#[allow(unused)]
 struct CharCoordinateIterator<'a> {
     iter: Chars<'a>,
     line: usize,
@@ -31,252 +31,170 @@ impl<'a> Iterator for CharCoordinateIterator<'a> {
 pub struct Fragment {
     pub(crate) fragment: String,
     pub(crate) line_index: usize,
-    pub(crate) column_index: usize,
 }
 
 #[derive(Debug, IntoIterator)]
 pub struct FragmentStream(Vec<Fragment>);
 
-impl FromStr for FragmentStream {
-    type Err = Box<dyn Error>;
+#[derive(Debug, PartialEq)]
+enum CharKind {
+    Alphabetic,
+    Numeric,
+    Punctuation,
+}
 
-    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
-        let mut stream = Vec::new();
-
-        #[derive(Debug, PartialEq)]
-        enum CharKind {
-            Alphabetic,
-            Numeric,
-            Punctuation,
+impl From<char> for CharKind {
+    fn from(value: char) -> Self {
+        if value.is_ascii_alphabetic() {
+            return Self::Alphabetic;
+        }
+        if value.is_numeric() {
+            return Self::Numeric;
+        }
+        if value.is_ascii_punctuation() {
+            return Self::Punctuation;
         }
 
-        impl From<char> for CharKind {
-            fn from(value: char) -> Self {
-                if value.is_ascii_alphabetic() {
-                    return Self::Alphabetic;
-                }
-                if value.is_numeric() {
-                    return Self::Numeric;
-                }
-                if value.is_ascii_punctuation() {
-                    return Self::Punctuation;
-                }
+        panic!("Unsupported char kind");
+    }
+}
 
-                panic!("Unsupported char kind");
-            }
+pub struct Fragmenter {
+    fragments: Vec<Fragment>,
+    current: String,
+}
+
+impl Fragmenter {
+    fn finalize_fragment(&mut self, line_index: usize) {
+        if !self.current.is_empty() {
+            let mut fragment = Fragment { fragment: String::new(), line_index };
+            
+            std::mem::swap(&mut fragment.fragment, &mut self.current);
+    
+            self.fragments.push(fragment);
         }
+    } 
+    
+    pub fn fragment(s: impl AsRef<str>) -> Result<FragmentStream> {
+        let mut this = Self {
+            fragments: Vec::new(),
+            current: String::new()
+        };
 
-        let mut current = String::new();
-        let mut current_pos = (0, 0);
-        let mut current_kind = CharKind::Alphabetic;
+        'line: for (line_index, line) in s.as_ref().lines().enumerate() {
+            let chars: Vec<char> = line.chars().collect();
+            
+            let mut i = 0;
+            while i < chars.len() {
+                match chars[i] {
+                    '\'' => {
+                        this.finalize_fragment(line_index);
 
-        let s = s.to_string();
+                        if chars.get(i + 2).is_none_or(|c| *c != '\'') {
+                            return Err(FragmentationError::InvalidCharLiteral { line_index, column_index: i }.boxed());
+                        }
+                        this.finalize_fragment(line_index);
+                        this.current = ['\'', chars[i + 1], '\''].iter().collect();
+                        this.finalize_fragment(line_index);
+                        
+                        i += 3;
+                    }
+                    '\"' => {
+                        this.finalize_fragment(line_index);
 
-        let chars: Vec<(char, usize, usize)> = CharCoordinateIterator {
-            iter: s.chars(),
-            line: 1,
-            column: 1,
-        }
-        .collect();
+                        this.current.push('\"');
 
-        let (_, _, _) = chars.last().unwrap();
+                        i += 1;
 
-        let mut i = 0;
-
-        while i < chars.len() {
-            let (c, line, column) = chars[i];
-
-            i += 1;
-
-            if c == '\'' {
-                if !current.is_empty() {
-                    stream.push(Fragment {
-                        fragment: current,
-                        line_index: current_pos.0,
-                        column_index: current_pos.1,
-                    });
-                    current_pos = (line, column);
-                    current = String::new();
-                }
-
-                current.push('\'');
-
-                current.push(chars[i].0);
-
-                current.push('\'');
-
-                stream.push(Fragment {
-                    fragment: current,
-                    line_index: current_pos.0,
-                    column_index: current_pos.1,
-                });
-                current_pos = (line, column);
-                current = String::new();
-
-                i += 2;
-                continue;
-            }
-
-            if c == '\"' {
-                if !current.is_empty() {
-                    stream.push(Fragment {
-                        fragment: current,
-                        line_index: current_pos.0,
-                        column_index: current_pos.1,
-                    });
-                    current_pos = (line, column);
-                    current = String::new();
-                }
-
-                current.push('\"');
-
-                while chars[i].0 != '\"' {
-                    if chars[i].0 == '\\' {
-                        match chars[i + 1].0 {
-                            'n' => {
-                                current.push('\n');
-                            }
-                            't' => {
-                                current.push('\t');
-                            }
-                            '\"' => {
-                                current.push('\"');
-                            }
-                            '\\' => {
-                                current.push('\\');
-                            }
-                            _ => {
-                                return Err(FragmentationError::InvalidControlCharacter {
-                                    line_index: line,
-                                    column_index: column,
+                        while chars[i] != '\"' {
+                            if chars[i] == '\\' {
+                                match chars.get(i + 1) {
+                                    Some('n') => {
+                                        this.current.push('\n');
+                                    }
+                                    Some('t') => {
+                                        this.current.push('\t');
+                                    }
+                                    Some('\"') => {
+                                        this.current.push('\"');
+                                    }
+                                    Some('\\') => {
+                                        this.current.push('\\');
+                                    }
+                                    Some(_) => {
+                                        return Err(FragmentationError::InvalidControlCharacter {
+                                            line_index,
+                                            column_index: i,
+                                        }
+                                        .boxed())
+                                    }
+                                    None => {
+                                        return Err(
+                                            FragmentationError::LinebreakInStringLiteral { line_index, column_index: i }.boxed()
+                                        );
+                                    }
                                 }
-                                .boxed())
+                                i = i + 2;
+                                continue;
+                            }
+
+                            this.current.push(chars[i]);
+
+                            i += 1;
+
+                            if i >= chars.len() {
+                                return Err(
+                                    FragmentationError::LinebreakInStringLiteral { line_index, column_index: i }.boxed()
+                                );
                             }
                         }
-                        i = i + 2;
-                        continue;
+
+                        this.current.push('\"');
+
+                        this.finalize_fragment(line_index);
                     }
-                    if chars[i].0 == '\n' {
-                        return Err(FragmentationError::LinebreakInStringLiteral {
-                            line_index: line,
-                            column_index: column,
+                    '#' => {
+                        this.finalize_fragment(line_index);
+                        continue 'line;
+                    }
+                    ';' => {
+                        this.finalize_fragment(line_index);
+                        this.current = ";".into();
+                        this.finalize_fragment(line_index);
+                    }
+                    _ => {
+                        if chars[i].is_ascii_whitespace() {
+                            this.finalize_fragment(line_index);
+                        } else {
+                            if !this.current.is_empty() && i > 0 {
+                                use CharKind::*;
+                                match (CharKind::from(chars[i - 1]), CharKind::from(chars[i])) {
+                                    (Alphabetic, Punctuation)
+                                    | (Punctuation, Alphabetic)
+                                    /*| (Numeric, Alphabetic) */ => {
+                                        this.finalize_fragment(line_index);
+                                    }
+                                    (Numeric, Punctuation) => {
+                                        if chars[i] != '.' {
+                                            this.finalize_fragment(line_index);
+                                        }
+                                    }
+            
+                                    _ => {}
+                                }
+                            }
+                            this.current.push(chars[i]);
                         }
-                        .boxed());
                     }
-
-                    current.push(chars[i].0);
-
-                    i += 1;
                 }
 
-                current.push('\"');
-
-                stream.push(Fragment {
-                    fragment: current,
-                    line_index: current_pos.0,
-                    column_index: current_pos.1,
-                });
-                current_pos = (line, column);
-                current = String::new();
 
                 i += 1;
-                continue;
             }
 
-            if c.is_ascii_whitespace() {
-                if current.is_empty() {
-                    current_pos = (line, column);
-                    continue;
-                }
-                stream.push(Fragment {
-                    fragment: current,
-                    line_index: current_pos.0,
-                    column_index: current_pos.1,
-                });
-                current_pos = (line, column);
-                current = String::new();
-                continue;
-            }
-
-            if c == '#' {
-                if !current.is_empty() {
-                    stream.push(Fragment {
-                        fragment: current,
-                        line_index: current_pos.0,
-                        column_index: current_pos.1,
-                    });
-                    current_pos = (line, column);
-                    current = String::new();
-                }
-
-                while chars[i].0 != '\n' && i < chars.len() {
-                    i += 1;
-                }
-
-                continue;
-            }
-
-            if c == ';' {
-                stream.push(Fragment {
-                    fragment: current,
-                    line_index: current_pos.0,
-                    column_index: current_pos.1,
-                });
-                stream.push(Fragment {
-                    fragment: ";".into(),
-                    line_index: current_pos.0,
-                    column_index: column,
-                });
-                current_pos = (line, column);
-                current = String::new();
-                continue;
-            }
-
-            let next_char_kind: CharKind = c.into();
-
-            if !current.is_empty() {
-                use CharKind::*;
-                match (current_kind, next_char_kind) {
-                    (Alphabetic, Punctuation)
-                    | (Punctuation, Alphabetic)
-                    /*| (Numeric, Alphabetic) */ => {
-                        stream.push(Fragment {
-                            fragment: current,
-                            line_index: current_pos.0,
-                            column_index: current_pos.1,
-                        });
-                        current_pos = (line, column);
-                        current = String::new();
-                    }
-                    (Numeric, Punctuation) => {
-                        if c != '.' {
-                            stream.push(Fragment {
-                                fragment: current,
-                                line_index: current_pos.0,
-                                column_index: current_pos.1,
-                            });
-                            current_pos = (line, column);
-                            current = String::new();
-                        }
-                    }
-
-                    _ => {}
-                }
-            }
-
-            current_kind = c.into();
-
-            current.push(c);
+            this.finalize_fragment(line_index);
         }
 
-        if !current.is_empty() {
-            stream.push(Fragment {
-                fragment: current,
-                line_index: current_pos.0,
-                column_index: current_pos.1,
-            });
-        }
-
-        Ok(Self(stream))
+        Ok(FragmentStream(this.fragments))
     }
 }

@@ -1,0 +1,10 @@
+
+module <MODNAME> {
+
+    # Example procedure
+    proc printHelloWorld() {
+        Debug::println("Hello world!");
+    }
+
+    export printHelloWorld;
+}

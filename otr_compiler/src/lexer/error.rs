@@ -38,6 +38,10 @@ pub enum FragmentationError {
         line_index: usize,
         column_index: usize,
     },
+    InvalidCharLiteral {
+        line_index: usize,
+        column_index: usize,
+    }
 }
 
 impl Error for FragmentationError {
@@ -63,6 +67,11 @@ impl std::fmt::Display for FragmentationError {
             } => write!(
                 f,
                 "{} Newline in string literal at line {line_index} column {column_index}!",
+                "Fragmentation Error!".on_red()
+            ),
+            FragmentationError::InvalidCharLiteral { line_index, column_index } => write!(
+                f,
+                "{} Invalid char literal at line {line_index} column {column_index}!",
                 "Fragmentation Error!".on_red()
             ),
         }

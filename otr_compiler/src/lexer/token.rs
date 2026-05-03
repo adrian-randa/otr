@@ -4,7 +4,6 @@ use derive_more::IntoIterator;
 pub struct ContextualizedToken {
     pub token: Token,
     pub line_index: usize,
-    pub column_index: usize,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
