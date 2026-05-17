@@ -1,5 +1,4 @@
-# UNDER CONSTRUCTION
-This project is in it's earliest stage. The code has not been cleaned at all and is incoherent.
-
 # OTR
-An interpreted, dynamically typed, imperative programming language built with rust.
+A dynamically typed programming / scripting language that does not use garbage collection.
+
+Documentation and reference are yet to be added. As soon as they are, you can find them here.
