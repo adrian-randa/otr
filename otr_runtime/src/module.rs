@@ -39,7 +39,7 @@ impl<'a> Module for RuntimeModule<'a> {
                 let (procedure, public) = compiled_module.get_procedure(identifier)
                     .ok_or(RuntimeError::NoSuchMember { member_identifier: identifier.to_string() }.boxed())?;
 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::FieldIsPrivate.boxed())
                 } else {
                     Ok(RuntimeProcedure::CompiledRef(
@@ -52,7 +52,7 @@ impl<'a> Module for RuntimeModule<'a> {
                 let (procedure, public) = compiled_module.get_procedure(identifier)
                     .ok_or(RuntimeError::ProcedureNotDefined { procedure_identifier: identifier.to_string() }.boxed())?;
                 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::ProcedureNotExported { procedure_identifier: identifier.clone() }.boxed())
                 } else {
                     Ok(RuntimeProcedure::CompiledRef(
@@ -78,7 +78,7 @@ impl<'a> Module for RuntimeModule<'a> {
                         struct_identifier: struct_identifier.to_string()
                     }.boxed())?;
                 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::AssociatedProcedureNotExported {
                         procedure_identifier: procedure_identifier.to_string(),
                         struct_identifier: struct_identifier.to_string()
@@ -95,7 +95,7 @@ impl<'a> Module for RuntimeModule<'a> {
                         struct_identifier: struct_identifier.to_string()
                     }.boxed())?;
 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::AssociatedProcedureNotExported {
                         procedure_identifier: procedure_identifier.to_string(),
                         struct_identifier: struct_identifier.to_string()
@@ -114,7 +114,7 @@ impl<'a> Module for RuntimeModule<'a> {
                 let (st, public) = compiled_module.get_struct(identifier)
                     .ok_or(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())?;
 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::StructNotExported { struct_identifier: identifier.to_string() }.boxed())
                 } else {
                     Ok(st.clone())
@@ -125,7 +125,7 @@ impl<'a> Module for RuntimeModule<'a> {
                 let (st, public) = compiled_module.get_struct(identifier)
                     .ok_or(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())?;
 
-                if !public && private_access {
+                if !public && !private_access {
                     Err(RuntimeError::StructNotExported { struct_identifier: identifier.to_string() }.boxed())
                 } else {
                     Ok(st.clone())

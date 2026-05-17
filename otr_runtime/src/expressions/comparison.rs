@@ -1,5 +1,4 @@
 use otr_core::{expression::comparison::ComparisonExpression, error::Result, value::Value::{self, *}, expression::Expression};
-use crate::error::RuntimeError;
 use crate::environment::Environment;
 use crate::expressions::eval_expression;
 
@@ -14,19 +13,7 @@ fn eval_greater_than_expression(lhs: &Expression, rhs: &Expression, environment:
     let lhs = eval_expression(lhs, environment)?;
     let rhs = eval_expression(rhs, environment)?;
 
-    match (lhs, rhs) {
-        (Integer(l), Integer(r)) => Ok(Bool(l > r)),
-        (Float(l), Float(r)) => Ok(Bool(l > r)),
-
-        (l, r) => Err(RuntimeError::Unknown {
-            message: format!(
-                "Ordering is undefined on {} and {}!",
-                l.get_type_id(),
-                r.get_type_id()
-            ),
-        }
-        .boxed()),
-    }
+    Ok(Bool(crate::value::compare(&lhs, &rhs)?.is_gt()))
 }
 
 fn eval_equals_expression(lhs: &Expression, rhs: &Expression, environment: &Environment) -> Result<Value> {

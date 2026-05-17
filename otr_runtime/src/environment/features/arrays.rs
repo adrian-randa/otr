@@ -1,6 +1,8 @@
+use std::cmp::Ordering;
+
 use crate::{RuntimeError, Value, environment::{Environment, features::FeatureBuilder}, module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}};
 
-use otr_core::error::Result;
+use otr_core::Result;
 
 pub(crate) struct ArraysFeatureBuilder {
     //TODO: Add support for feature arguments
@@ -34,6 +36,7 @@ impl Module for ArraysFeature {
         match identifier as &str {
             "new" => Ok(RuntimeProcedure::AbstractRef(&NewArrayProcedure)),
             "size" => Ok(RuntimeProcedure::AbstractRef(&ArraySizeProcedure)),
+            "sort" => Ok(RuntimeProcedure::AbstractRef(&ArraySortProcedure)),
 
             unknown => Err(RuntimeError::ProcedureNotDefined { procedure_identifier: unknown.to_string() }.boxed())
         }
@@ -93,5 +96,34 @@ impl Procedure for ArraySizeProcedure {
             }
             .boxed()),
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ArraySortProcedure;
+
+impl Procedure for ArraySortProcedure {
+    fn call(&self, _environment: Environment, mut arguments: Vec<Value>) -> Result<Value> {
+        let arg = arguments.pop().ok_or(
+            RuntimeError::NoSuchVariable {
+                variable_identifier: "array".into(),
+            }
+            .boxed(),
+        )?;
+
+        let mut arr = match arg {
+            Value::Array(arr) => arr,
+            other => return Err(RuntimeError::TypeMismatch {
+                expected: otr_core::r#type::Type::Array,
+                found: other.get_type_id(),
+            }
+            .boxed()),
+        };
+
+        arr.sort_by(
+            |l, r| crate::value::compare(l, r).unwrap_or(Ordering::Equal)
+        );
+
+        Ok(Value::Array(arr))
     }
 }

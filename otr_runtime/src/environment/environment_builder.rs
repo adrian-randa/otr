@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 use std::rc::Rc;
 
-use crate::{environment::{Environment, features::{FeatureBuilder, arrays::ArraysFeatureBuilder, debug::DebugFeatureBuilder, files::FilesFeatureBuilder, numbers::NumbersFeatureBuilder, strings::StringsFeatureBuilder}}, error::RuntimeError, module::RuntimeModule};
+use crate::{environment::{Environment, features::{FeatureBuilder, arrays::ArraysFeatureBuilder, debug::DebugFeatureBuilder, files::FilesFeatureBuilder, math::MathFeatureBuilder, numbers::NumbersFeatureBuilder, strings::StringsFeatureBuilder}}, error::RuntimeError, module::RuntimeModule};
 use otr_core::error::Result;
 
 pub(crate) trait EnvironmentBuilderState { }
@@ -42,6 +42,7 @@ impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
             "Files" => FilesFeatureBuilder::new(),
             "Numbers" => NumbersFeatureBuilder::new(),
             "Strings" => StringsFeatureBuilder::new(),
+            "Math" => MathFeatureBuilder::new(),
 
             other => return Err(RuntimeError::Unknown {
                 message: format!("Unknown feature: {}", other)

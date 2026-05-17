@@ -8,6 +8,27 @@ use otr_core::Result;
 use crate::error::context::VariableContextDecorator;
 use crate::error::RuntimeError;
 
+pub(crate) fn compare(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering> {
+    use Value::*;
+    match (lhs, rhs) {
+        (Integer(l), Integer(r)) => Ok(l.cmp(r)),
+        (Float(l), Float(r)) => Ok(l.partial_cmp(r).ok_or(
+            RuntimeError::Unknown { message: format!("Could not compare {l} to {r}") }.boxed()
+        ))?,
+        (String(l), String(r)) => Ok(l.cmp(r)),
+        (Char(l), Char(r)) => Ok(l.cmp(r)),
+
+        (l, r) => Err(RuntimeError::Unknown {
+            message: format!(
+                "Ordering is undefined on {} and {}!",
+                l.get_type_id(),
+                r.get_type_id()
+            ),
+        }
+        .boxed()),
+    }
+}
+
 fn try_get_value<'a>(member_map: &'a MemberMap, member_ident: &'a str) -> Result<&'a Value> {
     member_map
         .get_value(member_ident)

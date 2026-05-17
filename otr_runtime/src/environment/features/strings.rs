@@ -37,6 +37,7 @@ impl Module for StringsFeature {
             "length" => Ok(RuntimeProcedure::AbstractRef(&StringLengthProcdure)),
             "split" => Ok(RuntimeProcedure::AbstractRef(&StringSplitProcedure)),
             "toString" => Ok(RuntimeProcedure::AbstractRef(&ToStringProcedure)),
+            "display" => Ok(RuntimeProcedure::AbstractRef(&DisplayProcedure)),
             "toCharArray" => Ok(RuntimeProcedure::AbstractRef(&StringToCharArrayProcedure)),
             "fromBytes" => Ok(RuntimeProcedure::AbstractRef(&FromBytesProcedure)),
 
@@ -170,6 +171,63 @@ impl Procedure for ToStringProcedure {
     fn call(
         &self,
         _environment: Environment,
+        mut arguments: Vec<Value>,
+    ) -> Result<Value> {
+        let value = arguments.pop().ok_or(
+            RuntimeError::NoSuchVariable {
+                variable_identifier: "value".into(),
+            }
+            .boxed(),
+        )?;
+
+        let err = || -> Result<Value> {
+            Err(
+                RuntimeError::Unknown { message: "Only arrays of chars and strings can be joined to a string".into() }.boxed()
+            )
+        };
+
+        let s = match value {
+            Value::Integer(i) => i.to_string(),
+            Value::Float(f) => f.to_string(),
+            Value::String(s) => s,
+            Value::Char(c) => c.to_string(),
+            Value::Array(values) => {
+                let mut s = String::new();
+
+                for item in values {
+                    match item {
+                        Value::Char(c) => {
+                            s.push(c);
+                        }
+                        Value::String(st) => {
+                            s += &st;
+                        }
+                        _ => {
+                            return Err(
+                                RuntimeError::Unknown { message: "Only arrays of chars and strings can be joined to a string".into() }.boxed()
+                            );
+                        }
+                    }
+                }
+
+                s
+            },
+            _ => {
+                return err();
+            }
+        };
+
+        Ok(Value::String(s))
+    }
+}
+
+#[derive(Debug)]
+pub struct DisplayProcedure;
+
+impl Procedure for DisplayProcedure {
+    fn call(
+        &self,
+        _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
         let value = arguments.get(0).ok_or(
@@ -232,3 +290,4 @@ impl Procedure for FromBytesProcedure {
         })?))
     }
 }
+
