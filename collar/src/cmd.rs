@@ -1,14 +1,14 @@
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use std::process::{Command, Stdio};
 
-use otr_config::{Version, get_project_config};
+use otr_config::get_project_config;
 use otr_core::Result;
 
 use crate::catch;
 use crate::fs::{get_otrc_bin_path, get_otrrun_bin_path};
-use crate::{config_path, error::CollarError, fs::{get_installed_versions, get_otrc_dir, get_otrrun_dir}};
+use crate::{config_path, error::CollarError};
 
 pub fn compile_project(root: &Path, root_module: impl AsRef<str>) -> Result<()> {
     let config = get_project_config(config_path(root))?;

@@ -1,7 +1,7 @@
 use otr_config::Version;
 use otr_core::Result;
 
-use std::{env::current_dir, fs, path::{Path, PathBuf}};
+use std::{env::current_dir, fs::{self, Permissions}, os::unix::fs::PermissionsExt, path::{Path, PathBuf}};
 
 use crate::{catch, error::CollarError};
 
@@ -50,8 +50,10 @@ pub fn get_collar_dir() -> Result<PathBuf> {
 pub fn get_otrc_dir() -> Result<PathBuf> {
     let collar_dir = get_collar_dir()?;
 
-    let otrc_dir = collar_dir.join("bin/otrc");
+    let bin_path = collar_dir.join("bin");
+    let otrc_dir = bin_path.join("otrc");
 
+    ensure_dir_exists(&bin_path)?;
     ensure_dir_exists(&otrc_dir)?;
 
     Ok(otrc_dir)
@@ -60,8 +62,10 @@ pub fn get_otrc_dir() -> Result<PathBuf> {
 pub fn get_otrrun_dir() -> Result<PathBuf> {
     let collar_dir = get_collar_dir()?;
 
-    let otrrun_dir = collar_dir.join("bin/otrrun");
+    let bin_path = collar_dir.join("bin");
+    let otrrun_dir = bin_path.join("otrrun");
 
+    ensure_dir_exists(&bin_path)?;
     ensure_dir_exists(&otrrun_dir)?;
 
     Ok(otrrun_dir)
@@ -69,11 +73,12 @@ pub fn get_otrrun_dir() -> Result<PathBuf> {
 
 pub fn get_otrc_bin_path(version: Option<Version>) -> Result<PathBuf> {
     
-    let version = version.unwrap_or(
-        get_installed_versions()?.latest_otrc().ok_or(
+    let version = match version {
+        Some(version) => version,
+        None => get_installed_versions()?.latest_otrc().ok_or(
             CollarError::new("No version of 'otrc' installed!").boxed()
         )?
-    );
+    };
 
     let path = get_otrc_dir()?.join(version.to_string());
 
@@ -82,11 +87,12 @@ pub fn get_otrc_bin_path(version: Option<Version>) -> Result<PathBuf> {
 
 pub fn get_otrrun_bin_path(version: Option<Version>) -> Result<PathBuf> {
     
-    let version = version.unwrap_or(
-        get_installed_versions()?.latest_otrrun().ok_or(
+    let version = match version {
+        Some(version) => version,
+        None => get_installed_versions()?.latest_otrrun().ok_or(
             CollarError::new("No version of 'otrrun' installed!").boxed()
         )?
-    );
+    };
 
     let path = get_otrrun_dir()?.join(version.to_string());
 
@@ -96,13 +102,33 @@ pub fn get_otrrun_bin_path(version: Option<Version>) -> Result<PathBuf> {
 pub fn install_otrc(version: Version, bytes: impl AsRef<[u8]>) -> Result<()> {
     let otrc_bin_path = get_otrc_bin_path(Some(version))?;
 
-    catch(fs::write(otrc_bin_path, bytes), "Could not write 'otrc' binary")
+    catch(fs::write(&otrc_bin_path, bytes), "Could not write 'otrc' binary")?;
+
+    if cfg!(unix) {
+        let file = catch(fs::File::open(&otrc_bin_path), "Could not set execute permissions")?;
+    
+        let perms = Permissions::from_mode(0o744);
+
+        catch(file.set_permissions(perms), "Could not set execute permissions")?;
+    }
+
+    Ok(())
 }
 
 pub fn install_otrrun(version: Version, bytes: impl AsRef<[u8]>) -> Result<()> {
     let otrrun_bin_path = get_otrrun_bin_path(Some(version))?;
 
-    catch(fs::write(otrrun_bin_path, bytes), "Could not write 'otrrun' binary")
+    catch(fs::write(&otrrun_bin_path, bytes), "Could not write 'otrrun' binary")?;
+
+    if cfg!(unix) {
+        let file = catch(fs::File::open(&otrrun_bin_path), "Could not set execute permissions")?;
+    
+        let perms = Permissions::from_mode(0o744);
+
+        catch(file.set_permissions(perms), "Could not set execute permissions")?;
+    }
+
+    Ok(())
 }
 
 pub struct InstalledVersions {

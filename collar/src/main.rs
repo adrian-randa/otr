@@ -65,7 +65,7 @@ fn shell() -> Result<()> {
 
             println!("{}", "Installed 'otrc' versions:".blue());
             if versions.otrc.is_empty() {
-                println!("    {}", "none".red());
+                println!("    {}", "None".red());
             } else {
                 for version in versions.otrc {
                     println!("    {version}")
@@ -74,7 +74,7 @@ fn shell() -> Result<()> {
 
             println!("{}", "Installed 'otrrun' versions:".blue());
             if versions.otrrun.is_empty() {
-                println!("    {}", "none".red());
+                println!("    {}", "None".red());
             } else {
                 for version in versions.otrrun{
                     println!("    {version}")

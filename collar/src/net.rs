@@ -1,9 +1,8 @@
-use std::fs;
-
+use colored::Colorize;
 use current_platform::CURRENT_PLATFORM;
 use otr_config::Version;
 
-use otr_core::Result;
+use otr_core::{Error, Result, SystemError};
 use serde::{Deserialize, Serialize};
 
 use crate::{catch, error::CollarError};
@@ -17,9 +16,25 @@ struct GithubApiReleasesResponse(Vec<GithubRelease>);
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GithubRelease {
-    tag_name: Version,
+    tag_name: GithubReleaseVersion,
     assets: Vec<GithubReleaseAsset>,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(try_from = "&str")]
+struct GithubReleaseVersion(Version);
+
+impl TryFrom<&str> for GithubReleaseVersion {
+    type Error = Box<dyn Error>;
+
+    fn try_from(value: &str) -> std::prelude::v1::Result<Self, Self::Error> {
+        if value[0..=0] != *"v" {
+            return Err(SystemError::new("Invalid version number!".into()).boxed());
+        }
+        Ok(Self(Version::try_from(&value[1..])?))
+    }
+}
+
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GithubReleaseAsset {
@@ -61,12 +76,12 @@ fn fetch_latest_release_version() -> Result<Version> {
         CollarError::new("Could not find latest release").boxed()
     )?;
 
-    Ok(latest.tag_name)
+    Ok(latest.tag_name.0)
 
 }
 
 fn get_file_url(version: Version, filename: impl AsRef<str>) -> String {
-    "https://".to_string() + RELEASES_URL + "/download/" + &version.to_string() + "/" + filename.as_ref()
+    "https://".to_string() + RELEASES_URL + "/download/" + "v" + &version.to_string() + "/" + filename.as_ref()
 }
 
 fn get_otrc_file_url(version: Version) -> String {
@@ -114,13 +129,9 @@ pub fn download_otrc(version: Option<Version>) -> Result<(Version, Vec<u8>)> {
 
     let url = get_otrc_file_url(version);
 
-    println!("Getting {url}");
+    println!("Getting version {} from {url}", (&version.to_string() as &str).blue());
 
     let bytes = download_file(url)?;
-
-    /* let otrc_bin_path = get_otrc_bin_path(Some(version))?;
-
-    catch(fs::write(otrc_bin_path, bytes), "Could not write 'otrc' binary") */
 
     Ok((version, bytes))
 }
@@ -131,13 +142,9 @@ pub fn download_otrrun(version: Option<Version>) -> Result<(Version, Vec<u8>)> {
 
     let url = get_otrrun_file_url(version);
 
-    println!("Getting {url}");
+    println!("Getting version {} from {url}", (&version.to_string() as &str).blue());
 
     let bytes = download_file(url)?;
-
-    /* let otrrun_bin_path = get_otrrun_bin_path(Some(version))?;
-
-    catch(fs::write(otrrun_bin_path, bytes), "Could not write 'otrrun' binary") */
 
     Ok((version, bytes))
 }
