@@ -266,21 +266,21 @@ impl ExpressionParser {
     fn get_precedence(operator: &OperatorToken) -> usize {
         match operator {
             OperatorToken::Assignment => 0,
-            OperatorToken::Plus => 1,
-            OperatorToken::Minus => 1,
-            OperatorToken::Multiply => 2,
-            OperatorToken::Divide => 2,
-            OperatorToken::Modulo => 4,
-            OperatorToken::Power => 5,
-            OperatorToken::Not => 10,
-            OperatorToken::And => 2,
             OperatorToken::Or => 1,
+            OperatorToken::And => 2,
             OperatorToken::Equality => 3,
             OperatorToken::Inequality => 3,
-            OperatorToken::Greater => 3,
-            OperatorToken::Less => 3,
-            OperatorToken::GreaterEquals => 3,
-            OperatorToken::LessEquals => 3,
+            OperatorToken::Greater => 4,
+            OperatorToken::Less => 4,
+            OperatorToken::GreaterEquals => 4,
+            OperatorToken::LessEquals => 4,
+            OperatorToken::Plus => 5,
+            OperatorToken::Minus => 5,
+            OperatorToken::Multiply => 6,
+            OperatorToken::Divide => 6,
+            OperatorToken::Modulo => 6,
+            OperatorToken::Power => 7,
+            OperatorToken::Not => 8,
         }
     }
 
