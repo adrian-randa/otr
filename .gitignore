@@ -1,3 +1,4 @@
 /target
 .env
 /test_projects
+/collar/build.rs
