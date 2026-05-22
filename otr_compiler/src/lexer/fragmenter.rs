@@ -97,7 +97,7 @@ impl Fragmenter {
                         this.current = ['\'', chars[i + 1], '\''].iter().collect();
                         this.finalize_fragment(line_index);
                         
-                        i += 3;
+                        i += 2;
                     }
                     '\"' => {
                         this.finalize_fragment(line_index);
