@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use num::ToPrimitive;
 
 use crate::{RuntimeError, Value, environment::{Environment, features::FeatureBuilder}, module::{Module, RuntimeModule}, procedures::{Procedure, RuntimeProcedure}};
@@ -104,7 +106,9 @@ impl Procedure for StringToCharArrayProcedure {
         )?;
 
         match str {
-            Value::String(str) => Ok(Value::Array(str.chars().map(|c| Value::Char(c)).collect())),
+            Value::String(str) => Ok(Value::Array(Rc::new(RefCell::new(Some(
+                str.chars().map(|c| Value::Char(c)).collect::<Vec<Value>>().into_boxed_slice()
+            ))))),
 
             other => Err(RuntimeError::TypeMismatch {
                 expected: Type::String,
@@ -156,11 +160,12 @@ impl Procedure for StringSplitProcedure {
             .boxed());
         };
 
-        Ok(Value::Array(
+        Ok(Value::Array(Rc::new(RefCell::new(Some(
             str.split(pattern)
                 .map(|part| Value::String(part.into()))
-                .collect(),
-        ))
+                .collect::<Vec<Value>>()
+                .into_boxed_slice(),
+        )))))
     }
 }
 
@@ -191,16 +196,47 @@ impl Procedure for ToStringProcedure {
             Value::Float(f) => f.to_string(),
             Value::String(s) => s,
             Value::Char(c) => c.to_string(),
-            Value::Array(values) => {
+            Value::Array(rc) => {
+                let ref_cell = rc.borrow();
+
+                let values = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
                 let mut s = String::new();
 
                 for item in values {
                     match item {
                         Value::Char(c) => {
-                            s.push(c);
+                            s.push(*c);
                         }
                         Value::String(st) => {
-                            s += &st;
+                            s += st;
+                        }
+                        _ => {
+                            return Err(
+                                RuntimeError::Unknown { message: "Only arrays of chars and strings can be joined to a string".into() }.boxed()
+                            );
+                        }
+                    }
+                }
+
+                s
+            },
+            Value::ArrayRef(weak) => {
+                let rc = weak.upgrade().ok_or_else(|| RuntimeError::UseOfDroppedValue.boxed())?;
+
+                let ref_cell = rc.borrow();
+
+                let values = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
+                let mut s = String::new();
+
+                for item in values {
+                    match item {
+                        Value::Char(c) => {
+                            s.push(*c);
+                        }
+                        Value::String(st) => {
+                            s += st;
                         }
                         _ => {
                             return Err(
@@ -257,29 +293,60 @@ impl Procedure for FromBytesProcedure {
             .boxed(),
         )?;
 
-        let bytes = if let Value::Array(arr) = value {
-            let mut bytes = Vec::with_capacity(arr.len());
-            for (index, item) in arr.into_iter().enumerate() {
-                if let Value::Integer(byte) = item {
-                    bytes.push(
-                        byte.to_u8().ok_or(
-                            RuntimeError::Unknown {
-                                message: format!(
-                                    "Element of array at index {index} is not a valid byte!"
-                                ),
-                            }
-                            .boxed(),
-                        )?,
-                    );
-                };
+        let bytes = match value {
+            Value::Array(rc) => {
+                let ref_cell = rc.borrow();
+
+                let arr = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
+                let mut bytes = Vec::with_capacity(arr.len());
+                for (index, item) in arr.into_iter().enumerate() {
+                    if let Value::Integer(byte) = item {
+                        bytes.push(
+                            byte.to_u8().ok_or(
+                                RuntimeError::Unknown {
+                                    message: format!(
+                                        "Element of array at index {index} is not a valid byte!"
+                                    ),
+                                }
+                                .boxed(),
+                            )?,
+                        );
+                    };
+                }
+                bytes
             }
-            bytes
-        } else {
-            return Err(RuntimeError::TypeMismatch {
-                expected: Type::Array,
-                found: value.get_type_id(),
+            Value::ArrayRef(weak) => {
+                let rc = weak.upgrade().ok_or_else(|| RuntimeError::UseOfDroppedValue.boxed())?;
+
+                let ref_cell = rc.borrow();
+
+                let arr = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
+                let mut bytes = Vec::with_capacity(arr.len());
+                for (index, item) in arr.into_iter().enumerate() {
+                    if let Value::Integer(byte) = item {
+                        bytes.push(
+                            byte.to_u8().ok_or(
+                                RuntimeError::Unknown {
+                                    message: format!(
+                                        "Element of array at index {index} is not a valid byte!"
+                                    ),
+                                }
+                                .boxed(),
+                            )?,
+                        );
+                    };
+                }
+                bytes
             }
-            .boxed());
+            _ => {
+                return Err(RuntimeError::TypeMismatch {
+                    expected: Type::Array,
+                    found: value.get_type_id(),
+                }
+                .boxed());
+            }
         };
 
         Ok(Value::String(String::from_utf8(bytes).map_err(|err| {

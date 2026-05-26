@@ -13,7 +13,8 @@ pub enum Value {
     String(String),
     Char(char),
     Bool(bool),
-    Array(Vec<Value>),
+    Array(Rc<RefCell<Option<Box<[Value]>>>>),
+    ArrayRef(Weak<RefCell<Option<Box<[Value]>>>>),
     Struct(Rc<RefCell<Option<Struct>>>),
     StructRef(Weak<RefCell<Option<Struct>>>),
     Type(Type),
@@ -29,6 +30,7 @@ impl Clone for Value {
             Self::Char(arg0) => Self::Char(arg0.clone()),
             Self::Bool(arg0) => Self::Bool(arg0.clone()),
             Self::Array(arg0) => Self::Array(arg0.clone()),
+            Self::ArrayRef(arg0) => Self::ArrayRef(arg0.clone()),
             Self::Struct(arg0) => Value::Struct(Rc::new(RefCell::new(
                 arg0.borrow().as_ref().map(|obj| obj.clone()),
             ))),
@@ -64,6 +66,7 @@ impl Value {
             Value::Char(_) => Type::Char,
             Value::Bool(_) => Type::Bool,
             Value::Array(_) => Type::Array,
+            Value::ArrayRef(_) => Type::Array,
             Value::Struct(object) => object
                 .borrow()
                 .as_ref()
@@ -96,10 +99,27 @@ impl std::fmt::Display for Value {
             Value::String(s) => write!(f, "{}", s),
             Value::Char(c) => write!(f, "{}", c),
             Value::Bool(b) => write!(f, "{}", b),
-            Value::Array(values) => write!(
+            Value::Array(rc) => write!(
                 f,
-                "[{}]",
-                values.into_iter().map(|item| item.to_string()).join(", ")
+                "{}",
+                rc
+                    .borrow().as_ref()
+                    .map(|array| {
+                        array.into_iter().map(|item| item.to_string()).join(", ")
+                    })
+                    .unwrap_or("Moved".to_string())
+            ),
+            Value::ArrayRef(weak) => write!(
+                f, "{}", 
+                weak.upgrade()
+                    .map(|rc| {
+                        rc.borrow().as_ref()
+                            .map(|array| {
+                                array.into_iter().map(|item| item.to_string()).join(", ")
+                            })
+                            .unwrap_or("Moved".into())
+                    })
+                    .unwrap_or("Dropped".into())
             ),
             Value::Struct(ref_cell) => write!(
                 f,
@@ -108,7 +128,7 @@ impl std::fmt::Display for Value {
                     .borrow()
                     .as_ref()
                     .map(|obj| obj.to_string())
-                    .unwrap_or("Moved".to_string())
+                    .unwrap_or("Moved".into())
             ),
             Value::StructRef(weak) => write!(
                 f,
@@ -118,9 +138,9 @@ impl std::fmt::Display for Value {
                         rc.borrow()
                             .as_ref()
                             .map(|obj| obj.to_string())
-                            .unwrap_or("Moved".to_string())
+                            .unwrap_or("Moved".into())
                     })
-                    .unwrap_or("Dropped".to_string())
+                    .unwrap_or("Dropped".into())
             ),
             Value::Type(t) => write!(f, "{}", t),
         }

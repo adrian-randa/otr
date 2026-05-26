@@ -79,15 +79,25 @@ pub(crate) fn get(
 
 pub(crate) fn get_value(value: &Value, _: ()) -> Result<Value> {
     match value {
-        Value::Struct(ref_cell) => {
-            if ref_cell.borrow().is_none() {
+        Value::Struct(rc) => {
+            if rc.borrow().is_none() {
                 return Err(RuntimeError::UseOfMovedValue.boxed());
             }
 
             // Move value
-            let value = ref_cell.replace(None);
+            let value = rc.replace(None);
 
             Ok(Value::Struct(Rc::new(RefCell::new(value))))
+        }
+        Value::Array(rc) => {
+            if rc.borrow().is_none() {
+                return Err(RuntimeError::UseOfMovedValue.boxed());
+            }
+
+            // Move value
+            let value = rc.replace(None);
+
+            Ok(Value::Array(Rc::new(RefCell::new(value))))
         }
         _ => Ok(value.clone()),
     }
@@ -103,15 +113,31 @@ pub fn reference(
 
 pub(crate) fn reference_value(value: &Value, _: ()) -> Result<Value> {
     match value {
-        Value::Struct(ref_cell) => {
-            if ref_cell.borrow().is_none() {
+        Value::Struct(rc) => {
+            if rc.borrow().is_none() {
                 return Err(RuntimeError::UseOfMovedValue.boxed());
             }
 
             // Reference
-            let weak = Rc::downgrade(&ref_cell.clone());
+            let weak = Rc::downgrade(&rc.clone());
 
             Ok(Value::StructRef(weak))
+        }
+        Value::StructRef(weak) => {
+            Ok(Value::StructRef(weak.clone()))
+        }
+        Value::Array(rc) => {
+            if rc.borrow().is_none() {
+                return Err(RuntimeError::UseOfMovedValue.boxed());
+            }
+
+            // Reference
+            let weak = Rc::downgrade(&rc.clone());
+
+            Ok(Value::ArrayRef(weak))
+        }
+        Value::ArrayRef(weak) => {
+            Ok(Value::ArrayRef(weak.clone()))
         }
         _ => Err(RuntimeError::CannotReference {
             ty: value.get_type_id(),
@@ -147,14 +173,22 @@ pub(crate) fn set_value(value: &mut Value, new_value: Value) -> Result<()> {
 }
 
 pub(crate) fn clone_value(value: &Value, _: ()) -> Result<Value> {
-    if let Value::StructRef(weak) = value {
-        let rc = weak
-            .upgrade()
-            .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+    match value {
+        Value::StructRef(weak) => {
+            let rc = weak
+                .upgrade()
+                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
-        Ok(Value::Struct(rc).clone())
-    } else {
-        Ok(value.clone())
+            Ok(Value::Struct(rc).clone())
+        }
+        Value::ArrayRef(weak) => {
+            let rc = weak
+                .upgrade()
+                .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+
+            Ok(Value::Array(rc).clone())
+        }
+        value => Ok(value.clone())
     }
 }
 
@@ -173,8 +207,13 @@ pub(crate) fn apply_to_submember<Args, T>(
         let member_ident = format!("{:?}", addressant);
         let result = {
             match value {
-                Value::Array(arr) => {
+                Value::Array(rc) => {
                     if let VariableAddressant::Index(i) = addressant {
+                        let reference = rc.borrow();
+                        let arr = reference
+                            .as_ref()
+                            .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                         let arr_len = arr.len();
                         let value = arr.get(i)
                             .ok_or(
@@ -192,9 +231,37 @@ pub(crate) fn apply_to_submember<Args, T>(
                         .boxed())
                     }
                 }
-                Value::Struct(ref_cell) => {
+                Value::ArrayRef(weak) => {
+                     if let VariableAddressant::Index(i) = addressant {
+                        let rc = weak
+                            .upgrade()
+                            .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+
+                        let reference = rc.borrow();
+                        let arr = reference
+                            .as_ref()
+                            .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
+                        let arr_len = arr.len();
+                        let value = arr.get(i)
+                            .ok_or(
+                                RuntimeError::IndexOutOfBounds {
+                                    array_length: arr_len,
+                                    index: i,
+                                }
+                                .boxed(),
+                            )?;
+                        apply_to_submember(function, value, address, contained_module_id, args)
+                    } else {
+                        Err(RuntimeError::MembersNotAccepted {
+                            ty: value.get_type_id(),
+                        }
+                        .boxed())
+                    }
+                },
+                Value::Struct(rc) => {
                     if let VariableAddressant::Identifier(ident) = addressant {
-                        let reference = ref_cell.borrow();
+                        let reference = rc.borrow();
                         let obj = reference
                             .as_ref()
                             .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
@@ -282,8 +349,41 @@ pub(crate) fn apply_to_submember_mut<Args, T>(
         let member_ident = format!("{:?}", addressant);
         let result = {
             match value {
-                Value::Array(arr) => {
+                Value::Array(rc) => {
                     if let VariableAddressant::Index(i) = addressant {
+                        let mut reference = rc.borrow_mut();
+                        let arr = reference
+                            .as_mut()
+                            .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
+                        let arr_len = arr.len();
+                        let value = arr.get_mut(i)
+                            .ok_or(
+                                RuntimeError::IndexOutOfBounds {
+                                    array_length: arr_len,
+                                    index: i,
+                                }
+                                .boxed(),
+                            )?;
+                        apply_to_submember_mut(function, value, address, contained_module_id, args)
+                    } else {
+                        Err(RuntimeError::MembersNotAccepted {
+                            ty: value.get_type_id(),
+                        }
+                        .boxed())
+                    }
+                }
+                Value::ArrayRef(weak) => {
+                    if let VariableAddressant::Index(i) = addressant {
+                        let rc = weak
+                            .upgrade()
+                            .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
+
+                        let mut reference = rc.borrow_mut();
+                        let arr = reference
+                            .as_mut()
+                            .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
+
                         let arr_len = arr.len();
                         let value = arr.get_mut(i)
                             .ok_or(

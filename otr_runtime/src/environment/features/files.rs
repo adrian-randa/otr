@@ -112,12 +112,13 @@ impl Procedure for FSReadProcedure {
             .boxed()
         })?;
 
-        Ok(Value::Array(
+        Ok(Value::Array(Rc::new(RefCell::new(Some(
             bytes
                 .into_iter()
                 .map(|byte| Value::Integer(byte as i64))
-                .collect(),
-        ))
+                .collect::<Vec<Value>>()
+                .into_boxed_slice(),
+        )))))
     }
 }
 
@@ -142,7 +143,35 @@ impl Procedure for FSWriteProcedure {
 
         let bytes = match data {
             Value::String(s) => s.into_bytes(),
-            Value::Array(arr) => {
+            Value::Array(rc) => {
+                let ref_cell = rc.borrow();
+
+                let arr = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
+                let mut bytes = Vec::with_capacity(arr.len());
+                for (index, item) in arr.into_iter().enumerate() {
+                    if let Value::Integer(byte) = item {
+                        bytes.push(
+                            byte.to_u8().ok_or(
+                                RuntimeError::Unknown {
+                                    message: format!(
+                                        "Element of array at index {index} is not a valid byte!"
+                                    ),
+                                }
+                                .boxed(),
+                            )?,
+                        );
+                    };
+                }
+                bytes
+            }
+            Value::ArrayRef(weak) => {
+                let rc = weak.upgrade().ok_or_else(|| RuntimeError::UseOfDroppedValue.boxed())?;
+
+                let ref_cell = rc.borrow();
+
+                let arr = ref_cell.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+
                 let mut bytes = Vec::with_capacity(arr.len());
                 for (index, item) in arr.into_iter().enumerate() {
                     if let Value::Integer(byte) = item {
@@ -243,7 +272,7 @@ impl Procedure for FSListDirProcedure {
             }
         }
 
-        Ok(Value::Array(out))
+        Ok(Value::Array(Rc::new(RefCell::new(Some(out.into_boxed_slice())))))
     }
 }
 

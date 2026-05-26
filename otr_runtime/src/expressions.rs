@@ -65,7 +65,7 @@ fn eval_array_construction_expression(expression: &ArrayConstructionExpression, 
     for item in expression.get_items().iter() {
         array.push(eval_expression(item, environment)?);
     }
-    Ok(Value::Array(array))
+    Ok(Value::Array(Rc::new(RefCell::new(Some(array.into_boxed_slice())))))
 }
 
 
