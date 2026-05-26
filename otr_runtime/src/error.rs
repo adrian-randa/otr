@@ -94,7 +94,6 @@ pub enum RuntimeError {
         module_identifier: String,
     },
     DivisionByZero,
-
     Unknown {
         message: String,
     },
@@ -110,7 +109,7 @@ impl RuntimeError {
             RuntimeError::AddressantsNotAccepted { ty } => 
                 format!("Values of type {ty} do not accept addressants!"),
             RuntimeError::IndexOutOfBounds { array_length, index } => 
-                format!("Index out of bounds! Tried to index element at {array_length}, but the array size was {index}."),
+                format!("Index out of bounds! Tried to index element at {index}, but the array size was {array_length}."),
             RuntimeError::NoSuchMember { member_identifier } => 
                 format!("Tried to get member '{member_identifier}', but no such member exists!"),
             RuntimeError::UseOfMovedValue => 
