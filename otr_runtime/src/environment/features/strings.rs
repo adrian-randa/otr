@@ -49,15 +49,20 @@ impl Module for StringsFeature {
 
     fn get_associated_procedure(
         &'_ self,
-        _struct_identifier: &String,
-        _procedure_identifier: &String,
+        struct_identifier: &String,
+        procedure_identifier: &String,
         _private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
-        todo!()
+        Err(RuntimeError::AssociatedProcedureNotDefined {
+            procedure_identifier: procedure_identifier.to_string(),
+            struct_identifier: struct_identifier.to_string()
+        }.boxed())
     }
 
-    fn get_struct(&self, _identifier: &String, _private_access: bool) -> Result<Struct> {
-        todo!()
+    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<Struct> {
+        Err(RuntimeError::StructNotDefined {
+            struct_identifier: identifier.to_string()
+        }.boxed())
     }
 }
 
@@ -86,6 +91,14 @@ impl Procedure for StringLengthProcdure {
             }
             .boxed()),
         }
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -116,6 +129,14 @@ impl Procedure for StringToCharArrayProcedure {
             }
             .boxed()),
         }
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -166,6 +187,14 @@ impl Procedure for StringSplitProcedure {
                 .collect::<Vec<Value>>()
                 .into_boxed_slice(),
         )))))
+    }
+    
+    fn get_num_args(&self) -> usize {
+        2
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -255,6 +284,14 @@ impl Procedure for ToStringProcedure {
 
         Ok(Value::String(s))
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -274,6 +311,14 @@ impl Procedure for DisplayProcedure {
         )?;
 
         Ok(Value::String(value.to_string()))
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -355,6 +400,14 @@ impl Procedure for FromBytesProcedure {
             }
             .boxed()
         })?))
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 

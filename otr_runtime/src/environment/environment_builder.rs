@@ -58,7 +58,7 @@ impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
     }
 
     pub fn build(self) -> Environment<'static> {
-        let mut environment = Environment::new(String::new());
+        let mut environment = Environment::new(String::new(), 0);
 
         for (module_identifier, module) in self.features {
             environment.load_module(module_identifier, Rc::new(module));

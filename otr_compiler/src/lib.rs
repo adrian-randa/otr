@@ -15,24 +15,60 @@ pub trait CompilerState {
 }
 
 pub trait ExpressionParseEnvironment {
-    fn resolve_procedure_identifier(&self, ident: String) -> Result<ModuleAddress>;
-    fn resolve_struct_identifier(&self, ident: String) -> Result<ModuleAddress>;
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress>;
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress>;
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize>;
 }
 
 pub struct NoExpressionEnvironment;
 
 impl ExpressionParseEnvironment for NoExpressionEnvironment {
-    fn resolve_procedure_identifier(&self, ident: String) -> Result<ModuleAddress> {
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
         Err(CompilerError::InvalidExpression {
-            message: format!("Single identifier '{ident}' could not be mapped to procedure!"),
+            message: format!("Single identifier '{}' could not be mapped to procedure!", ident.as_ref()),
         }
         .boxed())
     }
-    fn resolve_struct_identifier(&self, ident: String) -> Result<ModuleAddress> {
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
         Err(CompilerError::InvalidExpression {
-            message: format!("Single identifier '{ident}' could not be mapped to struct!"),
+            message: format!("Single identifier '{}' could not be mapped to struct!", ident.as_ref()),
         }
         .boxed())
+    }
+    
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
+        Err(CompilerError::InvalidExpression {
+            message: format!("Single identifier '{}' could not be mapped to variable!", ident.as_ref()),
+        }
+        .boxed())
+    }
+}
+
+pub(crate) struct FallbackExpressionParseEnvironemnt<'a> {
+    main: &'a dyn ExpressionParseEnvironment,
+    fallback: &'a dyn ExpressionParseEnvironment,
+}
+
+impl<'a> ExpressionParseEnvironment for FallbackExpressionParseEnvironemnt<'a> {
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
+        self.main.resolve_procedure_identifier(ident)
+            .or(self.fallback.resolve_procedure_identifier(ident))
+    }
+
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
+        self.main.resolve_struct_identifier(ident)
+            .or(self.fallback.resolve_struct_identifier(ident))
+    }
+
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
+        self.main.resolve_variable_ident(ident)
+            .or(self.fallback.resolve_variable_ident(ident))
+    }
+}
+
+impl<'a> FallbackExpressionParseEnvironemnt<'a> {
+    pub fn new(main: &'a dyn ExpressionParseEnvironment, fallback: &'a dyn ExpressionParseEnvironment) -> Self {
+        Self { main, fallback }
     }
 }
 
@@ -72,6 +108,7 @@ impl Compiler {
     }
 }
 
+#[derive(Debug)]
 pub struct CompilerEnvironment {
     procedure_ident_map: HashMap<String, ModuleAddress>,
     struct_ident_map: HashMap<String, ModuleAddress>,
@@ -120,13 +157,13 @@ impl CompilerEnvironment {
 }
 
 impl ExpressionParseEnvironment for CompilerEnvironment {
-    fn resolve_procedure_identifier(&self, ident: String) -> Result<ModuleAddress> {
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
         self.procedure_ident_map
-            .get(&ident)
+            .get(ident.as_ref())
             .ok_or(
                 CompilerError::InvalidExpression {
                     message: format!(
-                        "Single identifier '{ident}' could not be mapped to a procedure!"
+                        "Single identifier '{}' could not be mapped to a procedure!", ident.as_ref()
                     ),
                 }
                 .boxed(),
@@ -134,18 +171,24 @@ impl ExpressionParseEnvironment for CompilerEnvironment {
             .map(|address| address.to_owned())
     }
 
-    fn resolve_struct_identifier(&self, ident: String) -> Result<ModuleAddress> {
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
         self.struct_ident_map
-            .get(&ident)
+            .get(ident.as_ref())
             .ok_or(
                 CompilerError::InvalidExpression {
                     message: format!(
-                        "Single identifier '{ident}' could not be mapped to a struct!"
+                        "Single identifier '{}' could not be mapped to a struct!", ident.as_ref()
                     ),
                 }
                 .boxed(),
             )
             .map(|address| address.to_owned())
+    }
+    
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
+        Err(
+            CompilerError::NoSuchVariable { ident: ident.as_ref().to_string() }.boxed()
+        )
     }
 }
 

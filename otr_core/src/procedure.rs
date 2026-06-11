@@ -30,19 +30,7 @@ pub enum Instruction {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledProcedure {
-    argument_identifiers: Vec<String>,
-    instructions: Vec<Instruction>,
-}
-
-impl CompiledProcedure {
-    pub fn new(argument_identifiers: Vec<String>, instructions: Vec<Instruction>) -> Self {
-        Self { argument_identifiers, instructions }
-    }
-    pub fn get_argument_identifiers(&self) -> &Vec<String> {
-        &self.argument_identifiers
-    }
-    
-    pub fn get_instructions(&self) -> &Vec<Instruction> {
-        &self.instructions
-    }
+    pub instructions: Vec<Instruction>,
+    pub num_args: usize,
+    pub stack_size: usize,
 }

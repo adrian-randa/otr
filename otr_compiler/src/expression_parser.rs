@@ -1,5 +1,5 @@
 use crate::{
-    CompilerError, ExpressionParseEnvironment, NoExpressionEnvironment,
+    CompilerError, ExpressionParseEnvironment,
     lexer::token::{
         KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken,
         PunctuationToken, Token,
@@ -16,7 +16,7 @@ use otr_core::{
         arithmetic::ArithmeticExpression,
         boolean::BooleanExpression,
         comparison::ComparisonExpression,
-        variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression},
+        variable::{VariableAccessMode, VariableAddressant, VariableExpression},
     },
     module::ModuleAddress,
     r#type::Type,
@@ -527,7 +527,7 @@ impl ExpressionAtomParser {
                     }
 
                     Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
-                        let module_address = environment.resolve_procedure_identifier(ident)?;
+                        let module_address = environment.resolve_procedure_identifier(&ident)?;
 
                         let inner = ExpressionParser::take_until_closing(
                             &mut tokens,
@@ -550,7 +550,7 @@ impl ExpressionAtomParser {
                     }
 
                     Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) => {
-                        let module_address = environment.resolve_struct_identifier(ident)?;
+                        let module_address = environment.resolve_struct_identifier(&ident)?;
 
                         let inner = ExpressionParser::take_until_closing(
                             &mut tokens,
@@ -629,6 +629,10 @@ impl ExpressionAtomParser {
                         self.state = ScopeAddress { address, access };
                     }
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
+                        if let Some(VariableAddressant::Identifier(ident)) = address.get_mut(0) {
+                            address[0] = VariableAddressant::StackIndex(environment.resolve_variable_ident(ident)?);
+                        }
+
                         let subexpression = Expression::Variable(VariableExpression::new(
                             address.try_into().unwrap(),
                             access,
@@ -895,15 +899,30 @@ impl ExpressionAtomParser {
                 message: "Empty subexpression atom!".into(),
             }
             .boxed()),
-            ExpressionAtomParserState::SingleIdent { ident } => Ok(ExpressionAtom::Subexpression(
-                Expression::Variable(VariableExpression::new(
-                    vec![VariableAddressant::Identifier(ident)]
-                        .try_into()
-                        .unwrap(),
-                    VariableAccessMode::Move,
-                )),
-            )),
-            ExpressionAtomParserState::ScopeAddress { address, access } => {
+            ExpressionAtomParserState::SingleIdent { ident } => {
+                Ok(ExpressionAtom::Subexpression(
+                    Expression::Variable(VariableExpression::new(
+                        vec![VariableAddressant::StackIndex(environment.resolve_variable_ident(&ident)?)]
+                            .try_into()
+                            .unwrap(),
+                        VariableAccessMode::Move,
+                    )),
+                ))
+            }
+            ExpressionAtomParserState::ScopeAddress { mut address, access } => {
+
+                let first = address
+                    .get_mut(0)
+                    .ok_or_else(|| CompilerError::InvalidExpression { message: "Empty expression".into() }.boxed())?;
+
+                if let VariableAddressant::Identifier(ident) = first {
+                    *first = VariableAddressant::StackIndex(environment.resolve_variable_ident(ident)?);
+                } else {
+                    return Err(CompilerError::InvalidExpression {
+                        message: "Variable addresses must start with an identifier".into()
+                    }.boxed());
+                }
+
                 Ok(ExpressionAtom::Subexpression({
                     Expression::Variable(VariableExpression::new(
                         address.try_into().unwrap(),
@@ -1009,44 +1028,4 @@ pub(crate) fn parse_type(ty: PrimitiveTypeToken) -> Type {
     }
 
     id!(ty: Null, Integer, Float, Bool, Char, String, Array, Moved, Dropped, Type)
-}
-
-pub(crate) fn parse_variable_address(address: Vec<Token>) -> Result<VariableAddress> {
-    let mut tokens = address.into_iter();
-
-    let mut addressants = Vec::new();
-
-    while let Some(token) = tokens.next() {
-        match token {
-            Token::Identifier(ident) => {
-                addressants.push(VariableAddressant::Identifier(ident));
-            }
-            Token::Punctuation(PunctuationToken::Dot) => {}
-            Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
-                let index_expression = ExpressionParser::take_until_closing(
-                    &mut tokens,
-                    Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing)),
-                )?;
-
-                let index_expression =
-                    ExpressionParser::parse(index_expression, &NoExpressionEnvironment)?;
-
-                addressants.push(VariableAddressant::DynamicIndex(index_expression.into()));
-            }
-
-            other => {
-                return Err(CompilerError::InvalidScopeAddress {
-                    unexpected_token: Some(other),
-                }
-                .boxed());
-            }
-        }
-    }
-
-    addressants.try_into().map_err(|_| {
-        CompilerError::InvalidScopeAddress {
-            unexpected_token: None,
-        }
-        .boxed()
-    })
 }

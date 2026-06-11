@@ -101,4 +101,12 @@ impl Procedure for NumberParseProcedure {
             .boxed()),
         }
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }

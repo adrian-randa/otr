@@ -72,7 +72,7 @@ impl CompilerState for CompilerProcedureState {
                     }
                     .boxed());
                 }
-            }
+            },
             ProcedureSubstate::FirstIdent => match token {
                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
                     self.substate = ProcedureSubstate::PreArgument;
@@ -81,7 +81,7 @@ impl CompilerState for CompilerProcedureState {
 
                 Token::Punctuation(PunctuationToken::ThinArrow) => {
                     self.substate = ProcedureSubstate::PreSecondIdent;
-                    self.procedure = self.procedure.push_argument_identifier("this".into());
+                    self.procedure = self.procedure.push_argument_identifier("this".into())?;
                     return Ok(self);
                 }
 
@@ -138,7 +138,7 @@ impl CompilerState for CompilerProcedureState {
             },
             ProcedureSubstate::PreArgument => match token {
                 Token::Identifier(ident) => {
-                    self.procedure = self.procedure.push_argument_identifier(ident);
+                    self.procedure = self.procedure.push_argument_identifier(ident)?;
                     self.substate = ProcedureSubstate::Argument;
                     return Ok(self);
                 }

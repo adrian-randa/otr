@@ -1,11 +1,14 @@
 use std::collections::HashMap;
 
 
-use otr_core::{procedure::{CompiledProcedure, Instruction}, value::Value, r#type::Type, error::Result};
+use otr_core::{error::Result, expression::variable::{VariableAddress, VariableAddressant}, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
 use crate::{error::RuntimeError, environment::Environment, error::ValueError, expressions::eval_expression};
 
 pub(crate) trait Procedure: std::fmt::Debug {
     fn call(&self, environment: Environment, arguments: Vec<Value>) -> Result<Value>;
+
+    fn get_num_args(&self) -> usize;
+    fn get_stack_size(&self) -> usize;
 }
 
 
@@ -27,35 +30,48 @@ impl<'a> Procedure for RuntimeProcedure<'a> {
             RuntimeProcedure::CompiledRef(compiled_procedure) => call_compiled_procedure(*compiled_procedure, environment, arguments),
         }
     }
+    
+    fn get_num_args(&self) -> usize {
+        match self {
+            RuntimeProcedure::Abstract(procedure) => procedure.get_num_args(),
+            RuntimeProcedure::AbstractRef(procedure) => procedure.get_num_args(),
+            RuntimeProcedure::Compiled(compiled_procedure) => compiled_procedure.num_args,
+            RuntimeProcedure::CompiledRef(compiled_procedure) => compiled_procedure.num_args,
+        }
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        match self {
+            RuntimeProcedure::Abstract(procedure) => procedure.get_stack_size(),
+            RuntimeProcedure::AbstractRef(procedure) => procedure.get_stack_size(),
+            RuntimeProcedure::Compiled(compiled_procedure) => compiled_procedure.stack_size,
+            RuntimeProcedure::CompiledRef(compiled_procedure) => compiled_procedure.stack_size,
+        }
+    }
 }
 
 
 fn call_compiled_procedure(procedure: &CompiledProcedure, mut environment: Environment, arguments: Vec<Value>) -> Result<Value> {
-    let members = HashMap::from_iter(
-        procedure.get_argument_identifiers()
-            .clone()
-            .into_iter()
-            .zip(arguments.into_iter()),
-    );
-
-    environment.insert_members(members);
+    for (i, argument) in arguments.into_iter().enumerate() {
+        environment.get_scope_mut().set(i, argument);
+    }
 
     let mut pc = 0;
-    let instructions = procedure.get_instructions();
+    let instructions = &procedure.instructions;
 
     while pc < instructions.len() {
         match &instructions[pc] {
             Instruction::PushVarToScope { identifier } => {
-                environment.get_scope_mut().push(identifier.clone())?;
+                // Legacy; Noop
             }
             Instruction::PopVarFromScope { identifier } => {
-                environment.get_scope_mut().pop(identifier)?;
+                // Legacy; Noop
             }
             Instruction::GrowStack => {
-                environment.get_scope_mut().grow_stack();
+                // Legacy; Noop
             }
             Instruction::ShrinkStack => {
-                environment.get_scope_mut().shrink_stack();
+                // Legacy; Noop
             }
             Instruction::EvaluateExpression { expression, target } => {
                 let eval_result = eval_expression(expression, &environment)?;

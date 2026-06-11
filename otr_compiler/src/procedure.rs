@@ -1,10 +1,10 @@
 use std::any::Any;
 
-use crate::{ExpressionParseEnvironment, error::CompilerError, expression_parser::{ExpressionParser, parse_variable_address}, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}};
-use otr_core::{error::Result, expression::{AssociatedProcedureCallExpression, Expression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddressant, VariableExpression}}, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
+use crate::{ExpressionParseEnvironment, FallbackExpressionParseEnvironemnt, NoExpressionEnvironment, error::CompilerError, expression_parser::ExpressionParser, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}};
+use otr_core::{error::Result, expression::{AssociatedProcedureCallExpression, Expression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression}}, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
 
 trait ScopeExcapeHandler: std::fmt::Debug {
-    fn resolve(&self, instructions: &mut Vec<Instruction>);
+    fn resolve(&self, builder: &mut CompiledProcedureBuilder);
 
     fn as_any(&self) -> &dyn Any;
 }
@@ -15,15 +15,16 @@ struct IfScopeEscapeHandler {
 }
 
 impl ScopeExcapeHandler for IfScopeEscapeHandler {
-    fn resolve(&self, instructions: &mut Vec<Instruction>) {
-        instructions.push(Instruction::ShrinkStack);
+    fn resolve(&self, builder: &mut CompiledProcedureBuilder) {
+        builder.instructions.push(Instruction::ShrinkStack);
+        builder.shrink_variable_stack();
 
-        let next_ic = instructions.len();
+        let next_ic = builder.instructions.len();
 
         if let Some(Instruction::JumpConditional {
             condition_expression: _,
             jump_target,
-        }) = instructions.get_mut(self.target_instruction)
+        }) = builder.instructions.get_mut(self.target_instruction)
         {
             *jump_target = next_ic;
         } else {
@@ -42,17 +43,18 @@ struct WhileScopeEscapeHandler {
 }
 
 impl ScopeExcapeHandler for WhileScopeEscapeHandler {
-    fn resolve(&self, instructions: &mut Vec<Instruction>) {
-        instructions.push(Instruction::ShrinkStack);
-        instructions.push(Instruction::JumpConditional {
+    fn resolve(&self, builder: &mut CompiledProcedureBuilder) {
+        builder.instructions.push(Instruction::ShrinkStack);
+        builder.shrink_variable_stack();
+        builder.instructions.push(Instruction::JumpConditional {
             condition_expression: Expression::Value(Value::Bool(true)),
             jump_target: self.target_instruction,
         });
-        let next_ic = instructions.len();
+        let next_ic = builder.instructions.len();
         if let Some(Instruction::JumpConditional {
             condition_expression: _,
             jump_target,
-        }) = instructions.get_mut(self.target_instruction)
+        }) = builder.instructions.get_mut(self.target_instruction)
         {
             *jump_target = next_ic;
         } else {
@@ -72,24 +74,25 @@ struct ForScopeEscapeHandler {
 }
 
 impl ScopeExcapeHandler for ForScopeEscapeHandler {
-    fn resolve(&self, instructions: &mut Vec<Instruction>) {
-        instructions.push(Instruction::ShrinkStack);
-        instructions.push(Instruction::JumpConditional {
+    fn resolve(&self, builder: &mut CompiledProcedureBuilder) {
+        builder.instructions.push(Instruction::ShrinkStack);
+        builder.shrink_variable_stack();
+        builder.instructions.push(Instruction::JumpConditional {
             condition_expression: Expression::Value(Value::Bool(true)),
             jump_target: self.start_of_body,
         });
 
-        let end_of_body = instructions.len();
+        let end_of_body = builder.instructions.len();
 
-        instructions.push(Instruction::ShrinkStack);
-        instructions.push(Instruction::PopVarFromScope {
+        builder.instructions.push(Instruction::ShrinkStack);
+        builder.instructions.push(Instruction::PopVarFromScope {
             identifier: "$CF_FOR_ITER".into(),
         });
 
         if let Some(Instruction::JumpConditional {
             condition_expression: _,
             jump_target,
-        }) = instructions.get_mut(self.escape_jump)
+        }) = builder.instructions.get_mut(self.escape_jump)
         {
             *jump_target = end_of_body;
         } else {
@@ -141,12 +144,32 @@ enum CompiledProcedureBuilderState {
     },
 }
 
+#[derive(Debug)]
 pub struct CompiledProcedureBuilder {
     argument_identifiers: Vec<String>,
     instructions: Vec<Instruction>,
     state: CompiledProcedureBuilderState,
     scope_stack: Vec<Box<dyn ScopeExcapeHandler + 'static>>,
     last_popped_scope: Option<Box<dyn ScopeExcapeHandler + 'static>>,
+
+    variable_stack: Vec<Vec<String>>,
+    num_variables: usize,
+    stack_top: usize,
+}
+
+impl ExpressionParseEnvironment for CompiledProcedureBuilder {
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<otr_core::module::ModuleAddress> {
+        NoExpressionEnvironment.resolve_procedure_identifier(ident)
+    }
+
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<otr_core::module::ModuleAddress> {
+        NoExpressionEnvironment.resolve_struct_identifier(ident)
+    }
+
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
+        self.try_resolve_variable_identifier(ident.as_ref())
+            .ok_or_else(|| CompilerError::NoSuchVariable { ident: ident.as_ref().to_string() }.boxed())
+    }
 }
 
 impl CompiledProcedureBuilder {
@@ -157,6 +180,10 @@ impl CompiledProcedureBuilder {
             state: CompiledProcedureBuilderState::Base,
             scope_stack: Vec::new(),
             last_popped_scope: None,
+
+            variable_stack: vec![Vec::new()],
+            num_variables: 0,
+            stack_top: 0,
         }
     }
 
@@ -168,13 +195,104 @@ impl CompiledProcedureBuilder {
         }
     }
 
-    pub fn push_argument_identifier(mut self, ident: String) -> Self {
-        self.argument_identifiers.push(ident);
-        self
+    pub fn push_argument_identifier(mut self, ident: String) -> Result<Self> {
+        self.argument_identifiers.push(ident.clone());
+        self.declare_variable(ident)?;
+        Ok(self)
     }
 
     pub fn scope_stack_size(&self) -> usize {
         self.scope_stack.len()
+    }
+
+    fn try_resolve_variable_identifier(&self, ident: &str) -> Option<usize> {
+        let mut i = self.stack_top;
+
+        for stack_idx in (0..self.variable_stack.len()).rev() {
+            for var_idx in (0..self.variable_stack[stack_idx].len()).rev() {
+                i -= 1;
+
+                if &self.variable_stack[stack_idx][var_idx] == ident {
+                    return Some(i);
+                }
+            }
+        } 
+
+        None
+    }
+
+    fn grow_variable_stack(&mut self) {
+        self.variable_stack.push(Vec::new());
+    }
+
+    fn shrink_variable_stack(&mut self) {
+        let top = self.variable_stack.pop();
+        if let Some(top) = top {
+            self.stack_top -= top.len();
+        }
+    }
+
+    pub fn declare_variable(&mut self, ident: String) -> Result<usize> {
+        let variables = self.variable_stack.last_mut().unwrap();
+
+        if variables.contains(&ident) {
+            Err(CompilerError::VarAlreadyDefined { ident }.boxed())
+        } else {
+            variables.push(ident.clone());
+            self.stack_top += 1;
+            self.num_variables = self.num_variables.max(self.stack_top);
+            
+            Ok(self.stack_top - 1)
+        }
+    }
+
+    fn parse_variable_address(&self, address: Vec<Token>, environment: &dyn ExpressionParseEnvironment) -> Result<VariableAddress> {
+        let mut tokens = address.into_iter();
+
+        let mut addressants = Vec::new();
+
+        while let Some(token) = tokens.next() {
+            match token {
+                Token::Identifier(ident) => {
+                    addressants.push(VariableAddressant::Identifier(ident));
+                }
+                Token::Punctuation(PunctuationToken::Dot) => {}
+                Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Opening)) => {
+                    let index_expression = ExpressionParser::take_until_closing(
+                        &mut tokens,
+                        Token::Punctuation(PunctuationToken::SquareBrackets(ParenthesisType::Closing)),
+                    )?;
+
+                    let index_expression =
+                        ExpressionParser::parse(index_expression, environment)?;
+
+                    addressants.push(VariableAddressant::DynamicIndex(index_expression.into()));
+                }
+
+                other => {
+                    return Err(CompilerError::InvalidScopeAddress {
+                        unexpected_token: Some(other),
+                    }
+                    .boxed());
+                }
+            }
+        }
+
+        if let Some(addressant) =  addressants.get_mut(0) {
+            if let VariableAddressant::Identifier(ident) = addressant {
+                let index = self.try_resolve_variable_identifier(ident)
+                    .ok_or_else(|| CompilerError::NoSuchVariable { ident: ident.clone() }.boxed())?;
+
+                *addressant = VariableAddressant::StackIndex(index);
+            }
+        }
+
+        addressants.try_into().map_err(|_| {
+            CompilerError::InvalidScopeAddress {
+                unexpected_token: None,
+            }
+            .boxed()
+        })
     }
 
     pub fn read(
@@ -254,7 +372,7 @@ impl CompiledProcedureBuilder {
                         .pop()
                         .ok_or(CompilerError::NoScopeToClose.boxed())?;
 
-                    handler.resolve(&mut self.instructions);
+                    handler.resolve(&mut self);
 
                     self.last_popped_scope = Some(handler);
                 }
@@ -454,28 +572,39 @@ impl CompiledProcedureBuilder {
         mut self,
         expression_parse_environment: &dyn ExpressionParseEnvironment,
     ) -> Result<Self> {
-        match &mut self.state {
+        match self.state {
             CompiledProcedureBuilderState::Base => {}
-            CompiledProcedureBuilderState::VarDeclaration { ident, expression } => {
+            CompiledProcedureBuilderState::VarDeclaration { ref ident, ref expression } => {
                 let ident = ident.clone().ok_or(
                     CompilerError::Unknown {
                         message: "Missing variable identifier!".into(),
                     }
                     .boxed(),
                 )?;
-                self.instructions.push(Instruction::PushVarToScope {
-                    identifier: ident.clone(),
-                });
+
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
+
+                let expression = expression.as_ref().map(
+                    |expression| {
+                        ExpressionParser::parse(
+                            expression.to_owned(),
+                            &expression_parse_environment,
+                        )        
+                    }
+                );
+
+                let stack_index = self.declare_variable(ident)?;
+
                 if let Some(expression) = expression {
-                    let expression = ExpressionParser::parse(
-                        expression.to_owned(),
-                        expression_parse_environment,
-                    )?;
+                    let expression = expression?;                    
 
                     self.instructions.push(Instruction::EvaluateExpression {
                         expression,
                         target: Some(
-                            vec![VariableAddressant::Identifier(ident)]
+                            vec![VariableAddressant::StackIndex(stack_index)]
                                 .try_into()
                                 .unwrap(),
                         ),
@@ -483,29 +612,38 @@ impl CompiledProcedureBuilder {
                 }
             }
             CompiledProcedureBuilderState::Assignment {
-                address,
-                expression,
+                ref address,
+                ref expression,
             } => {
-                let target = Some(parse_variable_address(address.to_owned())?);
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
 
-                let expression =
-                    ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?;
+                let target = Some(self.parse_variable_address(address.to_owned(), &expression_parse_environment)?);
 
-                self.instructions
-                    .push(Instruction::EvaluateExpression { expression, target });
+
+                let expression = ExpressionParser::parse(expression.to_owned(), &expression_parse_environment)?;
+
+                self.instructions.push(Instruction::EvaluateExpression { expression, target });
             }
             CompiledProcedureBuilderState::IfStatement {
-                condition_expression,
+                ref condition_expression,
                 parenthesis_index,
             } => {
-                if *parenthesis_index > 0 {
+                if parenthesis_index > 0 {
                     return Err(CompilerError::InvalidParenthesisStructure.boxed());
                 }
+
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
 
                 let condition_expression =
                     Expression::Boolean(BooleanExpression::Not(Box::new(ExpressionParser::parse(
                         condition_expression.to_owned(),
-                        expression_parse_environment,
+                        &expression_parse_environment,
                     )?)));
 
                 self.scope_stack.push(Box::new(IfScopeEscapeHandler {
@@ -517,9 +655,10 @@ impl CompiledProcedureBuilder {
                     jump_target: usize::MAX,
                 });
                 self.instructions.push(Instruction::GrowStack);
+                self.grow_variable_stack();
             }
             CompiledProcedureBuilderState::ElseStatement { original_jump } => {
-                let instruction = &mut self.instructions[*original_jump];
+                let instruction = &mut self.instructions[original_jump];
 
                 match instruction {
                     Instruction::JumpConditional { condition_expression: _, jump_target } => {
@@ -537,6 +676,7 @@ impl CompiledProcedureBuilder {
                         self.instructions.push(
                             Instruction::GrowStack
                         );
+                        self.grow_variable_stack();
                     }
 
                     _ => {
@@ -547,17 +687,22 @@ impl CompiledProcedureBuilder {
                 }
             }
             CompiledProcedureBuilderState::WhileStatement {
-                condition_expression,
+                ref condition_expression,
                 parenthesis_index,
             } => {
-                if *parenthesis_index > 0 {
+                if parenthesis_index > 0 {
                     return Err(CompilerError::InvalidParenthesisStructure.boxed());
                 }
+
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
 
                 let condition_expression =
                     Expression::Boolean(BooleanExpression::Not(Box::new(ExpressionParser::parse(
                         condition_expression.to_owned(),
-                        expression_parse_environment,
+                        &expression_parse_environment,
                     )?)));
 
                 self.scope_stack.push(Box::new(WhileScopeEscapeHandler {
@@ -569,44 +714,52 @@ impl CompiledProcedureBuilder {
                     jump_target: usize::MAX,
                 });
                 self.instructions.push(Instruction::GrowStack);
+                self.grow_variable_stack();
             }
             CompiledProcedureBuilderState::ForStatement {
-                variable_ident,
+                ref variable_ident,
                 in_keyword_read: _,
-                iterator_expression,
+                ref iterator_expression,
                 parenthesis_index,
             } => {
-                if *parenthesis_index > 0 {
+                if parenthesis_index > 0 {
                     return Err(CompilerError::InvalidParenthesisStructure.boxed());
                 }
 
-                let iterator_expression = ExpressionParser::parse(
-                    iterator_expression.to_owned(),
-                    expression_parse_environment,
-                )?;
+                let parsed_iterator_expression;
+
+                {
+                    let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                        expression_parse_environment,
+                        &self
+                    );
+    
+                    parsed_iterator_expression = ExpressionParser::parse(
+                        iterator_expression.to_owned(),
+                        &expression_parse_environment,
+                    )?;
+                }
 
                 let iterator_expression =
                     Expression::AssociatedProcedureCall(AssociatedProcedureCallExpression::new(
-                        Box::new(iterator_expression),
+                        Box::new(parsed_iterator_expression),
                         "intoIterator".into(),
                         Vec::new(),
                     ));
 
-                let variable_ident = variable_ident.take().ok_or(
+                let variable_ident = variable_ident.clone().ok_or(
                     CompilerError::Unknown {
                         message: "No given variable identifier!".into(),
                     }
                     .boxed(),
                 )?;
+                
+                let iter_idx = self.declare_variable("$CF_FOR_ITER".into()).or_else(|_| self.resolve_variable_ident(&"$CF_FOR_ITER"))?;
 
-                // Setup local controlflow variables
-                self.instructions.push(Instruction::PushVarToScope {
-                    identifier: "$CF_FOR_ITER".into(),
-                });
                 self.instructions.push(Instruction::EvaluateExpression {
                     expression: iterator_expression,
                     target: Some(
-                        vec![VariableAddressant::Identifier("$CF_FOR_ITER".into())]
+                        vec![VariableAddressant::StackIndex(iter_idx)]
                             .try_into()
                             .unwrap(),
                     ),
@@ -617,14 +770,16 @@ impl CompiledProcedureBuilder {
 
                 // Compute next
                 self.instructions.push(Instruction::GrowStack);
+                self.grow_variable_stack();
                 self.instructions.push(Instruction::PushVarToScope {
                     identifier: variable_ident.clone(),
                 });
+                let var_idx = self.declare_variable(variable_ident.clone())?;
                 self.instructions.push(Instruction::EvaluateExpression {
                     expression: Expression::AssociatedProcedureCall(
                         AssociatedProcedureCallExpression::new(
                             Box::new(Expression::Variable(VariableExpression::new(
-                                vec![VariableAddressant::Identifier("$CF_FOR_ITER".into())]
+                                vec![VariableAddressant::StackIndex(iter_idx)]
                                     .try_into()
                                     .unwrap(),
                                 VariableAccessMode::Ref,
@@ -634,7 +789,7 @@ impl CompiledProcedureBuilder {
                         ),
                     ),
                     target: Some(
-                        vec![VariableAddressant::Identifier(variable_ident.clone())]
+                        vec![VariableAddressant::StackIndex(var_idx)]
                             .try_into()
                             .unwrap(),
                     ),
@@ -646,7 +801,7 @@ impl CompiledProcedureBuilder {
                     condition_expression: Expression::Comparison(ComparisonExpression::Equals {
                         lhs: Box::new(Expression::Value(Value::Type(Type::Null))),
                         rhs: Box::new(Expression::Variable(VariableExpression::new(
-                            vec![VariableAddressant::Identifier(variable_ident.clone())]
+                            vec![VariableAddressant::StackIndex(var_idx)]
                                 .try_into()
                                 .unwrap(),
                             VariableAccessMode::TypeOf,
@@ -660,29 +815,44 @@ impl CompiledProcedureBuilder {
                     escape_jump,
                 }));
             }
-            CompiledProcedureBuilderState::Indeterminate { tokens } => {
+            CompiledProcedureBuilderState::Indeterminate { ref tokens } => {
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
+
                 let expression =
-                    ExpressionParser::parse(tokens.to_owned(), expression_parse_environment)?;
+                    ExpressionParser::parse(tokens.to_owned(), &expression_parse_environment)?;
 
                 self.instructions.push(Instruction::EvaluateExpression {
                     expression,
                     target: None,
                 });
             }
-            CompiledProcedureBuilderState::Return { expression } => {
+            CompiledProcedureBuilderState::Return { ref expression } => {
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
+
                 let expression = if expression.is_empty() {
                     Expression::Value(Value::Null)
                 } else {
-                    ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?
+                    ExpressionParser::parse(expression.to_owned(), &expression_parse_environment)?
                 };
 
                 self.instructions.push(Instruction::Return { expression });
             }
-            CompiledProcedureBuilderState::Throw { expression } => {
+            CompiledProcedureBuilderState::Throw { ref expression } => {
+                let expression_parse_environment = FallbackExpressionParseEnvironemnt::new(
+                    expression_parse_environment,
+                    &self
+                );
+
                 let expression = if expression.is_empty() {
                     Expression::Value(Value::Null)
                 } else {
-                    ExpressionParser::parse(expression.to_owned(), expression_parse_environment)?
+                    ExpressionParser::parse(expression.to_owned(), &expression_parse_environment)?
                 };
 
                 self.instructions.push(Instruction::Throw { expression });
@@ -700,11 +870,13 @@ impl CompiledProcedureBuilder {
                 }
                 .boxed());
             }
+            
 
-            Ok(CompiledProcedure::new(
-                self.argument_identifiers,
-                self.instructions,
-            ))
+            Ok(CompiledProcedure {
+                instructions: self.instructions,
+                num_args: self.argument_identifiers.len(),
+                stack_size: self.num_variables,
+            })
         } else {
             Err(CompilerError::Unknown {
                 message: "Incomplete instruction!".into(),

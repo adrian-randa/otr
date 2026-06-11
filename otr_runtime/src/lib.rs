@@ -77,7 +77,7 @@ impl RuntimeObjectBuilder<RuntimeObjectBuilderWithRoot> {
 impl RuntimeObject<'_> {
     fn new() -> Self {
         Self {
-            base_environement: Environment::new("".into()),
+            base_environement: Environment::new("".into(), 0),
             entrypoint: None,
         }
     }

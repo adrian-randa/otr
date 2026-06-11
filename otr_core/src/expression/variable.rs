@@ -1,4 +1,4 @@
-use derive_more::{Deref, IntoIterator};
+use derive_more::{Deref, DerefMut, IntoIterator};
 use serde::{Deserialize, Serialize};
 
 use crate::expression::Expression;
@@ -34,6 +34,7 @@ pub enum VariableAccessMode {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VariableAddressant {
+    StackIndex(usize),
     Identifier(String),
     Index(usize),
     DynamicIndex(Expression),
@@ -51,7 +52,7 @@ impl From<usize> for VariableAddressant {
     }
 }
 
-#[derive(Debug, Clone, Deref, IntoIterator, Serialize, Deserialize)]
+#[derive(Debug, Clone, Deref, DerefMut, IntoIterator, Serialize, Deserialize)]
 pub struct VariableAddress(Vec<VariableAddressant>);
 
 impl TryFrom<Vec<VariableAddressant>> for VariableAddress {

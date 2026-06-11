@@ -120,6 +120,14 @@ impl Procedure for FSReadProcedure {
                 .into_boxed_slice(),
         )))))
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -209,6 +217,14 @@ impl Procedure for FSWriteProcedure {
             })
             .map(|_| Value::Null)
     }
+    
+    fn get_num_args(&self) -> usize {
+        2
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -230,6 +246,14 @@ impl Procedure for FSExistsProcedure {
                 .boxed()
             })
             .map(|b| Value::Bool(b))
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -274,6 +298,14 @@ impl Procedure for FSListDirProcedure {
 
         Ok(Value::Array(Rc::new(RefCell::new(Some(out.into_boxed_slice())))))
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -296,6 +328,14 @@ impl Procedure for FSRemoveFileProcedure {
             })
             .map(|_| Value::Null)
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -317,5 +357,13 @@ impl Procedure for FSRemoveDirProcedure {
                 .boxed()
             })
             .map(|_| Value::Null)
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }

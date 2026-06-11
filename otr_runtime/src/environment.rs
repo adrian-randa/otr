@@ -1,6 +1,6 @@
 use super::scope::{Scope};
 
-use otr_core::expression::variable::VariableAddress;
+use otr_core::expression::variable::{VariableAddress, VariableAddressant};
 use otr_core::r#struct::Struct;
 use otr_core::value::Value;
 
@@ -11,7 +11,7 @@ use crate::error::RuntimeError;
 use otr_core::module::ModuleAddress;
 
 use otr_core::error::Result;
-use crate::scope::try_bake_variable_address;
+use crate::scope::{BakedVariableAddress, try_bake_variable_address};
 
 use std::rc::Rc;
 
@@ -29,18 +29,18 @@ impl Default for Environment<'_> {
         Self {
             contained_module_id: Default::default(),
             loaded_modules: Default::default(),
-            scope: Default::default(),
+            scope: Scope::new(0),
         }
     }
 }
 
 #[allow(unused)]
 impl Environment<'_> {
-    pub fn new(contained_module_id: String) -> Self {
+    pub fn new(contained_module_id: String, stack_size: usize) -> Self {
         Self {
             contained_module_id,
             loaded_modules: Default::default(),
-            scope: Default::default(),
+            scope: Scope::new(stack_size),
         }
     }
 
@@ -84,10 +84,6 @@ impl Environment<'_> {
             loaded_modules: self.loaded_modules.clone(),
             scope: new_scope,
         }
-    }
-
-    pub fn insert_members(&mut self, members: HashMap<String, Value>) {
-        self.scope.insert_members(members);
     }
 
     pub fn query_variable(&self, address: VariableAddress) -> Result<Value> {

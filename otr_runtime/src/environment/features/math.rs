@@ -79,6 +79,14 @@ impl Procedure for SinProcedure {
             }
         ))
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -104,6 +112,14 @@ impl Procedure for CosProcedure {
             }
         ))
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -128,5 +144,13 @@ impl Procedure for TanProcedure {
                 }.boxed())
             }
         ))
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }

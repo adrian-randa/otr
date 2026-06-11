@@ -25,7 +25,9 @@ pub(crate) fn eval_expression(expression: &Expression, environment: &Environment
 fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Environment) -> Result<Value> {
     let procedure = environment.get_procedure_by_address(expression.get_procedure_id())?;
 
-    let mut arguments = Vec::with_capacity(expression.get_arguments().len());
+    let num_args = expression.get_arguments().len();
+
+    let mut arguments = Vec::with_capacity(num_args);
     for eval_result in expression
         .get_arguments()
         .iter()
@@ -34,7 +36,7 @@ fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Envir
         arguments.push(eval_result?);
     }
 
-    let environment = environment.open_subenvironment(Scope::new(), &expression.get_procedure_id());
+    let environment = environment.open_subenvironment(Scope::new(procedure.get_stack_size()), &expression.get_procedure_id());
 
     Ok(procedure
         .call(environment, arguments)
@@ -164,7 +166,7 @@ fn eval_associated_procedure_call_expression(expression: &AssociatedProcedureCal
         arguments.push(eval_result?);
     }
 
-    let environment = environment.open_subenvironment(Scope::new(), &callee_id);
+    let environment = environment.open_subenvironment(Scope::new(procedure.get_stack_size()), &callee_id);
 
     Ok(procedure.call(environment, arguments).map_err(|error| {
         AssociatedProcedureContextDecorator::new_boxed(

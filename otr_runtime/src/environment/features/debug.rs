@@ -75,6 +75,14 @@ impl Procedure for DebugPrintProcedure {
 
         Ok(Value::Null)
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -96,5 +104,13 @@ impl Procedure for DebugPrintlnProcedure {
         println!("{}", arg.to_string());
 
         Ok(Value::Null)
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }

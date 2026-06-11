@@ -27,6 +27,12 @@ pub(crate) enum CompilerError {
     InvalidDefinition {
         message: String,
     },
+    VarAlreadyDefined {
+        ident: String,
+    },
+    NoSuchVariable {
+        ident: String
+    },
 
     Unknown {
         message: String,
@@ -69,6 +75,8 @@ impl std::fmt::Display for CompilerError {
             CompilerError::InvalidDefinition { message } => {
                 format!("Invalid definition! {message}")
             }
+            CompilerError::VarAlreadyDefined { ident } => format!("Variable '{ident}' already defined!"),
+            CompilerError::NoSuchVariable { ident } => format!("Variable '{ident}' not defined in this scope!"),
             CompilerError::Unknown { message } => format!("{message}"),
         };
 

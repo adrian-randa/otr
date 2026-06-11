@@ -74,6 +74,14 @@ impl Procedure for NewArrayProcedure {
             .boxed())
         }
     }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Debug)]
@@ -111,6 +119,14 @@ impl Procedure for ArraySizeProcedure {
             }
             .boxed()),
         }
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
 
@@ -159,5 +175,13 @@ impl Procedure for ArraySortProcedure {
 
 
         Ok(arg)
+    }
+    
+    fn get_num_args(&self) -> usize {
+        1
+    }
+    
+    fn get_stack_size(&self) -> usize {
+        0
     }
 }
