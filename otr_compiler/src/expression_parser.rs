@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use crate::{
     CompilerError, ExpressionParseEnvironment,
     lexer::token::{
@@ -57,7 +59,7 @@ impl ExpressionParser {
 
         let mut atoms = atoms.into_iter().map(|atom| Some(atom)).collect::<Vec<_>>();
 
-        for i in 0..operator_order.len() {
+        for i in 0..operator_order.len() {            
             if let Some(ExpressionAtom::Operator(op)) = atoms[operator_order[i].1].take() {
                 match op {
                     OperatorToken::Not => {
@@ -68,11 +70,12 @@ impl ExpressionParser {
                                 Expression::Boolean(BooleanExpression::Not(Box::new(subexpr))),
                             ))];
 
-                            atoms.splice(i..=i + 1, splice);
+                            atoms.splice((operator_order[i].1)..=(operator_order[i].1 + 1), splice);
+                            let op_index = operator_order[i].1;
 
                             for operator in &mut operator_order {
-                                if operator.1 > i {
-                                    *operator = (operator.0, operator.1 - 2);
+                                if operator.1 > op_index {
+                                    *operator = (operator.0, operator.1 - 1);
                                 }
                             }
                         }
@@ -116,18 +119,26 @@ impl ExpressionParser {
                 }
                 .boxed())?;
             }
+
+            println!("Atoms are now: {:?}", &atoms);
         }
 
         Ok(atoms[0].take().unwrap().unwrap_subexpression())
     }
 
     fn get_operator_order(atoms: &[ExpressionAtom]) -> Vec<(usize, usize)> {
-        let mut operator_order = Vec::new();
+        let mut operator_order = VecDeque::new();
         for i in 0..atoms.len() {
             if let ExpressionAtom::Operator(operator) = &atoms[i] {
-                operator_order.push((Self::get_precedence(operator), i));
+                if Self::is_right_associative(operator) {
+                    operator_order.push_front((Self::get_precedence(operator), i));
+                } else {
+                    operator_order.push_back((Self::get_precedence(operator), i));
+                }
             }
         }
+        let mut operator_order: Vec<(usize, usize)> = operator_order.into();
+
         operator_order.sort_by_key(|(precedence, _i)| usize::MAX - *precedence);
 
         operator_order
@@ -281,6 +292,13 @@ impl ExpressionParser {
             OperatorToken::Modulo => 6,
             OperatorToken::Power => 7,
             OperatorToken::Not => 8,
+        }
+    }
+
+    fn is_right_associative(operator: &OperatorToken) -> bool {
+        match operator {
+            OperatorToken::Power => true,
+            _ => false,
         }
     }
 
