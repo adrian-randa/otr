@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::expression::Expression;
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ArithmeticExpression {
     Add { lhs: Box<Expression>, rhs: Box<Expression> },
     Subtract { lhs: Box<Expression>, rhs: Box<Expression> },

@@ -964,6 +964,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "otr_tests"
+version = "0.1.0"
+dependencies = [
+ "otr_compiler",
+ "otr_core",
+ "otr_runtime",
+]
+
+[[package]]
 name = "otrc"
 version = "0.1.0"
 dependencies = [

@@ -1,9 +1,19 @@
-use derive_more::IntoIterator;
+use std::ops::Deref;
+
+use derive_more::{Deref, IntoIterator};
 
 #[derive(Debug)]
 pub struct ContextualizedToken {
     pub token: Token,
     pub line_index: usize,
+}
+
+impl Deref for ContextualizedToken {
+    type Target = Token;
+
+    fn deref(&self) -> &Self::Target {
+        &self.token
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

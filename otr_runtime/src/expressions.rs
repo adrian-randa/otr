@@ -4,7 +4,7 @@ use otr_core::{error::Result, expression::{variable::{VariableAccessMode, Variab
 use crate::{environment::Environment, error::{RuntimeError, context::{AssociatedProcedureContextDecorator, ProcedureContextDecorator}}, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
 
 
-pub(crate) fn eval_expression(expression: &Expression, environment: &Environment) -> Result<Value> {
+pub fn eval_expression(expression: &Expression, environment: &Environment) -> Result<Value> {
     match expression {
         Expression::Value(value) => Ok(value.clone()),
         Expression::Variable(expr) => eval_variable_expression(expr, environment),

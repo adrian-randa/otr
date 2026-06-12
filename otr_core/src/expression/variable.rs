@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::expression::Expression;
 
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VariableExpression {
     address: VariableAddress,
     access_mode: VariableAccessMode,
@@ -24,7 +24,7 @@ impl VariableExpression {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Copy, Serialize, Deserialize)]
 pub enum VariableAccessMode {
     Move,
     Clone,
@@ -32,7 +32,7 @@ pub enum VariableAccessMode {
     TypeOf,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum VariableAddressant {
     StackIndex(usize),
     Identifier(String),
@@ -52,7 +52,7 @@ impl From<usize> for VariableAddressant {
     }
 }
 
-#[derive(Debug, Clone, Deref, DerefMut, IntoIterator, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deref, DerefMut, IntoIterator, Serialize, Deserialize)]
 pub struct VariableAddress(Vec<VariableAddressant>);
 
 impl TryFrom<Vec<VariableAddressant>> for VariableAddress {

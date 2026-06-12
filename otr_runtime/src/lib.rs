@@ -14,7 +14,7 @@ use crate::expressions::eval_expression;
 use crate::module::RuntimeModule;
 
 pub mod environment;
-mod expressions;
+pub mod expressions;
 mod module;
 mod procedures;
 mod value;
