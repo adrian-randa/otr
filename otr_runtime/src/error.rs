@@ -70,6 +70,10 @@ pub enum RuntimeError {
     NoSuchVariable {
         variable_identifier: String,
     },
+    InvalidNumberOfArgs {
+        expected: usize,
+        supplied: usize,
+    },
     ProcedureNotExported {
         procedure_identifier: String,
     },
@@ -103,24 +107,24 @@ impl RuntimeError {
     pub(crate) fn get_message(&self) -> String {
         match self {
             RuntimeError::IndexingNotAccepted { ty } => 
-                format!("Indexing not allowed on values of type {ty}!"),
+            format!("Indexing not allowed on values of type {ty}!"),
             RuntimeError::MembersNotAccepted { ty } => 
-                format!("Getting a member is not allowed on values of type {ty}!"),
+            format!("Getting a member is not allowed on values of type {ty}!"),
             RuntimeError::AddressantsNotAccepted { ty } => 
                 format!("Values of type {ty} do not accept addressants!"),
-            RuntimeError::IndexOutOfBounds { array_length, index } => 
+                RuntimeError::IndexOutOfBounds { array_length, index } => 
                 format!("Index out of bounds! Tried to index element at {index}, but the array size was {array_length}."),
-            RuntimeError::NoSuchMember { member_identifier } => 
+                RuntimeError::NoSuchMember { member_identifier } => 
                 format!("Tried to get member '{member_identifier}', but no such member exists!"),
-            RuntimeError::UseOfMovedValue => 
+                RuntimeError::UseOfMovedValue => 
                 format!("Use of moved value!"),
-            RuntimeError::UseOfDroppedValue => 
+                RuntimeError::UseOfDroppedValue => 
                 format!("Use of dropped value!"),
-            RuntimeError::CannotReference { ty } => 
+                RuntimeError::CannotReference { ty } => 
                 format!("Referencing values of type {ty} is not allowed!"),
-            RuntimeError::FieldIsPrivate => 
+                RuntimeError::FieldIsPrivate => 
                 format!("Tried to access private field!"),
-            RuntimeError::KeyAlreadyPresent { key } => 
+                RuntimeError::KeyAlreadyPresent { key } => 
                 format!("The key '{key}' is already present!"),
             RuntimeError::NoEntrypoint => 
                 format!("Entrypoint is not specified!"),
@@ -130,6 +134,8 @@ impl RuntimeError {
                 format!("Variable '{variable_identifier}' is already declared!"),
             RuntimeError::NoSuchVariable { variable_identifier } => 
                 format!("Variable '{variable_identifier}' is not defined!"),
+            RuntimeError::InvalidNumberOfArgs { expected, supplied } => 
+                format!("Invalid number of arguments! This procedure takes {expected} arguments, but {supplied} were supplied."),
             RuntimeError::ProcedureNotExported { procedure_identifier } => 
                 format!("Procedure '{procedure_identifier}' is not exported!"),
             RuntimeError::AssociatedProcedureNotExported { procedure_identifier, struct_identifier } => 
@@ -185,6 +191,7 @@ impl Error for RuntimeError {
             RuntimeError::ModuleNotLoaded { module_identifier: _ } => err("ModuleNotLoaded"),
             RuntimeError::Unknown { message: _ } => err("Unknown"),
             RuntimeError::DivisionByZero => err("DivisionByZero"),
+            RuntimeError::InvalidNumberOfArgs { expected, supplied } => err("InvalidNumberOfArgs"),
         }
     }
 }

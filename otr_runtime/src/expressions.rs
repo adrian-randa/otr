@@ -26,6 +26,9 @@ fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Envir
     let procedure = environment.get_procedure_by_address(expression.get_procedure_id())?;
 
     let num_args = expression.get_arguments().len();
+    if num_args != procedure.get_num_args() {
+        return Err(RuntimeError::InvalidNumberOfArgs { expected: procedure.get_num_args(), supplied: num_args }.boxed());
+    }
 
     let mut arguments = Vec::with_capacity(num_args);
     for eval_result in expression

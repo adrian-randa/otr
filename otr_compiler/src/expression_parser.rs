@@ -119,8 +119,6 @@ impl ExpressionParser {
                 }
                 .boxed())?;
             }
-
-            println!("Atoms are now: {:?}", &atoms);
         }
 
         Ok(atoms[0].take().unwrap().unwrap_subexpression())
