@@ -533,7 +533,7 @@ impl ExpressionAtomParser {
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
                         self.state = AssociatedProcedureCall {
                             subexpression: Expression::Variable(VariableExpression::new(
-                                vec![VariableAddressant::Identifier(ident)]
+                                vec![VariableAddressant::StackIndex(environment.resolve_variable_ident(&ident)?)]
                                     .try_into()
                                     .unwrap(),
                                 VariableAccessMode::Move,
