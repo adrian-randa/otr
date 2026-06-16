@@ -5,7 +5,7 @@ use std::vec::IntoIter;
 use otr_core::member::MemberMap;
 use otr_core::{expression::variable::VariableAddressant, value::Value};
 use otr_core::Result;
-use crate::error::context::VariableContextDecorator;
+use crate::error::context::{StructContextDecorator, VariableContextDecorator};
 use crate::error::RuntimeError;
 
 pub(crate) fn compare(lhs: &Value, rhs: &Value) -> Result<std::cmp::Ordering> {
@@ -262,20 +262,28 @@ pub(crate) fn apply_to_submember<Args, T>(
                 Value::Struct(rc) => {
                     if let VariableAddressant::Identifier(ident) = addressant {
                         let reference = rc.borrow();
-                        let obj = reference
+                        let st = reference
                             .as_ref()
                             .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
-                        let module_id_matches = obj.get_struct_id().get_module_id()  == contained_module_id;
+                        let module_id_matches = st.get_struct_id().get_module_id()  == contained_module_id;
 
-                        let members = obj.get_members();
+                        let members = st.get_members();
 
                         if module_id_matches {
-                            let value = try_get_value(members, &ident)?;
+                            let value = try_get_value(members, &ident).map_err(|error|
+                                StructContextDecorator {
+                                    error, struct_id: st.get_struct_id().clone()
+                                }.boxed()
+                            )?;
                             
                             apply_to_submember(function, value, address, contained_module_id, args)
                         } else {
-                            let value = try_get_value_if_public(members, &ident)?;
+                            let value = try_get_value_if_public(members, &ident).map_err(|error|
+                                StructContextDecorator {
+                                    error, struct_id: st.get_struct_id().clone()
+                                }.boxed()
+                            )?;
                             
                             apply_to_submember(function, value, address, contained_module_id, args)
                         }
@@ -293,20 +301,28 @@ pub(crate) fn apply_to_submember<Args, T>(
                             .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                         let reference = rc.borrow();
-                        let obj = reference
+                        let st = reference
                             .as_ref()
                             .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
-                        let module_id_matches = obj.get_struct_id().get_module_id()  == contained_module_id;
+                        let module_id_matches = st.get_struct_id().get_module_id()  == contained_module_id;
 
-                        let members = obj.get_members();
+                        let members = st.get_members();
 
                         if module_id_matches {
-                            let value = try_get_value(members, &ident)?;
+                            let value = try_get_value(members, &ident).map_err(|error|
+                                StructContextDecorator {
+                                    error, struct_id: st.get_struct_id().clone()
+                                }.boxed()
+                            )?;
                             
                             apply_to_submember(function, value, address, contained_module_id, args)
                         } else {
-                            let value = try_get_value_if_public(members, &ident)?;
+                            let value = try_get_value_if_public(members, &ident).map_err(|error|
+                                StructContextDecorator {
+                                    error, struct_id: st.get_struct_id().clone()
+                                }.boxed()
+                            )?;
                             
                             apply_to_submember(function, value, address, contained_module_id, args)
                         }
@@ -404,20 +420,26 @@ pub(crate) fn apply_to_submember_mut<Args, T>(
                 Value::Struct(ref_cell) => {
                     if let VariableAddressant::Identifier(ident) = addressant {
                         let mut reference = ref_cell.borrow_mut();
-                        let obj = reference
+                        let st = reference
                             .as_mut()
                             .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
-                        let module_id_matches = obj.get_struct_id().get_module_id()  == contained_module_id;
+                        let struct_id = st.get_struct_id().clone();
 
-                        let members = obj.get_members_mut();
+                        let module_id_matches = struct_id.get_module_id()  == contained_module_id;
+
+                        let members = st.get_members_mut();
 
                         if module_id_matches {
-                            let value = try_get_value_mut(members, &ident)?;
+                            let value = try_get_value_mut(members, &ident).map_err(|error|
+                                StructContextDecorator { error, struct_id }.boxed()
+                            )?;
                             
                             apply_to_submember_mut(function, value, address, contained_module_id, args)
                         } else {
-                            let value = try_get_value_mut_if_public(members, &ident)?;
+                            let value = try_get_value_mut_if_public(members, &ident).map_err(|error|
+                                StructContextDecorator { error, struct_id }.boxed()
+                            )?;
                             
                             apply_to_submember_mut(function, value, address, contained_module_id, args)
                         }
@@ -435,20 +457,26 @@ pub(crate) fn apply_to_submember_mut<Args, T>(
                             .ok_or(RuntimeError::UseOfDroppedValue.boxed())?;
 
                         let mut reference = rc.borrow_mut();
-                        let obj = reference
+                        let st = reference
                             .as_mut()
                             .ok_or(RuntimeError::UseOfMovedValue.boxed())?;
 
-                        let module_id_matches = obj.get_struct_id().get_module_id()  == contained_module_id;
+                        let struct_id = st.get_struct_id().clone();
 
-                        let members = obj.get_members_mut();
+                        let module_id_matches = struct_id.get_module_id()  == contained_module_id;
+
+                        let members = st.get_members_mut();
 
                         if module_id_matches {
-                            let value = try_get_value_mut(members, &ident)?;
+                            let value = try_get_value_mut(members, &ident).map_err(|error|
+                                StructContextDecorator { error, struct_id }.boxed()
+                            )?;
                             
                             apply_to_submember_mut(function, value, address, contained_module_id, args)
                         } else {
-                            let value = try_get_value_mut_if_public(members, &ident)?;
+                            let value = try_get_value_mut_if_public(members, &ident).map_err(|error|
+                                StructContextDecorator { error, struct_id }.boxed()
+                            )?;
                             
                             apply_to_submember_mut(function, value, address, contained_module_id, args)
                         }

@@ -61,10 +61,10 @@ fn call_compiled_procedure(procedure: &CompiledProcedure, mut environment: Envir
 
     while pc < instructions.len() {
         match &instructions[pc] {
-            Instruction::PushVarToScope { identifier } => {
+            Instruction::PushVarToScope { identifier: _ } => {
                 // Legacy; Noop
             }
-            Instruction::PopVarFromScope { identifier } => {
+            Instruction::PopVarFromScope { identifier: _ } => {
                 // Legacy; Noop
             }
             Instruction::GrowStack => {

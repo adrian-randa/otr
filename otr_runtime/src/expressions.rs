@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc};
 
 use otr_core::{error::Result, expression::{variable::{VariableAccessMode, VariableAddressant, VariableExpression}, *}, r#type::Type, value::Value};
-use crate::{environment::Environment, error::{RuntimeError, context::{AssociatedProcedureContextDecorator, ProcedureContextDecorator}}, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
+use crate::{environment::Environment, error::{RuntimeError, context::{AssociatedProcedureContextDecorator, ProcedureContextDecorator, StructContextDecorator}}, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
 
 
 pub fn eval_expression(expression: &Expression, environment: &Environment) -> Result<Value> {
@@ -27,7 +27,12 @@ fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Envir
 
     let num_args = expression.get_arguments().len();
     if num_args != procedure.get_num_args() {
-        return Err(RuntimeError::InvalidNumberOfArgs { expected: procedure.get_num_args(), supplied: num_args }.boxed());
+        return Err(
+            ProcedureContextDecorator {
+                error: RuntimeError::InvalidNumberOfArgs { expected: procedure.get_num_args(), supplied: num_args }.boxed(),
+                procedure_id: expression.get_procedure_id().clone(),
+            }.boxed()
+        )
     }
 
     let mut arguments = Vec::with_capacity(num_args);
@@ -58,7 +63,12 @@ fn eval_struct_construction_expression(expression: &StructConstructionExpression
     for (field, expr) in expression.get_field_overrides() {
         let value = eval_expression(expr, environment)?;
         instance.get_members_mut().set(field, value)
-            .ok_or(RuntimeError::NoSuchMember { member_identifier: field.clone() }.boxed())?;
+            .ok_or_else(|| 
+                StructContextDecorator {
+                    error: RuntimeError::NoSuchMember { member_identifier: field.clone() }.boxed(),
+                    struct_id: expression.get_struct_id().clone()
+                }.boxed()
+            )?;
     }
 
     Ok(Value::Struct(Rc::new(RefCell::new(Some(instance)))))

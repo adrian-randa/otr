@@ -11,12 +11,13 @@ use otr_core::error::Result;
 
 
 pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &Environment) -> Result<BakedVariableAddress> {
-    let mut out = Vec::with_capacity(address.len());
 
-    for addressant in address {
-        let addressant = match addressant {
+    let mut address = address.0;
+
+    for i in 0..address.len() {
+        match &address[i] {
             VariableAddressant::DynamicIndex(expression) => {
-                let value = eval_expression(&expression, environment)?;
+                let value = eval_expression(expression, environment)?;
                 let idx: usize = match value {
                     Value::Integer(value) => {
                         let idx = value.try_into().unwrap();
@@ -32,15 +33,14 @@ pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &
                     }
                 };
 
-                VariableAddressant::Index(idx)
-            }
-            other => other
-        };
+                address[i] = VariableAddressant::Index(idx);
+            },
 
-        out.push(addressant);
+            _ => {},
+        }
     }
 
-    Ok(BakedVariableAddress(out.try_into().unwrap()))
+    Ok(BakedVariableAddress(address.try_into().unwrap()))
 }
 
 #[derive(Deref, IntoIterator)]
@@ -84,7 +84,7 @@ impl Scope {
     }
 
     pub fn set(&mut self, index: usize, value: Value) {
-        self.stack.set(index, value);
+        let _ = self.stack.set(index, value);
     }
 
     pub(crate) fn query_variable(

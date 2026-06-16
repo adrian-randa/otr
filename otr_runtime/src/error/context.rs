@@ -76,6 +76,36 @@ impl AssociatedProcedureContextDecorator {
 }
 
 #[derive(Debug)]
+pub(crate) struct StructContextDecorator {
+    pub(crate) error: Box<dyn Error>,
+    pub(crate) struct_id: ModuleAddress,
+}
+
+impl Error for StructContextDecorator {
+    fn to_value(&self) -> Value {
+        self.error.to_value()
+    }
+}
+
+impl std::fmt::Display for StructContextDecorator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let context = format!(
+            "On struct {}::{}",
+            self.struct_id.get_module_id(),
+            self.struct_id.get_identifier()
+        );
+
+        write!(f, "{}\n\t{}", self.error, (&context as &str).bright_red())
+    }
+}
+
+impl StructContextDecorator {
+    pub(crate) fn boxed(self) -> Box<dyn Error> {
+        Box::new(self)
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct HintContextDecorator {
     pub(crate) error: Box<dyn Error>,
 
