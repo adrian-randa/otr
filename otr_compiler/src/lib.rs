@@ -14,12 +14,13 @@ pub trait CompilerState {
     fn finalize(self: Box<Self>) -> Result<CompiledModule>;
 }
 
-pub trait ExpressionParseEnvironment {
+pub trait ExpressionParseEnvironment: std::fmt::Debug {
     fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress>;
     fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress>;
     fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize>;
 }
 
+#[derive(Debug)]
 pub struct NoExpressionEnvironment;
 
 impl ExpressionParseEnvironment for NoExpressionEnvironment {
@@ -44,6 +45,7 @@ impl ExpressionParseEnvironment for NoExpressionEnvironment {
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct FallbackExpressionParseEnvironemnt<'a> {
     main: &'a dyn ExpressionParseEnvironment,
     fallback: &'a dyn ExpressionParseEnvironment,
@@ -69,6 +71,51 @@ impl<'a> ExpressionParseEnvironment for FallbackExpressionParseEnvironemnt<'a> {
 impl<'a> FallbackExpressionParseEnvironemnt<'a> {
     pub fn new(main: &'a dyn ExpressionParseEnvironment, fallback: &'a dyn ExpressionParseEnvironment) -> Self {
         Self { main, fallback }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct UsingExpressionParseEnvironment {
+    entries: Vec<UsingEntry>,
+}
+
+#[derive(Debug)]
+struct UsingEntry {
+    module_name: String,
+    member_name: Option<String>,
+}
+
+impl ExpressionParseEnvironment for UsingExpressionParseEnvironment {
+    fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
+        self.resolve(ident)
+    }
+
+    fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
+        self.resolve(ident)
+    }
+
+    fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
+        Err(CompilerError::NoSuchVariable { ident: ident.as_ref().to_string() }.boxed())
+    }
+}
+
+impl UsingExpressionParseEnvironment {
+    pub(crate) fn new() -> Self {
+        Self { entries: Vec::new() }
+    }
+
+    pub(crate) fn push(&mut self, module_name: String, member_name: Option<String>) {
+        self.entries.push(UsingEntry { module_name, member_name });
+    }
+
+    fn resolve(&self, ident: &dyn AsRef<str>) -> Result<ModuleAddress> {
+        for entry in &self.entries {
+            if entry.member_name.as_ref().is_none_or(|member_name| ident.as_ref() == member_name as &str) {
+                return Ok(ModuleAddress::new(entry.module_name.clone(), ident.as_ref().into()));
+            }
+        }
+
+        Err(CompilerError::NoSuchMember { member_identifier: ident.as_ref().to_string() }.boxed())
     }
 }
 

@@ -93,6 +93,7 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("ref".into(), Keyword(Ref)))
             .with_rule(KeywordRule::new("clone".into(), Keyword(Clone)))
             .with_rule(KeywordRule::new("typeof".into(), Keyword(Typeof)))
+            .with_rule(KeywordRule::new("using".into(), Keyword(Using)))
             .with_rule(KeywordRule::new("null".into(), Literal(LiteralToken::Null)))
             .with_rule(KeywordRule::new(
                 "Null".into(),

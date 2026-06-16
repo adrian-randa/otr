@@ -916,6 +916,9 @@ impl ExpressionAtomParser {
             }
             .boxed()),
             ExpressionAtomParserState::SingleIdent { ident } => {
+                if let Ok(struct_id) = environment.resolve_struct_identifier(&ident) {
+                    return Ok(ExpressionAtom::Subexpression(Expression::Value(Value::Type(Type::Struct { struct_id }))))
+                }
                 Ok(ExpressionAtom::Subexpression(
                     Expression::Variable(VariableExpression::new(
                         vec![VariableAddressant::StackIndex(environment.resolve_variable_ident(&ident)?)]

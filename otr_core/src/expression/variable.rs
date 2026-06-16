@@ -6,8 +6,8 @@ use crate::expression::Expression;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct VariableExpression {
-    address: VariableAddress,
-    access_mode: VariableAccessMode,
+    pub address: VariableAddress,
+    pub access_mode: VariableAccessMode,
 }
 
 impl VariableExpression {
@@ -53,7 +53,7 @@ impl From<usize> for VariableAddressant {
 }
 
 #[derive(Debug, Clone, PartialEq, Deref, DerefMut, IntoIterator, Serialize, Deserialize)]
-pub struct VariableAddress(Vec<VariableAddressant>);
+pub struct VariableAddress(pub Vec<VariableAddressant>);
 
 impl TryFrom<Vec<VariableAddressant>> for VariableAddress {
     type Error = ();

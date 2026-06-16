@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use crate::{ExpressionParseEnvironment, FallbackExpressionParseEnvironemnt, NoExpressionEnvironment, error::CompilerError, expression_parser::ExpressionParser, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}};
+use crate::{ExpressionParseEnvironment, FallbackExpressionParseEnvironemnt, NoExpressionEnvironment, PunctuationToken::{DoubleColon, Semicolon}, UsingExpressionParseEnvironment, error::CompilerError, expression_parser::ExpressionParser, lexer::token::{KeywordToken, OperatorToken, ParenthesisType, PunctuationToken, Token}};
 use otr_core::{error::Result, expression::{AssociatedProcedureCallExpression, Expression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::{VariableAccessMode, VariableAddress, VariableAddressant, VariableExpression}}, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
 
 trait ScopeExcapeHandler: std::fmt::Debug {
@@ -108,6 +108,10 @@ impl ScopeExcapeHandler for ForScopeEscapeHandler {
 #[derive(Debug)]
 enum CompiledProcedureBuilderState {
     Base,
+    Using {
+        module_name: Option<String>,
+        member_name: Option<Option<String>>,
+    },
     VarDeclaration {
         ident: Option<String>,
         expression: Option<Vec<Token>>,
@@ -155,15 +159,17 @@ pub struct CompiledProcedureBuilder {
     variable_stack: Vec<Vec<String>>,
     num_variables: usize,
     stack_top: usize,
+
+    using_expression_parse_environment: UsingExpressionParseEnvironment,
 }
 
 impl ExpressionParseEnvironment for CompiledProcedureBuilder {
     fn resolve_procedure_identifier(&self, ident: &dyn AsRef<str>) -> Result<otr_core::module::ModuleAddress> {
-        NoExpressionEnvironment.resolve_procedure_identifier(ident)
+        self.using_expression_parse_environment.resolve_procedure_identifier(ident)
     }
 
     fn resolve_struct_identifier(&self, ident: &dyn AsRef<str>) -> Result<otr_core::module::ModuleAddress> {
-        NoExpressionEnvironment.resolve_struct_identifier(ident)
+        self.using_expression_parse_environment.resolve_struct_identifier(ident)
     }
 
     fn resolve_variable_ident(&self, ident: &dyn AsRef<str>) -> Result<usize> {
@@ -184,6 +190,8 @@ impl CompiledProcedureBuilder {
             variable_stack: vec![Vec::new()],
             num_variables: 0,
             stack_top: 0,
+
+            using_expression_parse_environment: UsingExpressionParseEnvironment::new(),
         }
     }
 
@@ -313,6 +321,12 @@ impl CompiledProcedureBuilder {
                         expression: None,
                     }
                 }
+                Token::Keyword(KeywordToken::Using) => {
+                    self.state = Using {
+                        member_name: None,
+                        module_name: None,
+                    }
+                }
                 Token::Keyword(KeywordToken::If) => {
                     self.state = IfStatement {
                         condition_expression: Vec::new(),
@@ -383,6 +397,32 @@ impl CompiledProcedureBuilder {
                     }
                 }
             },
+            Using { module_name, member_name } => {
+                match (token, module_name.as_mut(), member_name.as_mut()) {
+                    (Token::Identifier(ident), None, None) => {
+                        self.state = Using { module_name: Some(ident), member_name: None };
+                    }
+                    (Token::Punctuation(DoubleColon), Some(_), None) => {
+                        self.state = Using { module_name: module_name.take(), member_name: Some(None) };
+                    }
+                    (Token::Identifier(ident), Some(_), Some(None)) => {
+                        self.state = Using { module_name: module_name.take(), member_name: Some(Some(ident)) };
+                    }
+                    (Token::Punctuation(Semicolon), _, _) => {
+                        self = self.finish_current_instruction(expression_parse_environment)?;
+                    }
+                    (other, None, None) => {
+                        return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
+                    }
+                    (other, Some(_), None) => {
+                        return Err(CompilerError::UnexpectedToken { expected: Some("::".into()), found: other }.boxed());
+                    }
+                    (other, Some(_), Some(_)) => {
+                        return Err(CompilerError::UnexpectedToken { expected: Some(";".into()), found: other }.boxed());
+                    }
+                    _ => todo!(),
+                }
+            }
             VarDeclaration { ident, expression } => {
                 if ident.is_none() {
                     if let Token::Identifier(ident) = token {
@@ -573,7 +613,21 @@ impl CompiledProcedureBuilder {
         expression_parse_environment: &dyn ExpressionParseEnvironment,
     ) -> Result<Self> {
         match self.state {
-            CompiledProcedureBuilderState::Base => {}
+            CompiledProcedureBuilderState::Base => {},
+            CompiledProcedureBuilderState::Using { module_name, member_name } => {
+                let module_name = module_name.ok_or_else(|| CompilerError::InvalidDefinition {
+                    message: "No module name supplied for 'using' statement".into()
+                }.boxed())?;
+
+                let member_name = match member_name {
+                    None => None,
+                    Some(member_name) => member_name
+                };
+
+                self.using_expression_parse_environment.push(module_name, member_name);
+                
+                self.state = CompiledProcedureBuilderState::Base;
+            }
             CompiledProcedureBuilderState::VarDeclaration { ref ident, ref expression } => {
                 let ident = ident.clone().ok_or(
                     CompilerError::Unknown {
