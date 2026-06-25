@@ -18,7 +18,7 @@ use otr_core::{
         arithmetic::ArithmeticExpression,
         boolean::BooleanExpression,
         comparison::ComparisonExpression,
-        variable::{VariableAccessMode, VariableAddressant, VariableExpression},
+        variable::{VariableAccessMode, VariableAddress, VariableAddressant::{self, Identifier}, VariableExpression},
     },
     module::ModuleAddress,
     r#type::Type,
@@ -378,6 +378,9 @@ enum ExpressionAtomParserState {
     SingleIdent {
         ident: String,
     },
+    Ref {
+        ident: Option<String>,
+    },
     ScopeAddress {
         address: Vec<VariableAddressant>,
         access: VariableAccessMode,
@@ -392,6 +395,7 @@ enum ExpressionAtomParserState {
     ModuleMember {
         module_ident: String,
         member_ident: Option<String>,
+        as_ref: bool,
     },
     StructMember {
         subexpression: Expression,
@@ -442,10 +446,7 @@ impl ExpressionAtomParser {
                         self.state = SingleIdent { ident };
                     }
                     Token::Keyword(KeywordToken::Ref) => {
-                        self.state = ScopeAddressMember {
-                            access: VariableAccessMode::Ref,
-                            address: Vec::new(),
-                        };
+                        self.state = Ref { ident: None };
                     }
                     Token::Keyword(KeywordToken::Clone) => {
                         self.state = ScopeAddressMember {
@@ -498,6 +499,61 @@ impl ExpressionAtomParser {
                         .boxed());
                     }
                 },
+                Ref { ident: None } => {
+                    match token {
+                        Token::Identifier(ident) => {
+                            self.state = Ref { ident: Some(ident) };
+                        }
+
+                        Token::Literal(LiteralToken::Type(PrimitiveTypeToken::Array)) => {
+                            self.state = Subexpression { subexpression: Expression::Value(Value::Type(Type::ArrayRef)) };
+                        }
+
+                        other => {
+                            return Err(CompilerError::UnexpectedToken { expected: Some("Identifier".into()), found: other }.boxed());
+                        }
+                    }
+                },
+                Ref { ident: Some(ident) } => {
+                    match token {
+                        Token::Punctuation(PunctuationToken::Dot) => {
+                            self.state = ScopeAddressMember {
+                                address: vec![VariableAddressant::Identifier(ident)],
+                                access: VariableAccessMode::Ref,
+                            };
+                        }
+                        Token::Punctuation(PunctuationToken::SquareBrackets(
+                            ParenthesisType::Opening,
+                        )) => {
+                            let inner = ExpressionParser::take_until_closing(
+                                &mut tokens,
+                                Token::Punctuation(PunctuationToken::SquareBrackets(
+                                    ParenthesisType::Closing,
+                                )),
+                            )?;
+                            let index_expression = ExpressionParser::parse(inner, environment)?;
+
+                            self.state = ScopeAddress {
+                                address: vec![
+                                    VariableAddressant::Identifier(ident),
+                                    VariableAddressant::DynamicIndex(index_expression.into()),
+                                ],
+                                access: VariableAccessMode::Ref,
+                            };
+                        }
+                        Token::Punctuation(PunctuationToken::DoubleColon) => {
+                            self.state = ModuleMember {
+                                module_ident: ident,
+                                member_ident: None,
+                                as_ref: true,
+                            }
+                        }
+
+                        other => {
+                            return Err(CompilerError::UnexpectedToken { expected: Some("variable addressant or module member".into()), found: other }.boxed());
+                        }
+                    }
+                },
                 SingleIdent { ident } => match token {
                     Token::Punctuation(PunctuationToken::Dot) => {
                         self.state = ScopeAddressMember {
@@ -528,6 +584,7 @@ impl ExpressionAtomParser {
                         self.state = ModuleMember {
                             module_ident: ident,
                             member_ident: None,
+                            as_ref: false,
                         }
                     }
                     Token::Punctuation(PunctuationToken::ThinArrow) => {
@@ -725,12 +782,16 @@ impl ExpressionAtomParser {
                 ModuleMember {
                     module_ident,
                     member_ident,
+                    as_ref
                 } => {
                     if let Some(member_ident) = member_ident {
                         match token {
                             Token::Punctuation(PunctuationToken::Parenthesis(
                                 ParenthesisType::Opening,
                             )) => {
+                                if as_ref {
+                                    return Err(CompilerError::InvalidExpression { message: "only variables of type Struct or Array can be referenced".into() }.boxed());
+                                }
                                 let inner = ExpressionParser::take_until_closing(
                                     &mut tokens,
                                     Token::Punctuation(PunctuationToken::Parenthesis(
@@ -755,6 +816,9 @@ impl ExpressionAtomParser {
                             Token::Punctuation(PunctuationToken::CurlyBraces(
                                 ParenthesisType::Opening,
                             )) => {
+                                if as_ref {
+                                    return Err(CompilerError::InvalidExpression { message: "only variables of type Struct or Array can be referenced".into() }.boxed());
+                                }
                                 let inner = ExpressionParser::take_until_closing(
                                     &mut tokens,
                                     Token::Punctuation(PunctuationToken::CurlyBraces(
@@ -820,6 +884,7 @@ impl ExpressionAtomParser {
                             self.state = ModuleMember {
                                 module_ident,
                                 member_ident: Some(member_ident),
+                                as_ref,
                             }
                         } else {
                             return Err(CompilerError::UnexpectedToken {
@@ -915,6 +980,19 @@ impl ExpressionAtomParser {
                 message: "Empty subexpression atom!".into(),
             }
             .boxed()),
+            ExpressionAtomParserState::Ref { ident } => {
+                if let Some(ident) = ident {
+                    if let Ok(struct_id) = environment.resolve_struct_identifier(&ident) {
+                        return Ok(ExpressionAtom::Subexpression(Expression::Value(Value::Type(Type::StructRef { struct_id }))))
+                    }
+                    return Ok(ExpressionAtom::Subexpression(Expression::Variable(VariableExpression {
+                        address: VariableAddress(vec![VariableAddressant::StackIndex(environment.resolve_variable_ident(&ident)?)]),
+                        access_mode: VariableAccessMode::Ref
+                    })));
+                } else {
+                    return Err(CompilerError::InvalidExpression { message: "Expected Type or variable after 'ref'".into() }.boxed());
+                }
+            }
             ExpressionAtomParserState::SingleIdent { ident } => {
                 if let Ok(struct_id) = environment.resolve_struct_identifier(&ident) {
                     return Ok(ExpressionAtom::Subexpression(Expression::Value(Value::Type(Type::Struct { struct_id }))))
@@ -962,13 +1040,20 @@ impl ExpressionAtomParser {
             ExpressionAtomParserState::ModuleMember {
                 module_ident,
                 member_ident,
+                as_ref
             } => {
                 if let Some(member_ident) = member_ident {
-                    Ok(ExpressionAtom::Subexpression(Expression::Value(
-                        Value::Type(Type::Struct {
-                            struct_id: ModuleAddress::new(module_ident, member_ident),
-                        }),
-                    )))
+                    Ok(ExpressionAtom::Subexpression(Expression::Value(Value::Type(
+                        if as_ref {
+                            Type::StructRef {
+                                struct_id: ModuleAddress::new(module_ident, member_ident),
+                            }
+                        } else {
+                            Type::Struct {
+                                struct_id: ModuleAddress::new(module_ident, member_ident),
+                            }
+                        }
+                    ))))
                 } else {
                     Err(CompilerError::InvalidExpression {
                         message: "Incomplete subexpression!".into(),

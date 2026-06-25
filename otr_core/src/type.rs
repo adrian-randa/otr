@@ -11,7 +11,9 @@ pub enum Type {
     Char,
     Bool,
     Array,
+    ArrayRef,
     Struct { struct_id: ModuleAddress },
+    StructRef { struct_id: ModuleAddress },
     Moved,
     Dropped,
     Type,
@@ -31,6 +33,8 @@ impl std::fmt::Display for Type {
             Type::Moved => "Moved",
             Type::Dropped => "Dropped",
             Type::Type => "Type",
+            Type::ArrayRef => "ref Array",
+            Type::StructRef { struct_id } => &format!("ref {struct_id}"),
         };
 
         write!(f, "{}", representation)

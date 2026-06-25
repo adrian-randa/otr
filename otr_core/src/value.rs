@@ -66,7 +66,7 @@ impl Value {
             Value::Char(_) => Type::Char,
             Value::Bool(_) => Type::Bool,
             Value::Array(_) => Type::Array,
-            Value::ArrayRef(_) => Type::Array,
+            Value::ArrayRef(_) => Type::ArrayRef,
             Value::Struct(object) => object
                 .borrow()
                 .as_ref()
@@ -79,7 +79,7 @@ impl Value {
                 .map(|obj| {
                     obj.borrow()
                         .as_ref()
-                        .map(|obj| Type::Struct {
+                        .map(|obj| Type::StructRef {
                             struct_id: obj.get_struct_id().clone(),
                         })
                         .unwrap_or(Type::Moved)
