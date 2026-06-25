@@ -12,13 +12,13 @@ fn main() {
 }
 
 fn shell() -> otr_core::Result<()> {
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     match cli {
-        CLI::Script { object_path } => {
+        Cli::Script { object_path } => {
             run_script(&object_path)
         },
-        CLI::Project { root_path, config_path } => {
+        Cli::Project { root_path, config_path } => {
 
             let root_path = root_path.unwrap_or(get_current_dir()?);
 
@@ -56,7 +56,7 @@ fn shell() -> otr_core::Result<()> {
 #[derive(Parser, Debug)]
 #[command(about = "A CLI for compiling OTR projects and scripts")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-enum CLI {
+enum Cli {
     #[command(about = "Runs a single script file")]
     Script {
         #[arg(help = "The path to the project's directory")]

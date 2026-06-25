@@ -7,7 +7,7 @@ pub(crate) struct MathFeatureBuilder {
 }
 
 impl MathFeatureBuilder {
-    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+    pub(crate) fn new_boxed() -> Box<dyn FeatureBuilder> {
         Box::new(Self { })
     }
 }
@@ -29,7 +29,7 @@ struct MathFeature;
 impl Module for MathFeature {
     fn get_procedure(
         &'_ self,
-        identifier: &String,
+        identifier: &str,
         _private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
         match identifier as &str {
@@ -43,14 +43,14 @@ impl Module for MathFeature {
 
     fn get_associated_procedure(
         &'_ self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
+        struct_identifier: &str,
+        procedure_identifier: &str,
         _private_access: bool,
     ) -> Result<crate::procedures::RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 
-    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<otr_core::r#struct::Struct> {
+    fn get_struct(&self, identifier: &str, _private_access: bool) -> Result<otr_core::r#struct::Struct> {
         Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
     }
 }

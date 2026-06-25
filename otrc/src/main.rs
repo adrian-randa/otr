@@ -10,7 +10,7 @@ fn main() {
 }
 
 fn shell() -> otr_core::Result<()> {
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     let root_module_id = cli.root_module_id;
     let root_path = cli.root_path.unwrap_or(
@@ -29,7 +29,7 @@ fn shell() -> otr_core::Result<()> {
 #[derive(Parser, Debug)]
 #[command(about = "A CLI for compiling OTR projects and scripts")]
 #[command(version = env!("CARGO_PKG_VERSION"))]
-struct CLI {
+struct Cli {
     pub root_module_id: String,
 
     #[arg(

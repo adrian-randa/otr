@@ -8,12 +8,10 @@ use otr_core::error::Result;
 
 
 
-pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &Environment) -> Result<BakedVariableAddress> {
+pub(crate) fn try_bake_variable_address(mut address: VariableAddress, environment: &Environment) -> Result<BakedVariableAddress> {
 
-    let mut address = address.0;
-
-    for i in 0..address.len() {
-        if let VariableAddressant::DynamicIndex(expression) = &address[i] {
+    for addressant in address.iter_mut() {
+        if let VariableAddressant::DynamicIndex(expression) = addressant {
             let value = eval_expression(expression, environment)?;
             let idx: usize = match value {
                 Value::Integer(value) => {
@@ -30,11 +28,11 @@ pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &
                 }
             };
 
-            address[i] = VariableAddressant::Index(idx);
+            *addressant = VariableAddressant::Index(idx);
         }
     }
 
-    Ok(BakedVariableAddress(address.try_into().unwrap()))
+    Ok(BakedVariableAddress(address))
 }
 
 #[derive(Deref, IntoIterator)]

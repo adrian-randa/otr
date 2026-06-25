@@ -33,16 +33,22 @@ impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
     }
 }
 
+impl Default for EnvironmentBuilder<EnvironmentBuilderBaseState> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EnvironmentBuilder<EnvironmentBuilderBaseState> {
     pub fn with_feature(self, feature_ident: impl AsRef<str>) -> Result<EnvironmentBuilder<EnvironmentBuilderFeatureState>> {
         let feature_builder = match feature_ident.as_ref() as &str {
 
-            "Arrays" => ArraysFeatureBuilder::new(),
-            "Debug" => DebugFeatureBuilder::new(),
-            "Files" => FilesFeatureBuilder::new(),
-            "Numbers" => NumbersFeatureBuilder::new(),
-            "Strings" => StringsFeatureBuilder::new(),
-            "Math" => MathFeatureBuilder::new(),
+            "Arrays" => ArraysFeatureBuilder::new_boxed(),
+            "Debug" => DebugFeatureBuilder::new_boxed(),
+            "Files" => FilesFeatureBuilder::new_boxed(),
+            "Numbers" => NumbersFeatureBuilder::new_boxed(),
+            "Strings" => StringsFeatureBuilder::new_boxed(),
+            "Math" => MathFeatureBuilder::new_boxed(),
 
             other => return Err(RuntimeError::Unknown {
                 message: format!("Unknown feature: {}", other)

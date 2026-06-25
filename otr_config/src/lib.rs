@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use otr_core::error::{Error, system_error::SystemError};
 
-#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq, PartialOrd)]
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
 #[serde(try_from = "&str")]
 pub struct Version {
     pub major: usize,
@@ -12,19 +12,23 @@ pub struct Version {
     pub patch: usize,
 }
 
+impl PartialOrd for Version {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Ord for Version {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         match self.major.cmp(&other.major) {
-            std::cmp::Ordering::Equal => {
-                match self.minor.cmp(&other.minor) {
-                    std::cmp::Ordering::Equal => {
-                        self.patch.cmp(&other.patch)
-                    },
-                    other => other
-                }
-            },
-            other => other
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
         }
+        match self.minor.cmp(&other.minor) {
+            core::cmp::Ordering::Equal => {}
+            ord => return ord,
+        }
+        self.patch.cmp(&other.patch)
     }
 }
 

@@ -86,4 +86,8 @@ where
     pub(crate) fn len(&self) -> usize {
         self.entries.len()
     }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
 }

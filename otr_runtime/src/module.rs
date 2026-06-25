@@ -6,16 +6,16 @@ use crate::{error::RuntimeError, procedures::RuntimeProcedure};
 pub(crate) trait Module: std::fmt::Debug {
     fn get_procedure(
         &'_ self,
-        identifier: &String,
+        identifier: &str,
         private_access: bool,
     ) -> Result<RuntimeProcedure<'_>>;
     fn get_associated_procedure(
         &'_ self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
+        struct_identifier: &str,
+        procedure_identifier: &str,
         private_access: bool,
     ) -> Result<RuntimeProcedure<'_>>;
-    fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct>;
+    fn get_struct(&self, identifier: &str, private_access: bool) -> Result<Struct>;
 }
 
 #[allow(unused)]
@@ -30,7 +30,7 @@ pub(crate) enum RuntimeModule<'a> {
 impl<'a> Module for RuntimeModule<'a> {
     fn get_procedure(
         &'_ self,
-        identifier: &String,
+        identifier: &str,
         private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
         match self {
@@ -53,7 +53,7 @@ impl<'a> Module for RuntimeModule<'a> {
                     .ok_or(RuntimeError::ProcedureNotDefined { procedure_identifier: identifier.to_string() }.boxed())?;
                 
                 if !public && !private_access {
-                    Err(RuntimeError::ProcedureNotExported { procedure_identifier: identifier.clone() }.boxed())
+                    Err(RuntimeError::ProcedureNotExported { procedure_identifier: identifier.to_string() }.boxed())
                 } else {
                     Ok(RuntimeProcedure::CompiledRef(
                         procedure
@@ -65,8 +65,8 @@ impl<'a> Module for RuntimeModule<'a> {
 
     fn get_associated_procedure(
         &'_ self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
+        struct_identifier: &str,
+        procedure_identifier: &str,
         private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
         match self {
@@ -107,7 +107,7 @@ impl<'a> Module for RuntimeModule<'a> {
         }
     }
 
-    fn get_struct(&self, identifier: &String, private_access: bool) -> Result<Struct> {
+    fn get_struct(&self, identifier: &str, private_access: bool) -> Result<Struct> {
         match self {
             RuntimeModule::Abstract(module) => module.get_struct(identifier, private_access),
             RuntimeModule::Compiled(compiled_module) => {

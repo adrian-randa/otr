@@ -126,8 +126,8 @@ impl ExpressionParser {
 
     fn get_operator_order(atoms: &[ExpressionAtom]) -> Vec<(usize, usize)> {
         let mut operator_order = VecDeque::new();
-        for i in 0..atoms.len() {
-            if let ExpressionAtom::Operator(operator) = &atoms[i] {
+        for (i, atom) in atoms.iter().enumerate() {
+            if let ExpressionAtom::Operator(operator) = atom {
                 if Self::is_right_associative(operator) {
                     operator_order.push_front((Self::get_precedence(operator), i));
                 } else {
@@ -181,7 +181,7 @@ impl ExpressionParser {
 
         let mut slice = Vec::new();
 
-        let mut iter = tokens.into_iter();
+        let iter = tokens.into_iter();
 
         for token in iter {
             if stack.len() == 1 && token == parenthesis {
@@ -199,7 +199,7 @@ impl ExpressionParser {
     }
 
     fn split_by_commas(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<Vec<Token>>> {
-        let mut iter = tokens.into_iter();
+        let iter = tokens.into_iter();
 
         let mut slices = Vec::new();
         let mut current = Vec::new();
@@ -227,7 +227,7 @@ impl ExpressionParser {
     }
 
     fn split(tokens: impl IntoIterator<Item = Token>) -> Result<Vec<RawExpressionAtom>> {
-        let mut tokens = tokens.into_iter();
+        let tokens = tokens.into_iter();
 
         let mut atoms = Vec::new();
         let mut current_subexpression = Vec::new();
@@ -293,10 +293,7 @@ impl ExpressionParser {
     }
 
     fn is_right_associative(operator: &OperatorToken) -> bool {
-        match operator {
-            OperatorToken::Power => true,
-            _ => false,
-        }
+        matches!(operator, OperatorToken::Power)
     }
 
     fn resolve_binary_operator(

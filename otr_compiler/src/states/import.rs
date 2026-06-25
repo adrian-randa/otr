@@ -15,7 +15,47 @@ impl CompilerState for CompilerImportState {
         token: Token,
         compiler_environment: &mut CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>> {
-        if self.module_address.is_none() {
+        if let Some(ref mut address) = self.module_address {
+            match token {
+                Token::Punctuation(PunctuationToken::Semicolon) => {
+                    compiler_environment.push_file_to_queue(address.clone());
+                    self.module_state.get_module_mut().push_dependency(address.clone());
+                    Ok(Box::new(self.module_state))
+                }
+
+                Token::Keyword(KeywordToken::From) => {
+                    if address.path.is_some() {
+                        return Err(CompilerError::InvalidDefinition {
+                            message: "Cannot declare more than one location for an import!".into(),
+                        }
+                        .boxed());
+                    }
+
+                    address.path = Some(String::new());
+
+                    Ok(self)
+                }
+
+                Token::Literal(LiteralToken::String(path)) => {
+                    if address.path.is_some() {
+                        address.path = Some(path);
+                        Ok(self)
+                    } else {
+                        Err(CompilerError::InvalidDefinition {
+                            message: "Unexpected String literal. Try adding 'from' to declare a location for an import!".into()
+                        }.boxed())
+                    }
+                }
+
+                other => {
+                    Err(CompilerError::UnexpectedToken {
+                        expected: Some(";".into()),
+                        found: other,
+                    }
+                    .boxed())
+                }
+            }
+        } else {
             match token {
                 Token::Identifier(ident) => {
                     self.module_address = Some(ImportAddress {
@@ -33,51 +73,7 @@ impl CompilerState for CompilerImportState {
                     .boxed())
                 }
             }
-        } else {
-            match token {
-                Token::Punctuation(PunctuationToken::Semicolon) => {
-                    let address = self.module_address.unwrap();
-                    compiler_environment.push_file_to_queue(address.clone());
-                    self.module_state.get_module_mut().push_dependency(address);
-                    Ok(Box::new(self.module_state))
-                }
-
-                Token::Keyword(KeywordToken::From) => {
-                    let module_id = self.module_address.as_mut().unwrap();
-
-                    if module_id.path.is_some() {
-                        return Err(CompilerError::InvalidDefinition {
-                            message: "Cannot declare more than one location for an import!".into(),
-                        }
-                        .boxed());
-                    }
-
-                    module_id.path = Some(String::new());
-
-                    Ok(self)
-                }
-
-                Token::Literal(LiteralToken::String(path)) => {
-                    let module_id = self.module_address.as_mut().unwrap();
-                    if module_id.path.is_some() {
-                        module_id.path = Some(path);
-                        Ok(self)
-                    } else {
-                        Err(CompilerError::InvalidDefinition {
-                            message: "Unexpected String literal. Try adding 'from' to declare a location for an import!".into()
-                        }.boxed())
-                    }
-                }
-
-                other => {
-                    Err(CompilerError::UnexpectedToken {
-                        expected: Some(";".into()),
-                        found: other,
-                    }
-                    .boxed())
-                }
-            }
-        }
+        } 
     }
 
     fn finalize(self: Box<Self>) -> Result<CompiledModule> {

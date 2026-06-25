@@ -7,7 +7,7 @@ pub(crate) struct NumbersFeatureBuilder {
 }
 
 impl NumbersFeatureBuilder {
-    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+    pub(crate) fn new_boxed() -> Box<dyn FeatureBuilder> {
         Box::new(Self { })
     }
 }
@@ -28,7 +28,7 @@ struct NumbersFeature;
 impl Module for NumbersFeature {
     fn get_procedure(
         &'_ self,
-        identifier: &String,
+        identifier: &str,
         _private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
         match identifier as &str {
@@ -40,14 +40,14 @@ impl Module for NumbersFeature {
 
     fn get_associated_procedure(
         &'_ self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
+        struct_identifier: &str,
+        procedure_identifier: &str,
         _private_access: bool,
     ) -> Result<RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 
-    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<Struct> {
+    fn get_struct(&self, identifier: &str, _private_access: bool) -> Result<Struct> {
         Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
     }
 }
@@ -72,7 +72,7 @@ impl Procedure for NumberParseProcedure {
             Value::Char(c) => {
                 let n = *c as u8;
 
-                if !(b'0'..=b'9').contains(&n) {
+                if !n.is_ascii_digit() {
                     Err(RuntimeError::Unknown {
                         message: format!("'{}' is not a valid digit!", c),
                     }

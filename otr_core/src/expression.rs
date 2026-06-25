@@ -78,7 +78,7 @@ impl StructMemberExpression {
         Self { subexpression, member_ident }
     }
 
-    pub fn get_subexpression(&self) -> &Box<Expression> {
+    pub fn get_subexpression(&self) -> &Expression {
         &self.subexpression
     }
 
@@ -98,11 +98,11 @@ impl ArrayIndexExpression {
         Self { subexpression, index_expression }
     }
 
-    pub fn get_subexpression(&self) -> &Box<Expression> {
+    pub fn get_subexpression(&self) -> &Expression {
         &self.subexpression
     }
 
-    pub fn get_index_expression(&self) -> &Box<Expression> {
+    pub fn get_index_expression(&self) -> &Expression {
         &self.index_expression
     }
 }
@@ -153,7 +153,7 @@ impl CatchExpression {
         Self { subexpression }
     }
 
-    pub fn get_subexpression(&self) -> &Box<Expression> {
+    pub fn get_subexpression(&self) -> &Expression {
         &self.subexpression
     }
 }

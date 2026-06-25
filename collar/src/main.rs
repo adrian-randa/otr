@@ -14,12 +14,12 @@ fn main() {
 }
 
 fn shell() -> Result<()> {
-    let cli = CLI::parse();
+    let cli = Cli::parse();
 
     let current_dir = get_current_dir();
 
     match cli {
-        CLI::New(new_command) => {
+        Cli::New(new_command) => {
             match new_command {
                 NewCommand::Executable { name, version: version_str} => {
                     let version;
@@ -60,7 +60,7 @@ fn shell() -> Result<()> {
                 },
             }
         },
-        CLI::List => {
+        Cli::List => {
             let versions = get_installed_versions()?;
 
             println!("{}", "Installed 'otrc' versions:".blue());
@@ -83,14 +83,14 @@ fn shell() -> Result<()> {
 
             Ok(())
         },
-        CLI::Run => {
+        Cli::Run => {
             let current_dir = current_dir?;
 
             let config = get_config(&current_dir)?;
 
             compile_and_run_project(&current_dir, &config.root_module)
         },
-        CLI::Compile => {
+        Cli::Compile => {
             let current_dir = current_dir?;
 
             let config = get_config(&current_dir)?;
@@ -101,7 +101,7 @@ fn shell() -> Result<()> {
 
             success(format!("Compiled project in {:?}", elapsed))
         },
-        CLI::Install(install_command) => {
+        Cli::Install(install_command) => {
             let version = match install_command.version {
                 Some(v) => Some(Version::try_from(&v as &str)?),
                 None => None,
@@ -131,7 +131,7 @@ fn shell() -> Result<()> {
                 },
             }
         },
-        CLI::Uninstall(uninstall_command) => {
+        Cli::Uninstall(uninstall_command) => {
             let version = Version::try_from(&uninstall_command.version as &str)?;
 
             match uninstall_command.module {
@@ -154,7 +154,7 @@ fn success(message: impl AsRef<str>) -> Result<()> {
 
 #[derive(Debug, Parser)]
 #[command(about = "An OTR project and installation manager cli")]
-enum CLI {
+enum Cli {
     #[command(about = "Create a new OTR project")]
     #[command(subcommand)]
     New(NewCommand),

@@ -10,7 +10,7 @@ pub(crate) struct FilesFeatureBuilder {
 }
 
 impl FilesFeatureBuilder {
-    pub(crate) fn new() -> Box<dyn FeatureBuilder> {
+    pub(crate) fn new_boxed() -> Box<dyn FeatureBuilder> {
         Box::new(Self { })
     }
 }
@@ -31,7 +31,7 @@ struct FilesFeature;
 impl Module for FilesFeature {
     fn get_procedure(
         &'_ self,
-        identifier: &String,
+        identifier: &str,
         _private_access: bool,
     ) -> Result<crate::procedures::RuntimeProcedure<'_>> {
         match identifier as &str {
@@ -48,14 +48,14 @@ impl Module for FilesFeature {
 
     fn get_associated_procedure(
         &'_ self,
-        struct_identifier: &String,
-        procedure_identifier: &String,
+        struct_identifier: &str,
+        procedure_identifier: &str,
         _private_access: bool,
     ) -> Result<crate::procedures::RuntimeProcedure<'_>> {
         Err(RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: procedure_identifier.to_string(), struct_identifier: struct_identifier.to_string() }.boxed())
     }
 
-    fn get_struct(&self, identifier: &String, _private_access: bool) -> Result<Struct> {
+    fn get_struct(&self, identifier: &str, _private_access: bool) -> Result<Struct> {
         Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
     }
 }
@@ -76,7 +76,7 @@ fn file(path: String) -> Struct {
     f
 }
 
-fn get_path(arguments: &Vec<Value>) -> Result<&String> {
+fn get_path(arguments: &[Value]) -> Result<&String> {
     let path = arguments.first().ok_or(
         RuntimeError::NoSuchVariable {
             variable_identifier: "path".into(),

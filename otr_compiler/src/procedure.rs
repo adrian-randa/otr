@@ -196,11 +196,7 @@ impl CompiledProcedureBuilder {
     }
 
     pub fn is_scanning(&self) -> bool {
-        if let CompiledProcedureBuilderState::Base = self.state {
-            false
-        } else {
-            true
-        }
+        !matches!(self.state, CompiledProcedureBuilderState::Base)
     }
 
     pub fn push_argument_identifier(mut self, ident: String) -> Result<Self> {
@@ -612,10 +608,7 @@ impl CompiledProcedureBuilder {
                     message: "No module name supplied for 'using' statement".into()
                 }.boxed())?;
 
-                let member_name = match member_name {
-                    None => None,
-                    Some(member_name) => member_name
-                };
+                let member_name = member_name.unwrap_or_default();
 
                 self.using_expression_parse_environment.push(module_name, member_name);
                 
