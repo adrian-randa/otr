@@ -1,6 +1,6 @@
 use super::scope::{Scope};
 
-use otr_core::expression::variable::{VariableAddress, VariableAddressant};
+use otr_core::expression::variable::VariableAddress;
 use otr_core::r#struct::Struct;
 use otr_core::value::Value;
 
@@ -11,7 +11,7 @@ use crate::error::RuntimeError;
 use otr_core::module::ModuleAddress;
 
 use otr_core::error::Result;
-use crate::scope::{BakedVariableAddress, try_bake_variable_address};
+use crate::scope::try_bake_variable_address;
 
 use std::rc::Rc;
 

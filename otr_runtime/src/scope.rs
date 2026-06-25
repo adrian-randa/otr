@@ -1,10 +1,8 @@
-use std::{collections::HashMap};
-
 use derive_more::{Deref, IntoIterator};
 
 
 use otr_core::{expression::variable::{VariableAddress, VariableAddressant}, value::Value};
-use crate::{error::RuntimeError, environment::Environment, expressions::eval_expression, scope::vec_map::VecMap, value};
+use crate::{error::RuntimeError, environment::Environment, expressions::eval_expression, value};
 
 use otr_core::error::Result;
 
@@ -45,8 +43,6 @@ pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &
 
 #[derive(Deref, IntoIterator)]
 pub(crate) struct BakedVariableAddress(VariableAddress);
-
-pub mod vec_map;
 
 #[derive(Debug, Clone)]
 struct Stack(Box<[Value]>);

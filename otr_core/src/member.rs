@@ -1,8 +1,7 @@
-use std::collections::HashMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::value::Value;
+use crate::{value::Value, vec_map::VecMap};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Member {
@@ -33,7 +32,7 @@ impl Member {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MemberMap {
-    members: HashMap<String, Member>,
+    members: VecMap<Box<str>, Member>,
 }
 
 impl std::fmt::Display for MemberMap {
@@ -48,12 +47,12 @@ impl std::fmt::Display for MemberMap {
 impl MemberMap {
     pub fn new() -> Self {
         Self {
-            members: HashMap::new(),
+            members: VecMap::new(),
         }
     }
 
     pub fn insert(&mut self, ident: String, value: Value, is_public: bool) -> Option<Member> {
-        self.members.insert(ident.clone(), Member { value, is_public })
+        self.members.insert(ident.into_boxed_str(), Member { value, is_public })
     }
 
     pub fn get_value(&self, ident: &str) -> Option<&Value> {

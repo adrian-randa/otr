@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use derive_more::{Deref, IntoIterator};
+use derive_more::IntoIterator;
 
 #[derive(Debug)]
 pub struct ContextualizedToken {

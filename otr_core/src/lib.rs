@@ -9,6 +9,7 @@ pub mod r#struct;
 pub mod procedure;
 pub mod module;
 pub mod expression;
+pub mod vec_map;
 pub mod error;
 
 #[derive(Debug, Clone)]

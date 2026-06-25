@@ -64,9 +64,6 @@ pub enum RuntimeError {
         expected: Type,
         found: Type,
     },
-    VariableAlreadyPresent {
-        variable_identifier: String,
-    },
     NoSuchVariable {
         variable_identifier: String,
     },
@@ -130,8 +127,6 @@ impl RuntimeError {
                 format!("Entrypoint is not specified!"),
             RuntimeError::TypeMismatch { expected, found } => 
                 format!("Type mismatch! Expected {expected} but found {found}."),
-            RuntimeError::VariableAlreadyPresent { variable_identifier } => 
-                format!("Variable '{variable_identifier}' is already declared!"),
             RuntimeError::NoSuchVariable { variable_identifier } => 
                 format!("Variable '{variable_identifier}' is not defined!"),
             RuntimeError::InvalidNumberOfArgs { expected, supplied } => 
@@ -180,7 +175,6 @@ impl Error for RuntimeError {
             RuntimeError::KeyAlreadyPresent { key: _ } => err("KeyAlreadyPresent"),
             RuntimeError::NoEntrypoint => err("NoEntrypoint"),
             RuntimeError::TypeMismatch { expected: _, found: _ } => err("TypeMismatch"),
-            RuntimeError::VariableAlreadyPresent { variable_identifier: _ } => err("VariableAlreadyPresent"),
             RuntimeError::NoSuchVariable { variable_identifier: _ } => err("NoSuchVariable"),
             RuntimeError::ProcedureNotExported { procedure_identifier: _ } => err("NotExported"),
             RuntimeError::AssociatedProcedureNotExported { procedure_identifier: _, struct_identifier: _ } => err("NotExported"),
@@ -191,7 +185,7 @@ impl Error for RuntimeError {
             RuntimeError::ModuleNotLoaded { module_identifier: _ } => err("ModuleNotLoaded"),
             RuntimeError::Unknown { message: _ } => err("Unknown"),
             RuntimeError::DivisionByZero => err("DivisionByZero"),
-            RuntimeError::InvalidNumberOfArgs { expected, supplied } => err("InvalidNumberOfArgs"),
+            RuntimeError::InvalidNumberOfArgs { expected: _, supplied: _ } => err("InvalidNumberOfArgs"),
         }
     }
 }

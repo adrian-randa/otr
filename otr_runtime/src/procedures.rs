@@ -1,7 +1,4 @@
-use std::collections::HashMap;
-
-
-use otr_core::{error::Result, expression::variable::{VariableAddress, VariableAddressant}, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
+use otr_core::{error::Result, procedure::{CompiledProcedure, Instruction}, r#type::Type, value::Value};
 use crate::{error::RuntimeError, environment::Environment, error::ValueError, expressions::eval_expression};
 
 pub(crate) trait Procedure: std::fmt::Debug {
