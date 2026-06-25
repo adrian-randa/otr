@@ -61,7 +61,7 @@ impl Procedure for NumberParseProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let value = arguments.get(0).ok_or(
+        let value = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "number".into(),
             }
@@ -72,13 +72,13 @@ impl Procedure for NumberParseProcedure {
             Value::Char(c) => {
                 let n = *c as u8;
 
-                if n < '0' as u8 || n > '9' as u8 {
+                if !(b'0'..=b'9').contains(&n) {
                     Err(RuntimeError::Unknown {
                         message: format!("'{}' is not a valid digit!", c),
                     }
                     .boxed())
                 } else {
-                    Ok(Value::Integer((n - '0' as u8) as i64))
+                    Ok(Value::Integer((n - b'0') as i64))
                 }
             }
             Value::String(str) => {

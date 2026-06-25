@@ -134,7 +134,7 @@ impl Fragmenter {
                                         );
                                     }
                                 }
-                                i = i + 2;
+                                i += 2;
                                 continue;
                             }
 

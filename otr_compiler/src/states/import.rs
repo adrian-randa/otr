@@ -22,15 +22,15 @@ impl CompilerState for CompilerImportState {
                         module_id: ident,
                         path: None,
                     });
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Identifier".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             }
         } else {
@@ -39,7 +39,7 @@ impl CompilerState for CompilerImportState {
                     let address = self.module_address.unwrap();
                     compiler_environment.push_file_to_queue(address.clone());
                     self.module_state.get_module_mut().push_dependency(address);
-                    return Ok(Box::new(self.module_state));
+                    Ok(Box::new(self.module_state))
                 }
 
                 Token::Keyword(KeywordToken::From) => {
@@ -54,27 +54,27 @@ impl CompilerState for CompilerImportState {
 
                     module_id.path = Some(String::new());
 
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Literal(LiteralToken::String(path)) => {
                     let module_id = self.module_address.as_mut().unwrap();
                     if module_id.path.is_some() {
                         module_id.path = Some(path);
-                        return Ok(self);
+                        Ok(self)
                     } else {
-                        return Err(CompilerError::InvalidDefinition {
+                        Err(CompilerError::InvalidDefinition {
                             message: "Unexpected String literal. Try adding 'from' to declare a location for an import!".into()
-                        }.boxed());
+                        }.boxed())
                     }
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some(";".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             }
         }
@@ -91,7 +91,7 @@ impl CompilerState for CompilerImportState {
 impl CompilerImportState {
     pub fn new(module_state: CompilerModuleState) -> Self {
         Self {
-            module_state: module_state,
+            module_state,
             module_address: None,
         }
     }

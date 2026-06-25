@@ -19,7 +19,7 @@ impl TokenizerRule for KeywordRule {
         if fragment == self.keyword {
             return (Some(self.emits.clone()), String::new());
         }
-        return (None, fragment);
+        (None, fragment)
     }
 }
 

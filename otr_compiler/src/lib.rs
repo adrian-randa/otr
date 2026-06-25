@@ -123,6 +123,12 @@ pub struct Compiler {
     state: Box<dyn CompilerState>,
 }
 
+impl Default for Compiler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Compiler {
     pub fn new() -> Self {
         Self {
@@ -162,6 +168,12 @@ pub struct CompilerEnvironment {
 
     file_read_queue: Vec<ImportAddress>,
     read_modules: HashSet<ImportAddress>,
+}
+
+impl Default for CompilerEnvironment {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl CompilerEnvironment {

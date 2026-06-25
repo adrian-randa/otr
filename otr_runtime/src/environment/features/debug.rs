@@ -64,14 +64,14 @@ impl Procedure for DebugPrintProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let arg = arguments.get(0).ok_or(
+        let arg = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "content".into(),
             }
             .boxed(),
         )?;
 
-        print!("{}", arg.to_string());
+        print!("{}", arg);
 
         Ok(Value::Null)
     }
@@ -94,14 +94,14 @@ impl Procedure for DebugPrintlnProcedure {
         _environment: crate::environment::Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let arg = arguments.get(0).ok_or(
+        let arg = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "content".into(),
             }
             .boxed(),
         )?;
 
-        println!("{}", arg.to_string());
+        println!("{}", arg);
 
         Ok(Value::Null)
     }

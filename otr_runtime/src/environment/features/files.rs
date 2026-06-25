@@ -77,7 +77,7 @@ fn file(path: String) -> Struct {
 }
 
 fn get_path(arguments: &Vec<Value>) -> Result<&String> {
-    let path = arguments.get(0).ok_or(
+    let path = arguments.first().ok_or(
         RuntimeError::NoSuchVariable {
             variable_identifier: "path".into(),
         }
@@ -245,7 +245,7 @@ impl Procedure for FSExistsProcedure {
                 }
                 .boxed()
             })
-            .map(|b| Value::Bool(b))
+            .map(Value::Bool)
     }
     
     fn get_num_args(&self) -> usize {

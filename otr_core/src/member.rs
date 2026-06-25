@@ -44,6 +44,12 @@ impl std::fmt::Display for MemberMap {
     }
 }
 
+impl Default for MemberMap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemberMap {
     pub fn new() -> Self {
         Self {

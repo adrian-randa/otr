@@ -39,7 +39,7 @@ impl std::fmt::Display for Struct {
         write!(
             f,
             "{} {}",
-            self.get_struct_id().to_string(),
+            self.get_struct_id(),
             self.get_members()
         )
     }

@@ -5,8 +5,8 @@ use otr_core::Result;
 
 use crate::{cmd::{compile_project, run_project}, error::CollarError};
 
-const MAIN_OTR_TEMPLATE: &'static str = include_str!("../template/Main.otr");
-const LIBMAIN_OTR_TEMPLATE: &'static str = include_str!("../template/LibMain.otr");
+const MAIN_OTR_TEMPLATE: &str = include_str!("../template/Main.otr");
+const LIBMAIN_OTR_TEMPLATE: &str = include_str!("../template/LibMain.otr");
 
 pub fn catch<T, E: std::fmt::Display>(result: std::result::Result<T, E>, prefix: impl AsRef<str>) -> Result<T> {
     let prefix = prefix.as_ref();

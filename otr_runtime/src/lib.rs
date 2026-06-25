@@ -87,7 +87,7 @@ impl RuntimeObject<'_> {
         runtime_object.base_environement = base_environment;
         
         RuntimeObjectBuilder {
-            runtime_object: runtime_object,
+            runtime_object,
             phantom_data: PhantomData,
         }
     }

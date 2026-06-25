@@ -13,28 +13,24 @@ pub(crate) fn try_bake_variable_address(address: VariableAddress, environment: &
     let mut address = address.0;
 
     for i in 0..address.len() {
-        match &address[i] {
-            VariableAddressant::DynamicIndex(expression) => {
-                let value = eval_expression(expression, environment)?;
-                let idx: usize = match value {
-                    Value::Integer(value) => {
-                        let idx = value.try_into().unwrap();
+        if let VariableAddressant::DynamicIndex(expression) = &address[i] {
+            let value = eval_expression(expression, environment)?;
+            let idx: usize = match value {
+                Value::Integer(value) => {
+                    
 
-                        idx
+                    value.try_into().unwrap()
+                }
+                _ => {
+                    return Err(RuntimeError::TypeMismatch {
+                        expected: otr_core::r#type::Type::Integer,
+                        found: value.get_type_id(),
                     }
-                    _ => {
-                        return Err(RuntimeError::TypeMismatch {
-                            expected: otr_core::r#type::Type::Integer,
-                            found: value.get_type_id(),
-                        }
-                        .boxed())
-                    }
-                };
+                    .boxed())
+                }
+            };
 
-                address[i] = VariableAddressant::Index(idx);
-            },
-
-            _ => {},
+            address[i] = VariableAddressant::Index(idx);
         }
     }
 

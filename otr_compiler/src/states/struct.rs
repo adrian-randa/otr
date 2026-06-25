@@ -30,29 +30,29 @@ impl CompilerState for CompilerStructState {
                 Token::Identifier(ident) => {
                     self.identifier = Some(ident);
                     self.substate = CompilerStructSubstate::PreFields;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Identifier".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             CompilerStructSubstate::PreFields => match token {
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) => {
                     self.substate = CompilerStructSubstate::Field { is_public: false };
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("{".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             CompilerStructSubstate::Field { is_public } => match token {
@@ -64,7 +64,7 @@ impl CompilerState for CompilerStructState {
                 Token::Identifier(ident) => {
                     self.fields.push((ident, is_public));
                     self.substate = CompilerStructSubstate::AfterField;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
@@ -88,21 +88,21 @@ impl CompilerState for CompilerStructState {
                         false,
                     );
 
-                    return Ok(Box::new(self.module) as Box<dyn CompilerState>);
+                    Ok(Box::new(self.module) as Box<dyn CompilerState>)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Identifier".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             CompilerStructSubstate::AfterField => match token {
                 Token::Punctuation(PunctuationToken::Comma) => {
                     self.substate = CompilerStructSubstate::Field { is_public: false };
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
@@ -126,15 +126,15 @@ impl CompilerState for CompilerStructState {
                         false,
                     );
 
-                    return Ok(Box::new(self.module) as Box<dyn CompilerState>);
+                    Ok(Box::new(self.module) as Box<dyn CompilerState>)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: None,
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
         }

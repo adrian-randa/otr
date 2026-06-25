@@ -75,7 +75,7 @@ impl Procedure for StringLengthProcdure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let str = arguments.get(0).ok_or(
+        let str = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "string".into(),
             }
@@ -111,7 +111,7 @@ impl Procedure for StringToCharArrayProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let str = arguments.get(0).ok_or(
+        let str = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "string".into(),
             }
@@ -120,7 +120,7 @@ impl Procedure for StringToCharArrayProcedure {
 
         match str {
             Value::String(str) => Ok(Value::Array(Rc::new(RefCell::new(Some(
-                str.chars().map(|c| Value::Char(c)).collect::<Vec<Value>>().into_boxed_slice()
+                str.chars().map(Value::Char).collect::<Vec<Value>>().into_boxed_slice()
             ))))),
 
             other => Err(RuntimeError::TypeMismatch {
@@ -149,7 +149,7 @@ impl Procedure for StringSplitProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let str = arguments.get(0).ok_or(
+        let str = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "string".into(),
             }
@@ -303,7 +303,7 @@ impl Procedure for DisplayProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let value = arguments.get(0).ok_or(
+        let value = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "value".into(),
             }
@@ -331,7 +331,7 @@ impl Procedure for FromBytesProcedure {
         _environment: Environment,
         arguments: Vec<Value>,
     ) -> Result<Value> {
-        let value = arguments.get(0).ok_or(
+        let value = arguments.first().ok_or(
             RuntimeError::NoSuchVariable {
                 variable_identifier: "value".into(),
             }

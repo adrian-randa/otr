@@ -29,9 +29,9 @@ fn get_home_dir() -> Result<PathBuf> {
         .ok_or(CollarError::new("Could not get your home directory!").boxed())?;
 
     if home_dir.as_os_str().is_empty() {
-        return Err(CollarError::new(
+        Err(CollarError::new(
             "Could not get your home directory!"
-        ).boxed());
+        ).boxed())
     } else {
         Ok(home_dir)
     }

@@ -24,11 +24,11 @@ impl Clone for Value {
     fn clone(&self) -> Self {
         match self {
             Self::Null => Self::Null,
-            Self::Integer(arg0) => Self::Integer(arg0.clone()),
-            Self::Float(arg0) => Self::Float(arg0.clone()),
+            Self::Integer(arg0) => Self::Integer(*arg0),
+            Self::Float(arg0) => Self::Float(*arg0),
             Self::String(arg0) => Self::String(arg0.clone()),
-            Self::Char(arg0) => Self::Char(arg0.clone()),
-            Self::Bool(arg0) => Self::Bool(arg0.clone()),
+            Self::Char(arg0) => Self::Char(*arg0),
+            Self::Bool(arg0) => Self::Bool(*arg0),
             Self::Array(arg0) => Self::Array(arg0.clone()),
             Self::ArrayRef(arg0) => Self::ArrayRef(arg0.clone()),
             Self::Struct(arg0) => Value::Struct(Rc::new(RefCell::new(

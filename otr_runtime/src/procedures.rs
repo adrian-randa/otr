@@ -24,7 +24,7 @@ impl<'a> Procedure for RuntimeProcedure<'a> {
             RuntimeProcedure::Abstract(procedure) => procedure.call(environment, arguments),
             RuntimeProcedure::Compiled(compiled_procedure) => call_compiled_procedure(compiled_procedure, environment, arguments),
             RuntimeProcedure::AbstractRef(procedure) => procedure.call(environment, arguments),
-            RuntimeProcedure::CompiledRef(compiled_procedure) => call_compiled_procedure(*compiled_procedure, environment, arguments),
+            RuntimeProcedure::CompiledRef(compiled_procedure) => call_compiled_procedure(compiled_procedure, environment, arguments),
         }
     }
     

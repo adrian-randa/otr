@@ -62,7 +62,7 @@ pub(crate) struct NewArrayProcedure;
 
 impl Procedure for NewArrayProcedure {
     fn call(&self, _environment: Environment, arguments: Vec<Value>) -> Result<Value> {
-        let size = arguments.get(0).or(Some(&Value::Integer(0))).unwrap();
+        let size = arguments.first().unwrap_or(&Value::Integer(0));
 
         if let Value::Integer(size) = size {
             Ok(Value::Array(Rc::new(RefCell::new(Some(vec![Value::Null; *size as usize].into_boxed_slice())))))

@@ -61,14 +61,14 @@ impl std::fmt::Display for CompilerError {
                     None => "".to_string(),
                 }
             ),
-            CompilerError::NoScopeToClose => format!("There is no scope to close!"),
+            CompilerError::NoScopeToClose => "There is no scope to close!".to_string(),
             CompilerError::UnexpectedToken { expected, found } => match expected {
                 Some(expected) => {
                     format!("Unexpected token! Expected {expected}, found {:?}.", found)
                 }
                 None => format!("Unexpected token: {:?}!", found),
             },
-            CompilerError::InvalidParenthesisStructure => format!("Invalid parenthesis structure!"),
+            CompilerError::InvalidParenthesisStructure => "Invalid parenthesis structure!".to_string(),
             CompilerError::InvalidExpression { message } => {
                 format!("Invalid expression! {message}")
             }
@@ -77,7 +77,7 @@ impl std::fmt::Display for CompilerError {
             }
             CompilerError::VarAlreadyDefined { ident } => format!("Variable '{ident}' already defined!"),
             CompilerError::NoSuchVariable { ident } => format!("Variable '{ident}' not defined in this scope!"),
-            CompilerError::Unknown { message } => format!("{message}"),
+            CompilerError::Unknown { message } => message.to_string(),
         };
 
         write!(

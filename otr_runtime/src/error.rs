@@ -11,7 +11,7 @@ pub(crate) struct ValueError {
 
 impl std::fmt::Display for ValueError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.value.to_string())
+        write!(f, "{}", self.value)
     }
 }
 
@@ -114,17 +114,17 @@ impl RuntimeError {
                 RuntimeError::NoSuchMember { member_identifier } => 
                 format!("Tried to get member '{member_identifier}', but no such member exists!"),
                 RuntimeError::UseOfMovedValue => 
-                format!("Use of moved value!"),
+                "Use of moved value!".to_string(),
                 RuntimeError::UseOfDroppedValue => 
-                format!("Use of dropped value!"),
+                "Use of dropped value!".to_string(),
                 RuntimeError::CannotReference { ty } => 
                 format!("Referencing values of type {ty} is not allowed!"),
                 RuntimeError::FieldIsPrivate => 
-                format!("Tried to access private field!"),
+                "Tried to access private field!".to_string(),
                 RuntimeError::KeyAlreadyPresent { key } => 
                 format!("The key '{key}' is already present!"),
             RuntimeError::NoEntrypoint => 
-                format!("Entrypoint is not specified!"),
+                "Entrypoint is not specified!".to_string(),
             RuntimeError::TypeMismatch { expected, found } => 
                 format!("Type mismatch! Expected {expected} but found {found}."),
             RuntimeError::NoSuchVariable { variable_identifier } => 
@@ -146,9 +146,9 @@ impl RuntimeError {
             RuntimeError::ModuleNotLoaded { module_identifier } => 
                 format!("Module '{module_identifier}' is not loaded!"),
             RuntimeError::Unknown { message } => 
-                format!("{message}"),
+                message.to_string(),
             RuntimeError::DivisionByZero => 
-                format!("Division by zero!"),
+                "Division by zero!".to_string(),
         }
     }
 }

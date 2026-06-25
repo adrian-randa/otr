@@ -58,35 +58,35 @@ impl CompilerState for CompilerProcedureState {
                     if let Token::Identifier(ident) = token {
                         self.procedure_identifier = Some(ProcedureIdentifier::Procedure { ident });
                         self.substate = ProcedureSubstate::FirstIdent;
-                        return Ok(self);
+                        Ok(self)
                     } else {
-                        return Err(CompilerError::UnexpectedToken {
+                        Err(CompilerError::UnexpectedToken {
                             expected: Some("Identifier".into()),
                             found: token,
                         }
-                        .boxed());
+                        .boxed())
                     }
                 } else {
-                    return Err(CompilerError::InvalidDefinition {
+                    Err(CompilerError::InvalidDefinition {
                         message: "Procedure already has an identifier!".into(),
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             ProcedureSubstate::FirstIdent => match token {
                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
                     self.substate = ProcedureSubstate::PreArgument;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Punctuation(PunctuationToken::ThinArrow) => {
                     self.substate = ProcedureSubstate::PreSecondIdent;
                     self.procedure = self.procedure.push_argument_identifier("this".into())?;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("(".into()),
                         found: other,
                     }
@@ -105,31 +105,31 @@ impl CompilerState for CompilerProcedureState {
                                 procedure_ident,
                             });
                         self.substate = ProcedureSubstate::SecondIdent;
-                        return Ok(self);
+                        Ok(self)
                     } else {
-                        return Err(CompilerError::InvalidDefinition {
+                        Err(CompilerError::InvalidDefinition {
                             message: "Procedure already associated to a struct!".into(),
                         }
-                        .boxed());
+                        .boxed())
                     }
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Identifier".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             ProcedureSubstate::SecondIdent => match token {
                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Opening)) => {
                     self.substate = ProcedureSubstate::PreArgument;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("(".into()),
                         found: other,
                     }
@@ -140,39 +140,39 @@ impl CompilerState for CompilerProcedureState {
                 Token::Identifier(ident) => {
                     self.procedure = self.procedure.push_argument_identifier(ident)?;
                     self.substate = ProcedureSubstate::Argument;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
                     self.substate = ProcedureSubstate::PreInstructions;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 other => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Identifier".into()),
                         found: other,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             ProcedureSubstate::Argument => match token {
                 Token::Punctuation(PunctuationToken::Comma) => {
                     self.substate = ProcedureSubstate::PreArgument;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Punctuation(PunctuationToken::Parenthesis(ParenthesisType::Closing)) => {
                     self.substate = ProcedureSubstate::PreInstructions;
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 _ => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some(", or )".into()),
                         found: token,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             ProcedureSubstate::PreInstructions => {
@@ -180,20 +180,19 @@ impl CompilerState for CompilerProcedureState {
                     token
                 {
                     self.substate = ProcedureSubstate::Instructions;
-                    return Ok(self);
+                    Ok(self)
                 } else {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("{".into()),
                         found: token,
                     }
-                    .boxed());
+                    .boxed())
                 }
             }
             ProcedureSubstate::Instructions => {
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) =
                     token
-                {
-                    if self.procedure.scope_stack_size() == 0 && !self.procedure.is_scanning() {
+                    && self.procedure.scope_stack_size() == 0 && !self.procedure.is_scanning() {
                         let procedure = self.procedure.build()?;
                         let name = self.procedure_identifier.ok_or(
                             CompilerError::InvalidDefinition {
@@ -239,7 +238,6 @@ impl CompilerState for CompilerProcedureState {
 
                         return Ok(Box::new(self.module));
                     }
-                }
 
                 self.procedure = self.procedure.read(token, compiler_environment)?;
                 Ok(self)

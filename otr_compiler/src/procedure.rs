@@ -220,7 +220,7 @@ impl CompiledProcedureBuilder {
             for var_idx in (0..self.variable_stack[stack_idx].len()).rev() {
                 i -= 1;
 
-                if &self.variable_stack[stack_idx][var_idx] == ident {
+                if self.variable_stack[stack_idx][var_idx] == ident {
                     return Some(i);
                 }
             }
@@ -274,7 +274,7 @@ impl CompiledProcedureBuilder {
                     let index_expression =
                         ExpressionParser::parse(index_expression, environment)?;
 
-                    addressants.push(VariableAddressant::DynamicIndex(index_expression.into()));
+                    addressants.push(VariableAddressant::DynamicIndex(index_expression));
                 }
 
                 other => {
@@ -286,14 +286,13 @@ impl CompiledProcedureBuilder {
             }
         }
 
-        if let Some(addressant) =  addressants.get_mut(0) {
-            if let VariableAddressant::Identifier(ident) = addressant {
+        if let Some(addressant) =  addressants.get_mut(0)
+            && let VariableAddressant::Identifier(ident) = addressant {
                 let index = self.try_resolve_variable_identifier(ident)
                     .ok_or_else(|| CompilerError::NoSuchVariable { ident: ident.clone() }.boxed())?;
 
                 *addressant = VariableAddressant::StackIndex(index);
             }
-        }
 
         addressants.try_into().map_err(|_| {
             CompilerError::InvalidScopeAddress {
@@ -481,11 +480,9 @@ impl CompiledProcedureBuilder {
 
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) =
                     token
-                {
-                    if *parenthesis_index == 0 {
+                    && *parenthesis_index == 0 {
                         return self.finish_current_instruction(expression_parse_environment);
                     }
-                }
 
                 condition_expression.push(token);
             }
@@ -521,11 +518,9 @@ impl CompiledProcedureBuilder {
 
                 if let Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Opening)) =
                     token
-                {
-                    if *parenthesis_index == 0 {
+                    && *parenthesis_index == 0 {
                         return self.finish_current_instruction(expression_parse_environment);
                     }
-                }
 
                 condition_expression.push(token);
             }
@@ -565,11 +560,9 @@ impl CompiledProcedureBuilder {
                     if let Token::Punctuation(PunctuationToken::CurlyBraces(
                         ParenthesisType::Opening,
                     )) = token
-                    {
-                        if *parenthesis_index == 0 {
+                        && *parenthesis_index == 0 {
                             return self.finish_current_instruction(expression_parse_environment);
                         }
-                    }
 
                     iterator_expression.push(token);
                 } else {

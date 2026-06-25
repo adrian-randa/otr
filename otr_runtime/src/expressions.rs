@@ -44,21 +44,19 @@ fn eval_procedure_call(expression: &ProcedureCallExpression, environment: &Envir
         arguments.push(eval_result?);
     }
 
-    let environment = environment.open_subenvironment(Scope::new(procedure.get_stack_size()), &expression.get_procedure_id());
+    let environment = environment.open_subenvironment(Scope::new(procedure.get_stack_size()), expression.get_procedure_id());
 
-    Ok(procedure
+    procedure
         .call(environment, arguments)
         .map_err(|error| ProcedureContextDecorator {
             error,
             procedure_id: expression.get_procedure_id().clone()
         }.boxed())
-        ?
-    )
 }
 
 
 fn eval_struct_construction_expression(expression: &StructConstructionExpression, environment: &Environment) -> Result<Value> {
-    let mut instance = environment.get_struct_by_address(&expression.get_struct_id())?;
+    let mut instance = environment.get_struct_by_address(expression.get_struct_id())?;
 
     for (field, expr) in expression.get_field_overrides() {
         let value = eval_expression(expr, environment)?;
@@ -165,7 +163,7 @@ fn eval_associated_procedure_call_expression(expression: &AssociatedProcedureCal
 
     let procedure = module.get_associated_procedure(
         callee_id.get_identifier(),
-        &expression.get_procedure_ident(),
+        expression.get_procedure_ident(),
         environment.get_contained_module_id() == callee_id.get_module_id(),
     )?;
 
@@ -181,13 +179,13 @@ fn eval_associated_procedure_call_expression(expression: &AssociatedProcedureCal
 
     let environment = environment.open_subenvironment(Scope::new(procedure.get_stack_size()), &callee_id);
 
-    Ok(procedure.call(environment, arguments).map_err(|error| {
+    procedure.call(environment, arguments).map_err(|error| {
         AssociatedProcedureContextDecorator::new_boxed(
             error,
             callee_id,
             expression.get_procedure_ident().clone(),
         )
-    })?)
+    })
 }
 
 

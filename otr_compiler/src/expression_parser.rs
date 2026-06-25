@@ -18,7 +18,7 @@ use otr_core::{
         arithmetic::ArithmeticExpression,
         boolean::BooleanExpression,
         comparison::ComparisonExpression,
-        variable::{VariableAccessMode, VariableAddress, VariableAddressant::{self, Identifier}, VariableExpression},
+        variable::{VariableAccessMode, VariableAddress, VariableAddressant::{self}, VariableExpression},
     },
     module::ModuleAddress,
     r#type::Type,
@@ -57,7 +57,7 @@ impl ExpressionParser {
 
         let mut operator_order = Self::get_operator_order(&atoms);
 
-        let mut atoms = atoms.into_iter().map(|atom| Some(atom)).collect::<Vec<_>>();
+        let mut atoms = atoms.into_iter().map(Some).collect::<Vec<_>>();
 
         for i in 0..operator_order.len() {            
             if let Some(ExpressionAtom::Operator(op)) = atoms[operator_order[i].1].take() {
@@ -183,8 +183,8 @@ impl ExpressionParser {
 
         let mut iter = tokens.into_iter();
 
-        while let Some(token) = iter.next() {
-            if stack.len() == 1 && &token == &parenthesis {
+        for token in iter {
+            if stack.len() == 1 && token == parenthesis {
                 return Ok(slice);
             }
             stack.read(token.clone())?;
@@ -206,16 +206,15 @@ impl ExpressionParser {
 
         let mut parenthesis_stack = ParenthesisStack::new();
 
-        while let Some(next) = iter.next() {
+        for next in iter {
             parenthesis_stack.read(next.clone())?;
 
-            if let Token::Punctuation(PunctuationToken::Comma) = next {
-                if parenthesis_stack.is_empty() {
+            if let Token::Punctuation(PunctuationToken::Comma) = next
+                && parenthesis_stack.is_empty() {
                     slices.push(current);
                     current = Vec::new();
                     continue;
                 }
-            }
 
             current.push(next);
         }
@@ -235,7 +234,7 @@ impl ExpressionParser {
 
         let mut parenthesis_stack = ParenthesisStack::new();
 
-        while let Some(next) = tokens.next() {
+        for next in tokens {
             match next.clone() {
                 Token::Operator(operator) => {
                     if parenthesis_stack.is_empty() {
@@ -536,7 +535,7 @@ impl ExpressionAtomParser {
                             self.state = ScopeAddress {
                                 address: vec![
                                     VariableAddressant::Identifier(ident),
-                                    VariableAddressant::DynamicIndex(index_expression.into()),
+                                    VariableAddressant::DynamicIndex(index_expression),
                                 ],
                                 access: VariableAccessMode::Ref,
                             };
@@ -575,7 +574,7 @@ impl ExpressionAtomParser {
                         self.state = ScopeAddress {
                             address: vec![
                                 VariableAddressant::Identifier(ident),
-                                VariableAddressant::DynamicIndex(index_expression.into()),
+                                VariableAddressant::DynamicIndex(index_expression),
                             ],
                             access: VariableAccessMode::Move,
                         };
@@ -697,7 +696,7 @@ impl ExpressionAtomParser {
                         )?;
                         let index_expression = ExpressionParser::parse(inner, environment)?;
 
-                        address.push(VariableAddressant::DynamicIndex(index_expression.into()));
+                        address.push(VariableAddressant::DynamicIndex(index_expression));
 
                         self.state = ScopeAddress { address, access };
                     }
@@ -990,7 +989,7 @@ impl ExpressionAtomParser {
                         access_mode: VariableAccessMode::Ref
                     })));
                 } else {
-                    return Err(CompilerError::InvalidExpression { message: "Expected Type or variable after 'ref'".into() }.boxed());
+                    Err(CompilerError::InvalidExpression { message: "Expected Type or variable after 'ref'".into() }.boxed())
                 }
             }
             ExpressionAtomParserState::SingleIdent { ident } => {

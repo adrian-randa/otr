@@ -74,13 +74,13 @@ impl CompilerState for CompilerModuleState {
                     token
                 {
                     self.substate = ModuleSubstate::InScope;
-                    return Ok(self);
+                    Ok(self)
                 } else {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("{".into()),
                         found: token,
                     }
-                    .boxed());
+                    .boxed())
                 }
             }
             ModuleSubstate::InScope => match token {
@@ -90,24 +90,24 @@ impl CompilerState for CompilerModuleState {
                 }
 
                 Token::Keyword(KeywordToken::Import) => {
-                    return Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>);
+                    Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>)
                 }
 
                 Token::Keyword(KeywordToken::Proc) => {
-                    return Ok(Box::new(CompilerProcedureState::new(*self)));
+                    Ok(Box::new(CompilerProcedureState::new(*self)))
                 }
 
                 Token::Keyword(KeywordToken::Struct) => {
-                    return Ok(Box::new(CompilerStructState::new(*self)));
+                    Ok(Box::new(CompilerStructState::new(*self)))
                 }
 
                 Token::Keyword(KeywordToken::Export) => {
                     self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
-                    return Ok(self);
+                    Ok(self)
                 }
 
                 Token::Identifier(_) => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Procedure/Struct Declaration".into()),
                         found: token,
                     }
@@ -115,11 +115,11 @@ impl CompilerState for CompilerModuleState {
                 }
 
                 _ => {
-                    return Err(CompilerError::UnexpectedToken {
+                    Err(CompilerError::UnexpectedToken {
                         expected: Some("Procedure/Struct Declaration".into()),
                         found: token,
                     }
-                    .boxed());
+                    .boxed())
                 }
             },
             ModuleSubstate::Export(substate) => {

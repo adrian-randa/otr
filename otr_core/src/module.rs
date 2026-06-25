@@ -25,9 +25,9 @@ impl ImportAddress {
     pub fn to_flat_string(self) -> String {
         fn nibble_to_hex(nibble: u8) -> char {
             if nibble <= 9 {
-                return ('0' as u8 + nibble) as char
+                (b'0' + nibble) as char
             } else {
-                return ('a' as u8 - 10 + nibble) as char
+                (b'a' - 10 + nibble) as char
             }
         }
 

@@ -36,7 +36,7 @@ where
 
         for (i, (k, _)) in self.entries.iter_mut().enumerate() {
             let k = k as &KOwn;
-            if &*k.deref() == key.as_ref() {
+            if k.deref() == key.as_ref() {
                 index = Some(i);
             }
         }
@@ -50,7 +50,7 @@ where
 
     pub fn get(&self, key: impl AsRef<KLookup>) -> Option<&V> {
         for (k, v) in self.entries.iter() {
-            if &*k.deref() == key.as_ref() {
+            if k.deref() == key.as_ref() {
                 return Some(v)
             }
         }
@@ -61,7 +61,7 @@ where
     pub(crate) fn get_mut(&mut self, key: impl AsRef<KLookup>) -> Option<&mut V> {
         for (k, v) in self.entries.iter_mut() {
             let k = k as &KOwn;
-            if &*k.deref() == key.as_ref() {
+            if k.deref() == key.as_ref() {
                 return Some(v)
             }
         }
@@ -71,7 +71,7 @@ where
 
     pub(crate) fn contains_key(&self, key: impl AsRef<KLookup>) -> bool {
         for (k, _) in self.entries.iter() {
-            if &*k.deref() == key.as_ref() {
+            if k.deref() == key.as_ref() {
                 return true
             }
         }

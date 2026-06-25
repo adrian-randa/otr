@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use crate::{catch, error::CollarError};
 
 
-const RELEASES_URL: &'static str = "github.com/adrian-randa/otr/releases";
-const API_RELEASES_URL: &'static str = "api.github.com/repos/adrian-randa/otr/releases";
+const RELEASES_URL: &str = "github.com/adrian-randa/otr/releases";
+const API_RELEASES_URL: &str = "api.github.com/repos/adrian-randa/otr/releases";
 
 #[derive(Debug, Serialize, Deserialize)]
 struct GithubApiReleasesResponse(Vec<GithubRelease>);
@@ -72,7 +72,7 @@ fn fetch_latest_release_version() -> Result<Version> {
         "Could not parse Github API response"
     )?;
 
-    let latest = releases.0.get(0).ok_or(
+    let latest = releases.0.first().ok_or(
         CollarError::new("Could not find latest release").boxed()
     )?;
 
