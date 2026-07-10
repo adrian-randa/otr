@@ -88,6 +88,8 @@ pub fn build_runtime_object(root_path: &Path, root_module_address: ImportAddress
         let module_ident = address.module_id.clone();
         let module = read_module(root_path, address)?;
 
+        load_queue.extend_from_slice(module.get_dependencies());
+
         builder = builder.with_module(module, module_ident)
     }
 
