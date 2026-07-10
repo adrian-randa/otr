@@ -2,7 +2,7 @@ use std::{cell::RefCell, rc::Rc};
 
 use colored::Colorize;
 
-use otr_core::{module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value, error::Error};
+use otr_core::{error::Error, expression::Operator, module::ModuleAddress, r#struct::Struct, r#type::Type, value::Value};
 
 #[derive(Debug)]
 pub(crate) struct ValueError {
@@ -91,6 +91,14 @@ pub enum RuntimeError {
         procedure_identifier: String,
         struct_identifier: String,
     },
+    OperatorNotOverloaded {
+        struct_identifier: String,
+        operator: Operator,
+    },
+    OperatorNotExported {
+        struct_identifier: String,
+        operator: Operator,
+    },
     ModuleNotLoaded {
         module_identifier: String,
     },
@@ -104,24 +112,24 @@ impl RuntimeError {
     pub(crate) fn get_message(&self) -> String {
         match self {
             RuntimeError::IndexingNotAccepted { ty } => 
-            format!("Indexing not allowed on values of type {ty}!"),
+                format!("Indexing not allowed on values of type {ty}!"),
             RuntimeError::MembersNotAccepted { ty } => 
-            format!("Getting a member is not allowed on values of type {ty}!"),
+                format!("Getting a member is not allowed on values of type {ty}!"),
             RuntimeError::AddressantsNotAccepted { ty } => 
                 format!("Values of type {ty} do not accept addressants!"),
-                RuntimeError::IndexOutOfBounds { array_length, index } => 
+            RuntimeError::IndexOutOfBounds { array_length, index } => 
                 format!("Index out of bounds! Tried to index element at {index}, but the array size was {array_length}."),
-                RuntimeError::NoSuchMember { member_identifier } => 
+            RuntimeError::NoSuchMember { member_identifier } => 
                 format!("Tried to get member '{member_identifier}', but no such member exists!"),
-                RuntimeError::UseOfMovedValue => 
+            RuntimeError::UseOfMovedValue => 
                 "Use of moved value!".to_string(),
-                RuntimeError::UseOfDroppedValue => 
+            RuntimeError::UseOfDroppedValue => 
                 "Use of dropped value!".to_string(),
-                RuntimeError::CannotReference { ty } => 
+            RuntimeError::CannotReference { ty } => 
                 format!("Referencing values of type {ty} is not allowed!"),
-                RuntimeError::FieldIsPrivate => 
+            RuntimeError::FieldIsPrivate => 
                 "Tried to access private field!".to_string(),
-                RuntimeError::KeyAlreadyPresent { key } => 
+            RuntimeError::KeyAlreadyPresent { key } => 
                 format!("The key '{key}' is already present!"),
             RuntimeError::NoEntrypoint => 
                 "Entrypoint is not specified!".to_string(),
@@ -143,6 +151,10 @@ impl RuntimeError {
                 format!("Struct '{struct_identifier}' is not defined!"),
             RuntimeError::AssociatedProcedureNotDefined { procedure_identifier, struct_identifier } => 
                 format!("Associated procedure '{struct_identifier}->{procedure_identifier}' is not defined!"),
+            RuntimeError::OperatorNotOverloaded { struct_identifier, operator } =>
+                format!("Operator '{operator}' not overloaded for {struct_identifier}!"),
+            RuntimeError::OperatorNotExported { struct_identifier, operator } =>
+                format!("Operator '{operator}' for {struct_identifier} not exported!"),
             RuntimeError::ModuleNotLoaded { module_identifier } => 
                 format!("Module '{module_identifier}' is not loaded!"),
             RuntimeError::Unknown { message } => 
@@ -182,6 +194,8 @@ impl Error for RuntimeError {
             RuntimeError::ProcedureNotDefined { procedure_identifier: _ } => err("NotDefined"),
             RuntimeError::StructNotDefined { struct_identifier: _ } => err("NotDefined"),
             RuntimeError::AssociatedProcedureNotDefined { procedure_identifier: _, struct_identifier: _ } => err("NotDefined"),
+            RuntimeError::OperatorNotOverloaded { struct_identifier: _, operator: _ } => err("OperatorNotOverloaded"),
+            RuntimeError::OperatorNotExported { struct_identifier: _, operator: _ } => err("OperatorNotExported"),
             RuntimeError::ModuleNotLoaded { module_identifier: _ } => err("ModuleNotLoaded"),
             RuntimeError::Unknown { message: _ } => err("Unknown"),
             RuntimeError::DivisionByZero => err("DivisionByZero"),

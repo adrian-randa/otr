@@ -1,4 +1,4 @@
-use otr_core::module::CompiledModule;
+use otr_core::{expression::Operator, module::CompiledModule};
 use otr_core::r#struct::Struct;
 use otr_core::error::Result;
 use crate::{error::RuntimeError, procedures::RuntimeProcedure};
@@ -16,6 +16,7 @@ pub(crate) trait Module: std::fmt::Debug {
         private_access: bool,
     ) -> Result<RuntimeProcedure<'_>>;
     fn get_struct(&self, identifier: &str, private_access: bool) -> Result<Struct>;
+    fn get_operation(&self, struct_identifier: &str, operator: Operator, private_access: bool) -> Result<RuntimeProcedure<'_>>;
 }
 
 #[allow(unused)]
@@ -131,6 +132,34 @@ impl<'a> Module for RuntimeModule<'a> {
                     Ok(st.clone())
                 }
             },
+        }
+    }
+    
+    fn get_operation(&self, struct_identifier: &str, operator: Operator, private_access: bool) -> Result<RuntimeProcedure<'_>> {
+        match self {
+            RuntimeModule::Abstract(module) => module.get_operation(struct_identifier, operator, private_access),
+            RuntimeModule::AbstractRef(module) => module.get_operation(struct_identifier, operator, private_access),
+
+            RuntimeModule::Compiled(module) => {
+                let (procedure, public) = module.get_operator(struct_identifier, operator)
+                    .ok_or_else(|| RuntimeError::OperatorNotOverloaded { struct_identifier: struct_identifier.to_string(), operator }.boxed())?;
+
+                if !public && !private_access {
+                    return Err(RuntimeError::OperatorNotExported { struct_identifier: struct_identifier.to_string(), operator }.boxed());
+                }
+
+                Ok(RuntimeProcedure::CompiledRef(procedure))
+            }
+            RuntimeModule::CompiledRef(module) => {
+                let (procedure, public) = module.get_operator(struct_identifier, operator)
+                    .ok_or_else(|| RuntimeError::OperatorNotOverloaded { struct_identifier: struct_identifier.to_string(), operator }.boxed())?;
+
+                if !public && !private_access {
+                    return Err(RuntimeError::OperatorNotExported { struct_identifier: struct_identifier.to_string(), operator }.boxed());
+                }
+
+                Ok(RuntimeProcedure::CompiledRef(procedure))
+            }
         }
     }
 }

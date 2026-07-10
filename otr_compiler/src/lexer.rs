@@ -95,6 +95,7 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("typeof".into(), Keyword(Typeof)))
             .with_rule(KeywordRule::new("using".into(), Keyword(Using)))
             .with_rule(KeywordRule::new("null".into(), Literal(LiteralToken::Null)))
+            .with_rule(KeywordRule::new("operator".into(), Keyword(KeywordToken::Operator)))
             .with_rule(KeywordRule::new(
                 "Null".into(),
                 Literal(Type(PrimitiveTypeToken::Null)),
@@ -132,19 +133,19 @@ impl Default for Tokenizer {
                 Literal(Type(PrimitiveTypeToken::Moved)),
             ))
             .with_rule(KeywordRule::new(
-                "Dropeed".into(),
+                "Dropped".into(),
                 Literal(Type(PrimitiveTypeToken::Dropped)),
             ))
-            .with_rule(PatternRule::new("&&".into(), Operator(And)))
-            .with_rule(PatternRule::new("||".into(), Operator(Or)))
-            .with_rule(PatternRule::new("==".into(), Operator(Equality)))
-            .with_rule(PatternRule::new("!=".into(), Operator(Inequality)))
+            .with_rule(PatternRule::new("&&".into(), Token::Operator(And)))
+            .with_rule(PatternRule::new("||".into(), Token::Operator(Or)))
+            .with_rule(PatternRule::new("==".into(), Token::Operator(Equality)))
+            .with_rule(PatternRule::new("!=".into(), Token::Operator(Inequality)))
             .with_rule(PatternRule::new("::".into(), Punctuation(DoubleColon)))
-            .with_rule(PatternRule::new(">=".into(), Operator(GreaterEquals)))
-            .with_rule(PatternRule::new("<=".into(), Operator(LessEquals)))
+            .with_rule(PatternRule::new(">=".into(), Token::Operator(GreaterEquals)))
+            .with_rule(PatternRule::new("<=".into(), Token::Operator(LessEquals)))
             .with_rule(PatternRule::new("->".into(), Punctuation(ThinArrow)))
-            .with_rule(PatternRule::new(">".into(), Operator(Greater)))
-            .with_rule(PatternRule::new("<".into(), Operator(Less)))
+            .with_rule(PatternRule::new(">".into(), Token::Operator(Greater)))
+            .with_rule(PatternRule::new("<".into(), Token::Operator(Less)))
             .with_rule(PatternRule::new(
                 "(".into(),
                 Punctuation(Parenthesis(Opening)),
@@ -171,14 +172,14 @@ impl Default for Tokenizer {
             ))
             .with_rule(NumberLiteralRule)
             .with_rule(PatternRule::new("@".into(), Punctuation(At)))
-            .with_rule(PatternRule::new("!".into(), Operator(Not)))
-            .with_rule(PatternRule::new("+".into(), Operator(Plus)))
-            .with_rule(PatternRule::new("-".into(), Operator(Minus)))
-            .with_rule(PatternRule::new("*".into(), Operator(Multiply)))
-            .with_rule(PatternRule::new("/".into(), Operator(Divide)))
-            .with_rule(PatternRule::new("%".into(), Operator(Modulo)))
-            .with_rule(PatternRule::new("=".into(), Operator(Assignment)))
-            .with_rule(PatternRule::new("^".into(), Operator(Power)))
+            .with_rule(PatternRule::new("!".into(), Token::Operator(Not)))
+            .with_rule(PatternRule::new("+".into(), Token::Operator(Plus)))
+            .with_rule(PatternRule::new("-".into(), Token::Operator(Minus)))
+            .with_rule(PatternRule::new("*".into(), Token::Operator(Multiply)))
+            .with_rule(PatternRule::new("/".into(), Token::Operator(Divide)))
+            .with_rule(PatternRule::new("%".into(), Token::Operator(Modulo)))
+            .with_rule(PatternRule::new("=".into(), Token::Operator(Assignment)))
+            .with_rule(PatternRule::new("^".into(), Token::Operator(Power)))
             .with_rule(PatternRule::new(",".into(), Punctuation(Comma)))
             .with_rule(PatternRule::new(".".into(), Punctuation(Dot)))
             .with_rule(PatternRule::new(":".into(), Punctuation(Colon)))

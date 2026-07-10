@@ -1,3 +1,5 @@
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{{expression::{arithmetic::ArithmeticExpression, boolean::BooleanExpression, comparison::ComparisonExpression, variable::VariableExpression}, module::ModuleAddress, value::Value}};
@@ -17,6 +19,44 @@ pub enum Expression {
     ArrayConstruction(ArrayConstructionExpression),
     ArrayIndex(ArrayIndexExpression),
     Catch(CatchExpression)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Hash)]
+pub enum Operator {
+    Add, Subtract, Multiply, Divide, Modulo, Power, And, Or, Not, Greater
+}
+
+impl std::fmt::Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", 
+            match self {
+                Operator::Add => "add",
+                Operator::Subtract => "subtract",
+                Operator::Multiply => "multiply",
+                Operator::Divide => "divide",
+                Operator::Modulo => "modulo",
+                Operator::Power => "power",
+                Operator::And => "and",
+                Operator::Or => "or",
+                Operator::Not => "not",
+                Operator::Greater => "greater than",
+            }
+        )
+    }
+}
+
+impl Deref for Operator {
+    type Target = Self;
+
+    fn deref(&self) -> &Self::Target {
+        self
+    }
+}
+
+impl AsRef<Self> for Operator {
+    fn as_ref(&self) -> &Self {
+        self
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

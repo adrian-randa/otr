@@ -1,6 +1,6 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::{Rc, Weak}};
 
-use otr_core::{error::Result, expression::{variable::{VariableAccessMode, VariableAddressant, VariableExpression}, *}, r#type::Type, value::Value};
+use otr_core::{error::Result, expression::{variable::{VariableAccessMode, VariableAddressant, VariableExpression}, *}, r#struct::Struct, r#type::Type, value::Value};
 use crate::{environment::Environment, error::{RuntimeError, context::{AssociatedProcedureContextDecorator, ProcedureContextDecorator, StructContextDecorator}}, expressions::{arithmetic::eval_arithmetic_expression, boolean::eval_boolean_expression, comparison::eval_comparison_expression}, module::Module, procedures::Procedure, scope::Scope, value};
 
 
@@ -196,6 +196,77 @@ fn eval_catch_expression(expression: &CatchExpression, environment: &Environment
             Err(err) => err.to_value(),
         }
     )
+}
+
+fn eval_overloaded_operator_expression_owned(lhs: Rc<RefCell<Option<Struct>>>, operator: Operator, rhs: Value, environment: &Environment) -> Result<Value> {
+    
+    let subenvironment;
+    let operation_procedure;
+    {
+        let lhs_borrowed = lhs.borrow();
+        let lhs_ref = lhs_borrowed.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+        
+        let module_identifier = lhs_ref.get_struct_id().get_module_id();
+
+        let module = environment.get_loaded_module(module_identifier)
+            .ok_or_else(|| RuntimeError::ModuleNotLoaded { module_identifier: module_identifier.to_string() }.boxed())?;
+
+        operation_procedure = module.get_operation(
+            lhs_ref.get_struct_id().get_identifier(),
+            operator,
+            environment.get_contained_module_id() == module_identifier
+        )?;
+
+        
+        subenvironment = environment.open_subenvironment(
+            Scope::new(operation_procedure.get_stack_size()),
+            lhs_ref.get_struct_id()
+        );
+    }
+
+    let arguments = if matches!(operator, Operator::Not) {
+        vec![Value::Struct(lhs)]
+    } else {
+        vec![Value::Struct(lhs), rhs]
+    };
+
+    operation_procedure.call(subenvironment, arguments)
+}
+
+fn eval_overloaded_operator_expression_ref(lhs: Weak<RefCell<Option<Struct>>>, operator: Operator, rhs: Value, environment: &Environment) -> Result<Value> {
+    
+    let subenvironment;
+    let operation_procedure;
+    {
+        let upgraded = lhs.upgrade().ok_or_else(|| RuntimeError::UseOfDroppedValue.boxed())?;
+        let lhs_borrowed = upgraded.borrow();
+        let lhs_ref = lhs_borrowed.as_ref().ok_or_else(|| RuntimeError::UseOfMovedValue.boxed())?;
+        
+        let module_identifier = lhs_ref.get_struct_id().get_module_id();
+
+        let module = environment.get_loaded_module(module_identifier)
+            .ok_or_else(|| RuntimeError::ModuleNotLoaded { module_identifier: module_identifier.to_string() }.boxed())?;
+
+        operation_procedure = module.get_operation(
+            lhs_ref.get_struct_id().get_identifier(),
+            operator,
+            environment.get_contained_module_id() == module_identifier
+        )?;
+
+        
+        subenvironment = environment.open_subenvironment(
+            Scope::new(operation_procedure.get_stack_size()),
+            lhs_ref.get_struct_id()
+        );
+    }
+
+    let arguments = if matches!(operator, Operator::Not) {
+        vec![Value::StructRef(lhs)]
+    } else {
+        vec![Value::StructRef(lhs), rhs]
+    };
+
+    operation_procedure.call(subenvironment, arguments)
 }
 
 pub mod arithmetic;

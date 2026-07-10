@@ -12,7 +12,7 @@ enum CompilerStructSubstate {
 }
 
 pub struct CompilerStructState {
-    module: CompilerModuleState,
+    module: Box<CompilerModuleState>,
     substate: CompilerStructSubstate,
 
     identifier: Option<String>,
@@ -88,7 +88,7 @@ impl CompilerState for CompilerStructState {
                         false,
                     );
 
-                    Ok(Box::new(self.module) as Box<dyn CompilerState>)
+                    Ok(self.module)
                 }
 
                 other => {
@@ -126,7 +126,7 @@ impl CompilerState for CompilerStructState {
                         false,
                     );
 
-                    Ok(Box::new(self.module) as Box<dyn CompilerState>)
+                    Ok(self.module)
                 }
 
                 other => {
@@ -149,7 +149,7 @@ impl CompilerState for CompilerStructState {
 }
 
 impl CompilerStructState {
-    pub fn new(module: CompilerModuleState) -> Self {
+    pub fn new(module: Box<CompilerModuleState>) -> Self {
         Self {
             module,
             substate: CompilerStructSubstate::Identifier,

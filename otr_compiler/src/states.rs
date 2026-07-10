@@ -43,3 +43,4 @@ pub mod import;
 pub mod module;
 pub mod procedure;
 pub mod r#struct;
+pub mod operator_overload;

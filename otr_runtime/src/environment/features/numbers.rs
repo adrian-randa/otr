@@ -50,6 +50,10 @@ impl Module for NumbersFeature {
     fn get_struct(&self, identifier: &str, _private_access: bool) -> Result<Struct> {
         Err(RuntimeError::StructNotDefined { struct_identifier: identifier.to_string() }.boxed())
     }
+
+    fn get_operation(&self, struct_identifier: &str, operator: otr_core::expression::Operator, _private_access: bool) -> Result<RuntimeProcedure<'_>> {
+        Err(RuntimeError::OperatorNotOverloaded { struct_identifier: struct_identifier.to_string(), operator }.boxed())
+    }
 }
 
 #[derive(Debug)]

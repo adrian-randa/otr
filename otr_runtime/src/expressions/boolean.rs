@@ -1,6 +1,6 @@
-use otr_core::{expression::{Expression, boolean::BooleanExpression}, value::Value::{self, *}, error::Result};
+use otr_core::{error::Result, expression::{Expression, Operator, boolean::BooleanExpression}, value::Value::{self, *}};
 
-use crate::{expressions::eval_expression, error::RuntimeError, environment::Environment};
+use crate::{environment::Environment, error::RuntimeError, expressions::{eval_expression, eval_overloaded_operator_expression_owned, eval_overloaded_operator_expression_ref}};
 
 pub(crate) fn eval_boolean_expression(expression: &BooleanExpression, environment: &Environment) -> Result<Value> {
     match expression {
@@ -16,6 +16,9 @@ fn eval_and_expression(lhs: &Expression, rhs: &Expression, environment: &crate::
 
     match (lhs, rhs) {
         (Bool(l), Bool(r)) => Ok(Bool(l && r)),
+
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::And, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::And, r, environment),
 
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(
@@ -35,6 +38,9 @@ fn eval_or_expression(lhs: &Expression, rhs: &Expression, environment: &crate::E
     match (lhs, rhs) {
         (Bool(l), Bool(r)) => Ok(Bool(l || r)),
 
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Or, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Or, r, environment),
+
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(
                 "Cannot perform boolean or operation on {} and {}!",
@@ -51,6 +57,9 @@ fn eval_not_expression(expression: &Expression, environment: &crate::Environment
 
     match value {
         Bool(value) => Ok(Bool(!value)),
+
+        Struct(l) => eval_overloaded_operator_expression_owned(l, Operator::Not, Value::Null, environment),
+        StructRef(l) => eval_overloaded_operator_expression_ref(l, Operator::Not, Value::Null, environment),
 
         value => Err(RuntimeError::Unknown {
             message: format!(

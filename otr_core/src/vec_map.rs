@@ -8,6 +8,25 @@ pub(crate) struct VecMap<K: PartialEq, V> {
     entries: Vec<(K, V)>
 }
 
+impl<K: PartialEq, V> Default for VecMap<K, V> {
+    fn default() -> Self {
+        Self { entries: Vec::new() }
+    }
+}
+
+impl<K: PartialEq, V> VecMap<K, V> {
+        pub(crate) fn insert(&mut self, key: K, mut value: V) -> Option<V> {
+        for (k, v) in self.entries.iter_mut() {
+            if k == &key {
+                std::mem::swap(v, &mut value);
+                return Some(value)
+            }
+        }
+        self.entries.push((key, value));
+        None
+    }
+}
+
 #[allow(unused)]
 impl<KLookup, KOwn, V> VecMap<KOwn, V>
 where
@@ -18,17 +37,6 @@ where
         Self {
             entries: Vec::new()
         }
-    }
-
-    pub(crate) fn insert(&mut self, key: KOwn, mut value: V) -> Option<V> {
-        for (k, v) in self.entries.iter_mut() {
-            if k == &key {
-                std::mem::swap(v, &mut value);
-                return Some(value)
-            }
-        }
-        self.entries.push((key, value));
-        None
     }
 
     pub(crate) fn remove(&mut self, key: impl AsRef<KLookup>) -> Option<V> {

@@ -5,8 +5,8 @@ use crate::{
 use otr_core::{module::{CompiledModule, ImportAddress}, error::Result};
 
 pub struct CompilerImportState {
-    module_state: CompilerModuleState,
-    module_address: Option<ImportAddress>,
+    module: Box<CompilerModuleState>,
+    import_address: Option<ImportAddress>,
 }
 
 impl CompilerState for CompilerImportState {
@@ -15,12 +15,12 @@ impl CompilerState for CompilerImportState {
         token: Token,
         compiler_environment: &mut CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>> {
-        if let Some(ref mut address) = self.module_address {
+        if let Some(ref mut address) = self.import_address {
             match token {
                 Token::Punctuation(PunctuationToken::Semicolon) => {
                     compiler_environment.push_file_to_queue(address.clone());
-                    self.module_state.get_module_mut().push_dependency(address.clone());
-                    Ok(Box::new(self.module_state))
+                    self.module.get_module_mut().push_dependency(address.clone());
+                    Ok(self.module)
                 }
 
                 Token::Keyword(KeywordToken::From) => {
@@ -58,7 +58,7 @@ impl CompilerState for CompilerImportState {
         } else {
             match token {
                 Token::Identifier(ident) => {
-                    self.module_address = Some(ImportAddress {
+                    self.import_address = Some(ImportAddress {
                         module_id: ident,
                         path: None,
                     });
@@ -85,10 +85,10 @@ impl CompilerState for CompilerImportState {
 }
 
 impl CompilerImportState {
-    pub fn new(module_state: CompilerModuleState) -> Self {
+    pub fn new(module: Box<CompilerModuleState>) -> Self {
         Self {
-            module_state,
-            module_address: None,
+            module,
+            import_address: None,
         }
     }
 }

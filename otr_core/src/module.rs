@@ -1,8 +1,7 @@
-use std::{collections::HashMap, fmt::Display};
-
+use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 
-use crate::{{procedure::CompiledProcedure, r#struct::Struct}};
+use crate::{expression::Operator, procedure::CompiledProcedure, r#struct::Struct, vec_map::VecMap};
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct ImportAddress {
@@ -58,9 +57,12 @@ impl ImportAddress {
 pub struct CompiledModule {
     dependencies: Vec<ImportAddress>,
 
-    struct_prototypes: HashMap<String, (Struct, bool)>,
-    procedures: HashMap<String, (Box<CompiledProcedure>, bool)>,
-    associated_procedures: HashMap<(String, String), (Box<CompiledProcedure>, bool)>,
+    struct_prototypes: VecMap<String, (Struct, bool)>,
+    procedures: VecMap<String, (Box<CompiledProcedure>, bool)>,
+
+    associated_procedures: VecMap<String, VecMap<String, (Box<CompiledProcedure>, bool)>>,
+
+    operator_overloads: VecMap<String, VecMap<Operator, (Box<CompiledProcedure>, bool)>>,
 }
 
 impl CompiledModule {
@@ -70,7 +72,7 @@ impl CompiledModule {
         procedure: Box<CompiledProcedure>,
         exported: bool,
     ) {
-        self.procedures.insert(identifier, (procedure, exported));
+        self.procedures.insert(identifier.into(), (procedure, exported));
     }
 
     pub fn get_procedure(&self, identifier: &str) -> Option<&(Box<CompiledProcedure>, bool)> {
@@ -88,10 +90,14 @@ impl CompiledModule {
         procedure: Box<CompiledProcedure>,
         exported: bool,
     ) {
-        self.associated_procedures.insert(
-            (struct_identifier, procedure_identifier),
-            (procedure, exported),
-        );
+        if let Some(lut) = self.associated_procedures.get_mut(&struct_identifier) {
+            lut.insert(procedure_identifier, (procedure, exported));
+        } else {
+            let mut map = VecMap::new();
+            map.insert(procedure_identifier, (procedure, exported));
+    
+            self.associated_procedures.insert(struct_identifier, map);
+        }
     }
 
     pub fn get_associated_procedure(
@@ -101,7 +107,8 @@ impl CompiledModule {
     ) -> Option<&(Box<CompiledProcedure>, bool)> {
         self
             .associated_procedures
-            .get(&(struct_ident.to_string(), procedure_ident.to_string()))
+            .get(struct_ident)
+            .and_then(|lut| lut.get(procedure_ident))
     }
 
     pub fn get_associated_procedure_mut(
@@ -111,7 +118,26 @@ impl CompiledModule {
     ) -> Option<&mut (Box<CompiledProcedure>, bool)> {
         self
             .associated_procedures
-            .get_mut(&(struct_ident.to_string(), procedure_ident.to_string()))
+            .get_mut(struct_ident)
+            .and_then(|lut| lut.get_mut(procedure_ident))
+    }
+
+    pub fn insert_operator(&mut self, struct_identifier: String, operator: Operator, procedure: Box<CompiledProcedure>, exported: bool) {
+        if let Some(lut) = self.operator_overloads.get_mut(&struct_identifier) {
+            lut.insert(operator, (procedure, exported));
+        } else {
+            let mut lut = VecMap::new();
+            lut.insert(operator, (procedure, exported));
+            self.operator_overloads.insert(struct_identifier, lut);
+        }
+    }
+
+    pub fn get_operator(&self, struct_identifier: &str, operator: Operator) -> Option<&(Box<CompiledProcedure>, bool)> {
+        self.operator_overloads.get(struct_identifier).and_then(|lut| lut.get(operator))
+    }
+
+    pub fn get_operator_mut(&mut self, struct_identifier: &str, operator: Operator) -> Option<&mut (Box<CompiledProcedure>, bool)> {
+        self.operator_overloads.get_mut(struct_identifier).and_then(|lut| lut.get_mut(operator))
     }
 
 

@@ -1,12 +1,10 @@
 use std::collections::VecDeque;
 
 use crate::{
-    CompilerError, ExpressionParseEnvironment,
-    lexer::token::{
+    CompilerError, ExpressionParseEnvironment, PunctuationToken::ThinArrow, lexer::token::{
         KeywordToken, LiteralToken, OperatorToken, ParenthesisType, PrimitiveTypeToken,
         PunctuationToken, Token,
-    },
-    parenthesis::ParenthesisStack,
+    }, parenthesis::ParenthesisStack,
 };
 
 use otr_core::{
@@ -542,6 +540,17 @@ impl ExpressionAtomParser {
                                 module_ident: ident,
                                 member_ident: None,
                                 as_ref: true,
+                            }
+                        }
+                        Token::Punctuation(ThinArrow) => {
+                            self.state = AssociatedProcedureCall {
+                                subexpression: Expression::Variable(VariableExpression::new(
+                                    vec![VariableAddressant::StackIndex(environment.resolve_variable_ident(&ident)?)]
+                                        .try_into()
+                                        .unwrap(),
+                                    VariableAccessMode::Ref,
+                                )),
+                                ident: None,
                             }
                         }
 

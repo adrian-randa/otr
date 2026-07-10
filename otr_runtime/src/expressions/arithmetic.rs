@@ -1,6 +1,6 @@
-use otr_core::{expression::Expression, expression::arithmetic::ArithmeticExpression, value::Value::{self, *}, error::Result};
+use otr_core::{error::Result, expression::{Expression, Operator, arithmetic::ArithmeticExpression}, value::Value::{self, *}};
 
-use crate::{error::RuntimeError, environment::Environment};
+use crate::{environment::Environment, error::RuntimeError, expressions::{eval_overloaded_operator_expression_owned, eval_overloaded_operator_expression_ref}, module::Module, procedures::Procedure, scope::Scope};
 
 use super::eval_expression;
 
@@ -30,6 +30,9 @@ fn eval_add_expression(lhs: &Expression, rhs: &Expression, environment: &Environ
         (Integer(l), String(r)) => Ok(String(l.to_string() + &r)),
         (Float(l), String(r)) => Ok(String(l.to_string() + &r)),
 
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Add, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Add, r, environment),
+
         (l, r) => Err(RuntimeError::Unknown {
             message: format!("Cannot add {} and {}!", l.get_type_id(), r.get_type_id()),
         }
@@ -45,6 +48,9 @@ fn eval_subtract_expression(lhs: &Expression, rhs: &Expression, environment: &En
     match (lhs, rhs) {
         (Integer(l), Integer(r)) => Ok(Integer(l - r)),
         (Float(l), Float(r)) => Ok(Float(l - r)),
+
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Subtract, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Subtract, r, environment),
 
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(
@@ -64,6 +70,9 @@ fn eval_multiply_expression(rhs: &Expression, lhs: &Expression, environment: &En
     match (lhs, rhs) {
         (Integer(l), Integer(r)) => Ok(Integer(l * r)),
         (Float(l), Float(r)) => Ok(Float(l * r)),
+
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Multiply, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Multiply, r, environment),
 
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(
@@ -90,6 +99,9 @@ fn eval_divide_expression(lhs: &Expression, rhs: &Expression, environment: &Envi
             }
         },
         (Float(l), Float(r)) => Ok(Float(l / r)),
+
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Divide, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Divide, r, environment),
 
         (l, r) => Err(RuntimeError::Unknown {
             message: format!("Cannot divide {} and {}!", l.get_type_id(), r.get_type_id()),
@@ -119,6 +131,9 @@ fn eval_power_expression(base: &Expression, exponent: &Expression, environment: 
         )),
         (Float(l), Float(r)) => Ok(Float(l.powf(r))),
 
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Power, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Power, r, environment),
+
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(
                 "Cannot compute power of {} and {}!",
@@ -137,6 +152,9 @@ fn eval_modulo_expression(lhs: &Expression, rhs: &Expression, environment: &Envi
     match (lhs, rhs) {
         (Integer(l), Integer(r)) => Ok(Integer(l.rem_euclid(r))),
         (Float(l), Float(r)) => Ok(Float(l.rem_euclid(r))),
+
+        (Struct(l), r) => eval_overloaded_operator_expression_owned(l, Operator::Modulo, r, environment),
+        (StructRef(l), r) => eval_overloaded_operator_expression_ref(l, Operator::Modulo, r, environment),
 
         (l, r) => Err(RuntimeError::Unknown {
             message: format!(

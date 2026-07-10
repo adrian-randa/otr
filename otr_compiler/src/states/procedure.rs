@@ -27,7 +27,7 @@ enum ProcedureIdentifier {
 }
 
 pub struct CompilerProcedureState {
-    module: CompilerModuleState,
+    module: Box<CompilerModuleState>,
     procedure_identifier: Option<ProcedureIdentifier>,
     procedure: CompiledProcedureBuilder,
 
@@ -35,7 +35,7 @@ pub struct CompilerProcedureState {
 }
 
 impl CompilerProcedureState {
-    pub fn new(module: CompilerModuleState) -> Self {
+    pub fn new(module: Box<CompilerModuleState>) -> Self {
         Self {
             module,
             procedure_identifier: None,
@@ -236,7 +236,7 @@ impl CompilerState for CompilerProcedureState {
                             }
                         }
 
-                        return Ok(Box::new(self.module));
+                        return Ok(self.module);
                     }
 
                 self.procedure = self.procedure.read(token, compiler_environment)?;

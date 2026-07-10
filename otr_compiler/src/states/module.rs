@@ -1,7 +1,7 @@
-use crate::{CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, states::{CompilerBaseState, import::CompilerImportState, procedure::CompilerProcedureState, r#struct::CompilerStructState}
+use crate::{CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, states::{CompilerBaseState, import::CompilerImportState, operator_overload::CompilerOperatorOverloadState, procedure::CompilerProcedureState, r#struct::CompilerStructState}
 };
 
-use otr_core::{module::CompiledModule, error::Result};
+use otr_core::{error::Result, expression::Operator, module::CompiledModule};
     
 #[derive(Debug, PartialEq, Eq)]
 enum ModuleSubstate {
@@ -14,6 +14,7 @@ enum ModuleSubstate {
 enum ModuleExportSubstate {
     Base,
     SingleIdent(String),
+    Operator(String, Operator),
     Arrow {
         struct_ident: String,
     },
@@ -90,20 +91,24 @@ impl CompilerState for CompilerModuleState {
                 }
 
                 Token::Keyword(KeywordToken::Import) => {
-                    Ok(Box::new(CompilerImportState::new(*self)) as Box<dyn CompilerState>)
+                    Ok(Box::new(CompilerImportState::new(self)) as Box<dyn CompilerState>)
                 }
 
                 Token::Keyword(KeywordToken::Proc) => {
-                    Ok(Box::new(CompilerProcedureState::new(*self)))
+                    Ok(Box::new(CompilerProcedureState::new(self)))
                 }
 
                 Token::Keyword(KeywordToken::Struct) => {
-                    Ok(Box::new(CompilerStructState::new(*self)))
+                    Ok(Box::new(CompilerStructState::new(self)))
                 }
 
                 Token::Keyword(KeywordToken::Export) => {
                     self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
                     Ok(self)
+                }
+
+                Token::Keyword(KeywordToken::Operator) => {
+                    Ok(Box::new(CompilerOperatorOverloadState::new(self)))
                 }
 
                 Token::Identifier(_) => {
@@ -150,6 +155,15 @@ impl CompilerState for CompilerModuleState {
                             self.substate = ModuleSubstate::Export(ModuleExportSubstate::Arrow {
                                 struct_ident: ident,
                             });
+                            Ok(self)
+                        }
+
+                        Token::Operator(operator) => {
+                            let operator = operator.try_into_core_operator().ok_or_else(||
+                                CompilerError::UnexpectedToken { expected: Some("overloadable operator".into()), found: Token::Operator(operator) }.boxed()
+                            )?;
+
+                            self.substate = ModuleSubstate::Export(ModuleExportSubstate::Operator(ident, operator));
                             Ok(self)
                         }
 
@@ -215,6 +229,26 @@ impl CompilerState for CompilerModuleState {
                         }
                         .boxed()),
                     },
+                    ModuleExportSubstate::Operator(struct_identifier, operator) => match token {
+
+                        Token::Punctuation(PunctuationToken::Semicolon) => {
+                            set_operator_visibility(&mut self.module, &struct_identifier, operator, true)?;
+                            self.substate = ModuleSubstate::InScope;
+                            Ok(self)
+                        }
+
+                        Token::Punctuation(PunctuationToken::Comma) => {
+                            set_operator_visibility(&mut self.module, &struct_identifier, operator, true)?;
+                            self.substate = ModuleSubstate::Export(ModuleExportSubstate::Base);
+                            Ok(self)
+                        }
+
+                        other => Err(CompilerError::UnexpectedToken {
+                            expected: Some("',' or ';'".into()),
+                            found: other,
+                        }
+                        .boxed()),
+                    },
                 }
             }
         }
@@ -252,17 +286,30 @@ fn set_struct_visibility(module: &mut CompiledModule, member_ident: &str, visibi
 
 fn set_associated_precedure_visibility(
     module: &mut CompiledModule,
-    struct_ident: &str,
-    procedure_ident: &str,
+    struct_identifier: &str,
+    procedure_identifier: &str,
     visibility: bool,
 ) -> Result<()> {
-    if let Some(member) = module.get_associated_procedure_mut(struct_ident, procedure_ident) {
+    if let Some(member) = module.get_associated_procedure_mut(struct_identifier, procedure_identifier) {
         member.1 = visibility;
         Ok(())
     } else {
         Err(CompilerError::NoSuchMember {
-            member_identifier: format!("{struct_ident}->{procedure_ident}")
+            member_identifier: format!("{struct_identifier}->{procedure_identifier}")
         }.boxed())
     }
 }
 
+fn set_operator_visibility(
+    module: &mut CompiledModule,
+    struct_identifier: &str,
+    operator: Operator,
+    visibility: bool
+) -> Result<()> {
+    if let Some(entry) = module.get_operator_mut(struct_identifier, operator) {
+        entry.1 = visibility;
+        Ok(())
+    } else {
+        Err(CompilerError::NoSuchMember { member_identifier: format!("{struct_identifier} {operator}") }.boxed())
+    }
+}

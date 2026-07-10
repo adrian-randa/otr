@@ -1,6 +1,7 @@
 use std::ops::Deref;
 
 use derive_more::IntoIterator;
+use otr_core::expression::Operator;
 
 #[derive(Debug)]
 pub struct ContextualizedToken {
@@ -25,7 +26,7 @@ pub enum Token {
     Literal(LiteralToken),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KeywordToken {
     Let,
     Const,
@@ -51,9 +52,10 @@ pub enum KeywordToken {
     Clone,
     Typeof,
     Using,
+    Operator,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OperatorToken {
     Assignment,
     Plus,
@@ -73,13 +75,34 @@ pub enum OperatorToken {
     LessEquals,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl OperatorToken {
+    pub fn try_into_core_operator(self) -> Option<Operator> {
+        use OperatorToken::*;
+        Some(
+            match self {
+                Plus =>  Operator::Add,
+                Minus =>  Operator::Subtract,
+                Multiply =>  Operator::Multiply,
+                Divide =>  Operator::Divide,
+                Modulo =>  Operator::Modulo,
+                And =>  Operator::And,
+                Or =>  Operator::Or,
+                Not =>  Operator::Not,
+                Greater =>  Operator::Greater,
+
+                _ => return None,
+            }
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ParenthesisType {
     Opening,
     Closing,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PunctuationToken {
     Parenthesis(ParenthesisType),
     SquareBrackets(ParenthesisType),
@@ -104,7 +127,7 @@ pub enum LiteralToken {
     Type(PrimitiveTypeToken),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PrimitiveTypeToken {
     Null,
     Integer,
