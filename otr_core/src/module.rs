@@ -173,11 +173,11 @@ pub struct ModuleAddress {
     ident: String,
 }
 
-impl From<(&str, &str)> for ModuleAddress {
-    fn from(value: (&str, &str)) -> Self {
+impl<T: AsRef<str>, U: AsRef<str>> From<(T, U)> for ModuleAddress {
+    fn from(value: (T, U)) -> Self {
         Self {
-            module_id: value.0.to_string(),
-            ident: value.1.to_string(),
+            module_id: value.0.as_ref().to_string(),
+            ident: value.1.as_ref().to_string(),
         }
     }
 }
