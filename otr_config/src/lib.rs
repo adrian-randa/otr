@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{collections::HashMap, fs, path::{Path, PathBuf}};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -169,7 +169,7 @@ impl ProjectConfiguration {
     }
 }
 
-pub fn get_project_config(config_path: PathBuf) -> otr_core::error::Result<ProjectConfiguration> {
+pub fn get_project_config(config_path: &Path) -> otr_core::error::Result<ProjectConfiguration> {
     
     let config_string = fs::read_to_string(config_path).map_err(|err| SystemError::new(
         format!("Could not read project configuration file: {}", err)
@@ -177,6 +177,38 @@ pub fn get_project_config(config_path: PathBuf) -> otr_core::error::Result<Proje
 
     let config = toml::from_str(&config_string).map_err(|err| SystemError::new(
         format!("Could not parse project configuration file: {}", err)
+    ).boxed())?;
+
+    Ok(config)
+}
+
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct GlobalConfiguration {
+    pub roots: HashMap<String, PathBuf>,
+}
+
+impl GlobalConfiguration {
+
+    pub fn new() -> Self {
+        Self {
+            roots: HashMap::new()
+        }
+    }
+
+    pub fn try_resolve_root(&self, alias: impl AsRef<str>) -> Option<&Path> {
+        self.roots.get(alias.as_ref()).map(PathBuf::as_ref)
+    }
+}
+
+pub fn get_global_config(global_config_path: &Path) -> otr_core::error::Result<GlobalConfiguration> {
+    
+    let config_string = fs::read_to_string(global_config_path).map_err(|err| SystemError::new(
+        format!("Could not read global configuration file: {}", err)
+    ).boxed())?;
+
+    let config = toml::from_str(&config_string).map_err(|err| SystemError::new(
+        format!("Could not parse global configuration file: {}", err)
     ).boxed())?;
 
     Ok(config)

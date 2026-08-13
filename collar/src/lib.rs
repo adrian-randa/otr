@@ -90,7 +90,7 @@ pub fn new_library(root: &Path, name: String, otr_version: Version) -> Result<()
 pub fn get_config(root: &Path) -> Result<ProjectConfiguration> {
     let config_path = config_path(root);
 
-    get_project_config(config_path)
+    get_project_config(&config_path)
 }
 
 pub fn compile_and_run_project(root: &Path, root_module: impl AsRef<str>) -> Result<()> {

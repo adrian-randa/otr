@@ -978,6 +978,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "otr_compiler",
+ "otr_config",
  "otr_core",
  "serde_cbor",
 ]

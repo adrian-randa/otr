@@ -1,10 +1,11 @@
 use std::{fs, path::{Path, PathBuf}};
 
 use otr_compiler::{Compiler, CompilerEnvironment, Fragmenter, lexer::Tokenizer};
+use otr_config::GlobalConfiguration;
 use otr_core::{SystemError, error::Result, module::{CompiledModule, ImportAddress}};
 
 
-pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name: String) -> Result<()> {
+pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name: String, global_configuration: Option<GlobalConfiguration>) -> Result<()> {
     let mut environment = CompilerEnvironment::new();
 
     environment.push_file_to_queue(ImportAddress {
@@ -13,7 +14,7 @@ pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name
     });
 
     while let Some(address) = environment.get_next_file() {
-        let source = read_source_file(root_file_path.to_path_buf(), address.clone())?;
+        let source = read_source_file(root_file_path.to_path_buf(), address.clone(), global_configuration.as_ref())?;
 
         let compiled_module = compile_single_file(source, &mut environment)?;
 
@@ -32,11 +33,8 @@ pub fn compile_single_file(source: String, environment: &mut CompilerEnvironment
     compiler.compile(tokens.into_iter(), environment)
 }
 
-pub fn read_source_file(root_file_path: PathBuf, address: ImportAddress) -> Result<String> {
-    let file_path = root_file_path
-            .join(address.path.as_ref().map(|r| r as &str).unwrap_or(""))
-            .join(address.module_id)
-            .with_extension("otr");
+pub fn read_source_file(root_file_path: PathBuf, address: ImportAddress, global_configuration: Option<&GlobalConfiguration>) -> Result<String> {
+    let file_path = resolve_import_address(&root_file_path, address, global_configuration)?;
 
     fs::read_to_string(file_path)
         .map_err(|err| SystemError::new(format!("Could not read source file: {}", err)).boxed())
@@ -67,4 +65,36 @@ pub fn write_compiled_file(root_file_path: &Path, address: ImportAddress, module
     fs::write(output_file_path, bytes).map_err(|err|
         SystemError::new(format!("Could not write compiled file: {err}")).boxed()
     )
+}
+
+fn resolve_import_address(root_file_path: &Path, address: ImportAddress, global_configuration: Option<&GlobalConfiguration>) -> Result<PathBuf> {
+
+    if let Some(path) = &address.path {
+        let mut path = path as &str;
+
+        if path.starts_with("@") {
+
+            let root;
+            if let Some(p) = path[1..].split_once("/") {
+                root = p.0;
+                path = p.1;
+            } else {
+                root = &path[1..];
+                path = "";
+            }
+
+            let root = global_configuration
+                .ok_or(SystemError::new(format!("Tried to resolve root '{root}', but no global configuration has been supplied")).boxed())?
+                .try_resolve_root(root).ok_or(
+                    SystemError::new(format!("Could not find root for '{root}'")).boxed()
+                )?;
+
+            return Ok(root.join(path).join(address.module_id).with_extension("otr"))
+        }
+    }
+
+    Ok(root_file_path
+        .join(address.path.as_ref().map(|r| r as &str).unwrap_or(""))
+        .join(address.module_id)
+        .with_extension("otr"))
 }

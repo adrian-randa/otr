@@ -1,11 +1,13 @@
-use std::{env, path::PathBuf};
+use std::{env, path::PathBuf, process::exit};
 
 use clap::Parser;
+use otr_config::get_global_config;
 use otr_core::SystemError;
 
 fn main() {
     if let Err(err) = shell() {
         println!("{}", err);
+        exit(1);
     }
 }
 
@@ -20,7 +22,12 @@ fn shell() -> otr_core::Result<()> {
             })?
     );
 
-    otrc::compile_and_write_dependency_tree(&root_path, root_module_id)?;
+    let global_configuration = match cli.global_configuration_path {
+        Some(config_path) => Some(get_global_config(&config_path)?),
+        None => None,
+    };
+
+    otrc::compile_and_write_dependency_tree(&root_path, root_module_id, global_configuration)?;
 
 
     Ok(())
@@ -38,4 +45,11 @@ struct Cli {
         help = "The path to the project's directory"
     )]
     pub root_path: Option<PathBuf>,
+
+    #[arg(
+        short = 'G',
+        long = "globals",
+        help = "The path to the global config file"
+    )]
+    pub global_configuration_path: Option<PathBuf>
 }

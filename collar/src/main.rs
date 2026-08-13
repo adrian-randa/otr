@@ -1,4 +1,4 @@
-use std::time::Instant;
+use std::{process::exit, time::Instant};
 
 use clap::{Parser, Subcommand};
 use collar::{cmd::compile_project, compile_and_run_project, error::CollarError, fs::{ensure_dir_exists, get_current_dir, get_installed_versions, install_otrc, install_otrrun, uninstall_otrc, uninstall_otrrun}, get_config, net::{download_otrc, download_otrrun}, new_executable, new_library};
@@ -10,6 +10,7 @@ use otr_core::Result;
 fn main() {
     if let Err(err) = shell() {
         println!("{err}");
+        exit(1);
     }
 }
 

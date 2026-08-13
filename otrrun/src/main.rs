@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, process::exit};
 
 use clap::Parser;
 use otr_core::{SystemError, module::ImportAddress};
@@ -8,6 +8,7 @@ use otr_config::{Version, get_project_config};
 fn main() {
     if let Err(err) = shell() {
         println!("{}", err);
+        exit(1);
     }
 }
 
@@ -26,7 +27,7 @@ fn shell() -> otr_core::Result<()> {
                 get_current_dir()?.join("otr_config").with_extension("toml")
             );
 
-            let config = get_project_config(config_path)?;
+            let config = get_project_config(&config_path)?;
 
             let config_version = config.get_otr_version();
             let own_version = Version::try_from(env!("CARGO_PKG_VERSION")).unwrap();

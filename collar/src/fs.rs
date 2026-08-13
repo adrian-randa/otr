@@ -1,4 +1,4 @@
-use otr_config::Version;
+use otr_config::{GlobalConfiguration, Version};
 use otr_core::Result;
 
 use std::{env::current_dir, fs::{self, Permissions}, os::unix::fs::PermissionsExt, path::{Path, PathBuf}};
@@ -45,6 +45,21 @@ pub fn get_collar_dir() -> Result<PathBuf> {
     ensure_dir_exists(&collar_dir)?;
 
     Ok(collar_dir)
+}
+
+pub fn get_globals_path() -> Result<PathBuf> {
+    let globals_path = get_collar_dir()?.join("globals").with_extension("toml");
+
+    if !catch(fs::exists(&globals_path), "Could not locate globals config file")? {
+        catch(
+            fs::write(&globals_path, 
+                catch(toml::to_string_pretty(&GlobalConfiguration::default()), "Could not serialize default globals config file")?
+            ),
+            "Could not write default globals config file"
+        )?;
+    }
+
+    Ok(globals_path)
 }
 
 pub fn get_otrc_dir() -> Result<PathBuf> {
