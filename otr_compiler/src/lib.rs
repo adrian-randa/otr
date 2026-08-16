@@ -147,7 +147,7 @@ impl Compiler {
 
     pub fn compile(mut self, tokens: impl Iterator<Item = ContextualizedToken>, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
         for token in tokens {
-            let line = token.line_index;
+            let line = token.line_index + 1;
             let token = token.token;
 
             self = self.read(token, environment)
