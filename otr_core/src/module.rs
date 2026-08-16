@@ -7,6 +7,7 @@ use crate::{expression::Operator, procedure::CompiledProcedure, r#struct::Struct
 pub struct ImportAddress {
     pub module_id: String,
     pub path: Option<String>,
+    pub alias: Option<String>
 }
 
 impl Display for ImportAddress {

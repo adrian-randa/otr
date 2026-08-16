@@ -40,7 +40,8 @@ fn shell() -> otr_core::Result<()> {
 
             let root_module_address = ImportAddress {
                 module_id: config.get_root_module().to_string(),
-                path: None
+                path: None,
+                alias: None,
             };
 
             let base_environment = build_environment_from_features(config.features())?;

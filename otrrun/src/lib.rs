@@ -36,7 +36,8 @@ pub fn run_script(object_path: &Path) -> Result<()> {
         root_path,
         ImportAddress {
             module_id: module_ident.clone(),
-            path: None
+            path: None,
+            alias: None,
         }
     )?;
 
@@ -86,11 +87,12 @@ pub fn build_runtime_object(root_path: &Path, root_module_address: ImportAddress
         }
         
         let module_ident = address.module_id.clone();
+        let alias = address.alias.clone();
         let module = read_module(root_path, address)?;
 
         load_queue.extend_from_slice(module.get_dependencies());
 
-        builder = builder.with_module(module, module_ident)
+        builder = builder.with_module(module, alias.unwrap_or(module_ident))
     }
 
     Ok(builder.build())

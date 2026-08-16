@@ -53,6 +53,7 @@ pub enum KeywordToken {
     Typeof,
     Using,
     Operator,
+    As,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

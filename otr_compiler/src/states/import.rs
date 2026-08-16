@@ -47,6 +47,29 @@ impl CompilerState for CompilerImportState {
                     }
                 }
 
+                Token::Keyword(KeywordToken::As) => {
+                    if address.alias.is_some() {
+                        return Err(CompilerError::InvalidDefinition {
+                            message: "Cannot declare more than one alias for an import!".into()
+                        }.boxed());
+                    }
+
+                    address.alias = Some(String::new());
+
+                    Ok(self)
+                }
+
+                Token::Identifier(alias) => {
+                    if address.alias.is_some() {
+                        address.alias = Some(alias);
+                        Ok(self)
+                    } else {
+                        Err(CompilerError::InvalidDefinition {
+                            message: "Unexpected Identifier. Try adding 'as' to declare an alias for an import!".into()
+                        }.boxed())
+                    }
+                }
+
                 other => {
                     Err(CompilerError::UnexpectedToken {
                         expected: Some(";".into()),
@@ -61,6 +84,7 @@ impl CompilerState for CompilerImportState {
                     self.import_address = Some(ImportAddress {
                         module_id: ident,
                         path: None,
+                        alias: None,
                     });
                     Ok(self)
                 }

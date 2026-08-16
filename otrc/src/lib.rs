@@ -10,7 +10,8 @@ pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name
 
     environment.push_file_to_queue(ImportAddress {
         module_id: root_module_name,
-        path: None
+        path: None,
+        alias: None,
     });
 
     while let Some(address) = environment.get_next_file() {

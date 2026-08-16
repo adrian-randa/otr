@@ -96,6 +96,7 @@ impl Default for Tokenizer {
             .with_rule(KeywordRule::new("using".into(), Keyword(Using)))
             .with_rule(KeywordRule::new("null".into(), Literal(LiteralToken::Null)))
             .with_rule(KeywordRule::new("operator".into(), Keyword(KeywordToken::Operator)))
+            .with_rule(KeywordRule::new("as".into(), Keyword(KeywordToken::As)))
             .with_rule(KeywordRule::new(
                 "Null".into(),
                 Literal(Type(PrimitiveTypeToken::Null)),
