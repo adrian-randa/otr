@@ -1,6 +1,6 @@
 use otr_core::{error::Result, expression::{Expression, Operator, arithmetic::ArithmeticExpression}, value::Value::{self, *}};
 
-use crate::{environment::Environment, error::RuntimeError, expressions::{eval_overloaded_operator_expression_owned, eval_overloaded_operator_expression_ref}, module::Module, procedures::Procedure, scope::Scope};
+use crate::{environment::Environment, error::RuntimeError, expressions::{eval_overloaded_operator_expression_owned, eval_overloaded_operator_expression_ref}};
 
 use super::eval_expression;
 
