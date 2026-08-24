@@ -29,7 +29,9 @@ impl Clone for Value {
             Self::String(arg0) => Self::String(arg0.clone()),
             Self::Char(arg0) => Self::Char(*arg0),
             Self::Bool(arg0) => Self::Bool(*arg0),
-            Self::Array(arg0) => Self::Array(arg0.clone()),
+            Self::Array(arg0) => Value::Array(Rc::new(RefCell::new(
+                arg0.borrow().as_ref().map(|arr| arr.clone())
+            ))),
             Self::ArrayRef(arg0) => Self::ArrayRef(arg0.clone()),
             Self::Struct(arg0) => Value::Struct(Rc::new(RefCell::new(
                 arg0.borrow().as_ref().map(|obj| obj.clone()),
