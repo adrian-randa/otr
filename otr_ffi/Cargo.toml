@@ -1,0 +1,13 @@
+[package]
+name = "otr_ffi"
+version = "0.1.0"
+license.workspace = true
+readme.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+otr_core = { workspace = true }

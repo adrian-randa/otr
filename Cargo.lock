@@ -954,6 +954,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "otr_ffi"
+version = "0.1.0"
+dependencies = [
+ "otr_core",
+]
+
+[[package]]
 name = "otr_runtime"
 version = "0.1.0"
 dependencies = [
