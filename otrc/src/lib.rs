@@ -1,6 +1,6 @@
 use std::{fs, path::{Path, PathBuf}};
 
-use otr_compiler::{Compiler, CompilerEnvironment, Fragmenter, lexer::Tokenizer};
+use otr_compiler::{Compiler, CompilerEnvironment, Fragmenter, Module, lexer::Tokenizer};
 use otr_config::GlobalConfiguration;
 use otr_core::{SystemError, error::Result, module::{CompiledModule, ImportAddress}};
 
@@ -25,7 +25,7 @@ pub fn compile_and_write_dependency_tree(root_file_path: &Path, root_module_name
     Ok(())
 }
 
-pub fn compile_single_file(source: String, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
+pub fn compile_single_file(source: String, environment: &mut CompilerEnvironment) -> Result<Module> {
     let fragments = Fragmenter::fragment(&source)?;
     let tokens = Tokenizer::default().tokenize(fragments)?;
 
@@ -41,7 +41,7 @@ pub fn read_source_file(root_file_path: PathBuf, address: ImportAddress, global_
         .map_err(|err| SystemError::new(format!("Could not read source file: {}", err)).boxed())
 }
 
-pub fn write_compiled_file(root_file_path: &Path, address: ImportAddress, module: &CompiledModule) -> Result<()> {
+pub fn write_compiled_file(root_file_path: &Path, address: ImportAddress, module: &Module) -> Result<()> {
     let output_dir_path = root_file_path.join("compiled");
 
     let output_dir_exists = fs::exists(&output_dir_path).map_err(|err| SystemError::new(
@@ -54,14 +54,26 @@ pub fn write_compiled_file(root_file_path: &Path, address: ImportAddress, module
                 SystemError::new(format!("Could not create output directory: {err}")).boxed()
             )?;
     }
-
-    let bytes = serde_cbor::to_vec(module).map_err(|err| 
-        SystemError::new(format!("Could not serialize compiled module: {err}")).boxed()
-    )?;
-
     let output_file_name = address.to_flat_string();
-    
-    let output_file_path = output_dir_path.join(output_file_name).with_extension("oco");
+
+    let bytes;
+    let output_file_path;
+    match module {
+        Module::Compiled(compiled_module) => {
+            bytes = serde_cbor::to_vec(compiled_module).map_err(|err| 
+                SystemError::new(format!("Could not serialize compiled module: {err}")).boxed()
+            )?;
+        
+            output_file_path = output_dir_path.join(output_file_name).with_extension("oco");
+        },
+        Module::External(external_module) => {
+            bytes = serde_cbor::to_vec(external_module).map_err(|err| 
+                SystemError::new(format!("Could not serialize compiled module: {err}")).boxed()
+            )?;
+        
+            output_file_path = output_dir_path.join(output_file_name).with_extension("oem");
+        },
+    }
 
     fs::write(output_file_path, bytes).map_err(|err|
         SystemError::new(format!("Could not write compiled file: {err}")).boxed()

@@ -49,7 +49,7 @@ impl ExternalModule {
                 message: format!("Could not insert binding '{symbol_name}' as it was not found in the difinition!")
             }.boxed())?;
         
-        Ok(self.bindings.insert(symbol_name, RuntimeExternalFunction { function, num_args: definition.parameters.len() }))
+        Ok(self.bindings.insert(symbol_name, RuntimeExternalFunction { function, num_args: definition.arguments.len() }))
     }
 
     pub fn get_binding(&self, symbol_name: impl AsRef<str>) -> Option<RuntimeExternalFunction> {

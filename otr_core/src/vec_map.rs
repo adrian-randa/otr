@@ -1,9 +1,10 @@
 use std::ops::Deref;
 
+use derive_more::IntoIterator;
 use serde::{Deserialize, Serialize};
 
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, IntoIterator)]
 pub struct VecMap<K: PartialEq, V> {
     entries: Vec<(K, V)>
 }

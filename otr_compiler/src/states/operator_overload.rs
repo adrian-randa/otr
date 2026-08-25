@@ -1,6 +1,6 @@
 use otr_core::expression::Operator;
 
-use crate::{CompilerState, ParenthesisType, PunctuationToken, Token, error::CompilerError, parenthesis::ParenthesisStack, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState};
+use crate::{CompilerState, Module, ParenthesisType, PunctuationToken, Token, error::CompilerError, parenthesis::ParenthesisStack, procedure::CompiledProcedureBuilder, states::module::CompilerModuleState};
 
 
 pub(crate) enum CompilerOperatorOverloadState {
@@ -79,7 +79,7 @@ impl CompilerState for CompilerOperatorOverloadState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> otr_core::Result<otr_core::module::CompiledModule> {
+    fn finalize(self: Box<Self>) -> otr_core::Result<Module> {
         Err(CompilerError::Unknown { message: "Unfinished operator overload definition!".into() }.boxed())
     }
 }

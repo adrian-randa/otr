@@ -1,10 +1,10 @@
-use crate::{CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, Token}, states::module::CompilerModuleState};
+use crate::{CompilerEnvironment, CompilerError, CompilerState, Module, lexer::token::{KeywordToken, Token}, states::module::CompilerModuleState};
 
 use otr_core::{error::Result, module::CompiledModule};
 
 #[derive(Clone)]
 pub(crate) struct CompilerBaseState {
-    module: Option<CompiledModule>,
+    module: Option<Module>,
 }
 
 impl CompilerBaseState {
@@ -34,7 +34,7 @@ impl CompilerState for CompilerBaseState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
+    fn finalize(self: Box<Self>) -> Result<Module> {
         self.module.ok_or(CompilerError::Unknown { message: "No module declared in this file".into() }.boxed())
     }
 }
@@ -44,3 +44,4 @@ pub mod module;
 pub mod procedure;
 pub mod r#struct;
 pub mod operator_overload;
+pub mod external;

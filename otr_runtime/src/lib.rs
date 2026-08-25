@@ -7,6 +7,7 @@ use otr_core::module::{CompiledModule, ModuleAddress};
 use otr_core::value::Value;
 use crate::error::context::{HintContextDecorator};
 use crate::environment::Environment;
+use crate::external::ExternalModule;
 
 use otr_core::error::Result;
 use crate::error::RuntimeError;
@@ -19,7 +20,7 @@ mod module;
 mod procedures;
 mod value;
 mod error;
-mod external;
+pub mod external;
 
 #[derive(Debug)]
 pub struct RuntimeObject<'a> {
@@ -65,8 +66,13 @@ impl RuntimeObjectBuilder<RuntimeObjectBuilderNoRoot> {
 }
 
 impl RuntimeObjectBuilder<RuntimeObjectBuilderWithRoot> {
-    pub fn with_module(mut self, module: CompiledModule, module_ident: String) -> Self {
+    pub fn with_compiled_module(mut self, module: CompiledModule, module_ident: String) -> Self {
         self.runtime_object.base_environement.load_module(module_ident, Rc::new(RuntimeModule::Compiled(module)));
+        self
+    }
+
+    pub fn with_external_module(mut self, module: ExternalModule, module_ident: String) -> Self {
+        self.runtime_object.base_environement.load_module(module_ident, Rc::new(RuntimeModule::Abstract(Box::new(module))));
         self
     }
 

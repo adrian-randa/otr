@@ -1,4 +1,4 @@
-use crate::{CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, states::{CompilerBaseState, import::CompilerImportState, operator_overload::CompilerOperatorOverloadState, procedure::CompilerProcedureState, r#struct::CompilerStructState}
+use crate::{CompilerEnvironment, CompilerError, CompilerState, Module, lexer::token::{KeywordToken, ParenthesisType, PunctuationToken, Token}, states::{CompilerBaseState, import::CompilerImportState, operator_overload::CompilerOperatorOverloadState, procedure::CompilerProcedureState, r#struct::CompilerStructState}
 };
 
 use otr_core::{error::Result, expression::Operator, module::CompiledModule};
@@ -86,7 +86,7 @@ impl CompilerState for CompilerModuleState {
             }
             ModuleSubstate::InScope => match token {
                 Token::Punctuation(PunctuationToken::CurlyBraces(ParenthesisType::Closing)) => {
-                    self.base.module = Some(self.module);
+                    self.base.module = Some(Module::Compiled(self.module));
                     Ok(Box::new(self.base))
                 }
 
@@ -254,7 +254,7 @@ impl CompilerState for CompilerModuleState {
         }
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
+    fn finalize(self: Box<Self>) -> Result<Module> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

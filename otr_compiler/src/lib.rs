@@ -4,6 +4,12 @@ use crate::{error::{CompilerError, context::LineIndexContextDecorator}, states::
 
 use otr_core::{module::{CompiledModule, ImportAddress, ModuleAddress}, error::Result};
 
+#[derive(Debug, Clone)]
+pub enum Module {
+    Compiled(CompiledModule),
+    External(ExternalModule),
+}
+
 pub trait CompilerState {
     fn read(
         self: Box<Self>,
@@ -11,7 +17,7 @@ pub trait CompilerState {
         compiler_environment: &mut CompilerEnvironment,
     ) -> Result<Box<dyn CompilerState>>;
 
-    fn finalize(self: Box<Self>) -> Result<CompiledModule>;
+    fn finalize(self: Box<Self>) -> Result<Module>;
 }
 
 pub trait ExpressionParseEnvironment: std::fmt::Debug {
@@ -141,11 +147,11 @@ impl Compiler {
         Ok(self)
     }
 
-    pub fn finalize(self) -> Result<CompiledModule> {
+    pub fn finalize(self) -> Result<Module> {
         self.state.finalize()
     }
 
-    pub fn compile(mut self, tokens: impl Iterator<Item = ContextualizedToken>, environment: &mut CompilerEnvironment) -> Result<CompiledModule> {
+    pub fn compile(mut self, tokens: impl Iterator<Item = ContextualizedToken>, environment: &mut CompilerEnvironment) -> Result<Module> {
         for token in tokens {
             let line = token.line_index + 1;
             let token = token.token;
@@ -260,3 +266,4 @@ pub mod lexer;
 
 pub use expression_parser::ExpressionParser;
 pub use lexer::{Tokenizer, token::{self, *}, fragmenter::{self, *}};
+use otr_ffi::external::ExternalModule;

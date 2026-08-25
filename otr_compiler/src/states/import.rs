@@ -1,5 +1,5 @@
 use crate::{
-    CompilerEnvironment, CompilerError, CompilerState, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}, states::{module::CompilerModuleState}
+    CompilerEnvironment, CompilerError, CompilerState, Module, lexer::token::{KeywordToken, LiteralToken, PunctuationToken, Token}, states::module::CompilerModuleState
 };
 
 use otr_core::{module::{CompiledModule, ImportAddress}, error::Result};
@@ -100,7 +100,7 @@ impl CompilerState for CompilerImportState {
         } 
     }
 
-    fn finalize(self: Box<Self>) -> Result<CompiledModule> {
+    fn finalize(self: Box<Self>) -> Result<Module> {
         Err(CompilerError::InvalidDefinition {
             message: "Unfinished module declaration!".into(),
         }

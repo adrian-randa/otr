@@ -3,7 +3,7 @@ use std::{path::PathBuf, process::exit};
 use clap::Parser;
 use otr_core::{SystemError, module::ImportAddress};
 use otrrun::{build_environment_from_features, build_runtime_object, get_current_dir, run_script};
-use otr_config::{Version, get_project_config};
+use otr_config::{Version, get_global_config, get_project_config};
 
 fn main() {
     if let Err(err) = shell() {
@@ -19,7 +19,7 @@ fn shell() -> otr_core::Result<()> {
         Cli::Script { object_path } => {
             run_script(&object_path)
         },
-        Cli::Project { root_path, config_path } => {
+        Cli::Project { root_path, config_path, global_configuration_path } => {
 
             let root_path = root_path.unwrap_or(get_current_dir()?);
 
@@ -46,7 +46,13 @@ fn shell() -> otr_core::Result<()> {
 
             let base_environment = build_environment_from_features(config.features())?;
 
-            let runtime_object = build_runtime_object(&root_path, root_module_address, base_environment)?;
+            let global_configuration = if let Some(global_configuration_path) = global_configuration_path {
+                Some(get_global_config(&global_configuration_path)?)
+            } else {
+                None
+            };
+
+            let runtime_object = build_runtime_object(&root_path, root_module_address, base_environment, global_configuration)?;
 
             runtime_object.execute()?;
 
@@ -79,5 +85,12 @@ enum Cli {
             help = "The path to the project's config file"
         )]
         config_path: Option<PathBuf>,
+
+        #[arg(
+            short = 'G',
+            long = "globals",
+            help = "The path to the global config file"
+        )]
+        global_configuration_path: Option<PathBuf>
     }
 }

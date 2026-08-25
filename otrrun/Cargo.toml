@@ -8,9 +8,11 @@ rust-version.workspace = true
 
 [dependencies]
 otr_core = { workspace = true }
+otr_ffi = { workspace = true }
 otr_runtime = { workspace = true }
 otr_config = { workspace = true }
 
 serde = { workspace = true }
 serde_cbor = { workspace = true }
 clap = { workspace = true }
+libloading = { workspace = true}
