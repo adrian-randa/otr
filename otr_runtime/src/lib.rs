@@ -19,6 +19,7 @@ mod module;
 mod procedures;
 mod value;
 mod error;
+mod external;
 
 #[derive(Debug)]
 pub struct RuntimeObject<'a> {

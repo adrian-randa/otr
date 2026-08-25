@@ -968,6 +968,7 @@ dependencies = [
  "derive_more",
  "num",
  "otr_core",
+ "otr_ffi",
 ]
 
 [[package]]

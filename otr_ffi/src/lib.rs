@@ -2,6 +2,10 @@ use std::{cell::RefCell, ffi::*, mem::ManuallyDrop, ptr::{slice_from_raw_parts_m
 
 use otr_core::{Result, SystemError, value::Value};
 
+pub type ExternalFunctionPointer = unsafe extern "C" fn(CValue) -> CValue;
+
+pub mod external;
+
 #[repr(C)]
 pub struct CValue {
     data: CValueUnion,

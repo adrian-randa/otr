@@ -27,3 +27,4 @@ otr_compiler = { path = "otr_compiler", version = "0.1.0"}
 otr_runtime = { path = "otr_runtime", version = "0.1.0"}
 otr_core = { path = "otr_core", version = "0.1.0"}
 otr_config = { path = "otr_config", version = "0.1.0"}
+otr_ffi = { path = "otr_ffi", version = "0.1.0"}
