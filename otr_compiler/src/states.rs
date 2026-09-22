@@ -1,4 +1,4 @@
-use crate::{CompilerEnvironment, CompilerError, CompilerState, Module, lexer::token::{KeywordToken, Token}, states::module::CompilerModuleState};
+use crate::{CompilerEnvironment, CompilerError, CompilerState, Module, lexer::token::{KeywordToken, Token}, states::{external::CompilerExternalModuleState, module::CompilerModuleState}};
 
 use otr_core::{error::Result, module::CompiledModule};
 
@@ -24,6 +24,10 @@ impl CompilerState for CompilerBaseState {
         match token {
             Token::Keyword(KeywordToken::Module) => {
                 Ok(Box::new(CompilerModuleState::new(*self)) as Box<dyn CompilerState>)
+            }
+
+            Token::Keyword(KeywordToken::External) => {
+                Ok(Box::new(CompilerExternalModuleState::new(*self)) as Box<dyn CompilerState>)
             }
 
             other => Err(CompilerError::UnexpectedToken {

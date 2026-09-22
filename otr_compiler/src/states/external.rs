@@ -24,6 +24,12 @@ pub(crate) enum CompilerExternalModuleState {
     }
 }
 
+impl CompilerExternalModuleState {
+    pub(crate) fn new(base: CompilerBaseState) -> Self {
+        Self::Base { base }
+    }
+}
+
 impl CompilerState for CompilerExternalModuleState {
     fn read(
         mut self: Box<Self>,

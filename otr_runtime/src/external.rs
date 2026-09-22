@@ -6,7 +6,7 @@ use crate::{error::RuntimeError, module::Module, procedures::{Procedure, Runtime
 
 #[derive(Debug, Clone, Copy)]
 pub struct RuntimeExternalFunction {
-    function: otr_ffi::ExternalFunctionPointer,
+    function: otr_ffi::external::ExternalFunctionPointer,
     num_args: usize,
 }
 
@@ -14,10 +14,13 @@ impl Procedure for RuntimeExternalFunction {
     fn call(&self, _environment: crate::environment::Environment, arguments: Vec<otr_core::value::Value>) -> otr_core::Result<otr_core::value::Value> {
         let packed_arguments = Value::Array(Rc::new(RefCell::new(Some(arguments.into_boxed_slice()))));
 
+
+
         unsafe {
-            let returned = (self.function)(packed_arguments.try_into()?);
+            let input = Box::into_raw(Box::new(packed_arguments.try_into()?));
+            let output = Box::from_raw((self.function)(input));
             
-            otr_ffi::cvalue_to_value(returned)
+            otr_ffi::value::cvalue_to_value(*output)
         }
     }
 
@@ -41,7 +44,7 @@ impl ExternalModule {
         Self { definition, bindings: VecMap::default() }
     }
 
-    pub fn insert_binding(&mut self, symbol_name: String, function: otr_ffi::ExternalFunctionPointer) -> Result<Option<RuntimeExternalFunction>> {
+    pub fn insert_binding(&mut self, symbol_name: String, function: otr_ffi::external::ExternalFunctionPointer) -> Result<Option<RuntimeExternalFunction>> {
         let definition = self.definition
             .functions
             .get(&symbol_name)

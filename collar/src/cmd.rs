@@ -58,6 +58,7 @@ pub fn run_project(root: &Path) -> Result<()> {
     let output = Command::new(otrrun_bin_path)
         .arg("project")
         .arg("--path").arg("./compiled")
+        .arg("--globals").arg(get_globals_path()?)
         .stdout(Stdio::inherit())
         .output()
         .map_err(

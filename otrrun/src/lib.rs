@@ -1,8 +1,13 @@
-use std::{collections::HashSet, env, fs, path::{Path, PathBuf}};
+use std::{cell::RefCell, collections::HashSet, env, fs, path::{Path, PathBuf}};
 
+use libloading::Library;
 use otr_config::{Features, GlobalConfiguration};
 use otr_core::{Result, SystemError, module::{CompiledModule, ImportAddress}};
 use otr_runtime::{EnvironmentBuilder, RuntimeObject, environment::Environment, external::ExternalModule};
+
+thread_local! {
+    static loaded_libraries: RefCell<Vec<Library>> = RefCell::new(Vec::new());
+}
 
 pub enum Module {
     Compiled(CompiledModule),
@@ -184,10 +189,18 @@ fn read_external_module(root_file_path: &Path, address: ImportAddress, global_co
         binded_module.insert_binding(symbol.0, *function)?;
     }
 
+    loaded_libraries.with_borrow_mut(|libs| libs.push(library));
+
     Ok(binded_module)
 }
 
 fn resolve_library_path(root_file_path: &Path, address: ImportAddress, global_configuration: Option<&GlobalConfiguration>) -> Result<PathBuf> {
+
+    let extension = if cfg!(windows) {
+        "dll"
+    } else {
+        "so"
+    };
 
     if let Some(path) = &address.path {
         let mut path = path as &str;
@@ -208,12 +221,6 @@ fn resolve_library_path(root_file_path: &Path, address: ImportAddress, global_co
                 .try_resolve_root(root).ok_or(
                     SystemError::new(format!("Could not find root for '{root}'")).boxed()
                 )?;
-            
-            let extension = if cfg!(windows) {
-                "dll"
-            } else {
-                "so"
-            };
 
             return Ok(root.join(path).join(address.module_id).with_extension(extension))
         }
@@ -222,5 +229,5 @@ fn resolve_library_path(root_file_path: &Path, address: ImportAddress, global_co
     Ok(root_file_path
         .join(address.path.as_ref().map(|r| r as &str).unwrap_or(""))
         .join(address.module_id)
-        .with_extension("otr"))
+        .with_extension(extension))
 }

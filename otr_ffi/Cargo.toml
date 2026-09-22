@@ -7,7 +7,7 @@ edition.workspace = true
 rust-version.workspace = true
 
 [lib]
-crate-type = ["dylib"]
+crate-type = ["rlib", "dylib", "staticlib"]
 
 [dependencies]
 otr_core = { workspace = true }
